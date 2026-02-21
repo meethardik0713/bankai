@@ -51,18 +51,11 @@ def detect_type(desc):
     return ''
 
 def detect_bank(lines):
-    print("=== FIRST 15 LINES ===")
-    for l in lines[:15]:
-        print(repr(l))
-    print("======================")
     for line in lines[:50]:
         if is_canara_date(line):
-            print("BANK: canara")
             return 'canara'
         if is_kotak_date(line):
-            print("BANK: kotak")
             return 'kotak'
-    print("BANK: generic")
     return 'generic'
 
 def parse_canara(lines):
@@ -117,15 +110,21 @@ def parse_kotak(lines):
                 amounts_found.append(float(lines[i].replace(',', '')))
                 i += 1
             desc = ' '.join(desc_parts)
-            print(f"KOTAK | DATE: {date} | AMOUNTS: {amounts_found} | DESC: {desc[:50]}")
             amount = None
             balance = None
+            txn_type = ''
             if len(amounts_found) == 2:
                 amount = amounts_found[0]
                 balance = amounts_found[1]
+                # Balance badhа = CR, ghata = DR
+                prev_balance = balance - amount
+                if balance > prev_balance:
+                    txn_type = 'CR'
+                else:
+                    txn_type = 'DR'
             elif len(amounts_found) == 1:
                 amount = amounts_found[0]
-            txn_type = detect_type(desc)
+                txn_type = detect_type(desc)
             transactions.append({'date': date, 'desc': desc, 'amount': amount, 'balance': balance, 'type': txn_type})
         else:
             i += 1
@@ -211,3 +210,4 @@ def export():
 
 if __name__ == '__main__':
     app.run(debug=True)
+    
