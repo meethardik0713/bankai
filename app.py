@@ -38,8 +38,8 @@ def detect_type(desc):
         return 'DR'
     if 'UPI/CR/' in desc_upper or 'NEFT/CR/' in desc_upper or 'IMPS/CR/' in desc_upper:
         return 'CR'
-    cr_keywords = ['CREDIT', 'SALARY', 'DEPOSIT', 'REFUND', 'CASHBACK', 'INTEREST', 'INWARD', 'RECEIVED', 'BY CASH', 'BY CLG']
-    dr_keywords = ['DEBIT', 'WITHDRAWAL', 'SENT', 'PAYMENT', 'PURCHASE', 'ATM', 'TRANSFER TO']
+    cr_keywords = ['CREDIT', 'SALARY', 'DEPOSIT', 'REFUND', 'CASHBACK', 'INTEREST', 'INWARD', 'RECEIVED', 'BY CASH', 'BY CLG', 'PAYMENT FROM']
+    dr_keywords = ['DEBIT', 'WITHDRAWAL', 'SENT', 'PAYMENT', 'PURCHASE', 'ATM', 'TRANSFER TO', 'PAY TO', 'PAY VIA']
     for kw in cr_keywords:
         if kw in desc_upper:
             return 'CR'
@@ -116,11 +116,8 @@ def parse_kotak(lines):
             if len(amounts_found) == 2:
                 amount = amounts_found[0]
                 balance = amounts_found[1]
-                # Balance badhа = CR, ghata = DR
-                prev_balance = balance - amount
-                if balance > prev_balance:
-                    txn_type = 'CR'
-                else:
+                txn_type = detect_type(desc)
+                if txn_type == '':
                     txn_type = 'DR'
             elif len(amounts_found) == 1:
                 amount = amounts_found[0]
