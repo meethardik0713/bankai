@@ -186,6 +186,10 @@ def home():
                            amounts_count=amounts_count,
                            selected_filename=selected_filename)
 
+@app.route('/about')
+def about():
+    return render_template('about.html')
+
 @app.route('/export', methods=['POST'])
 def export():
     dates = request.form.getlist('dates')
