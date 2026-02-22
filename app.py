@@ -35,8 +35,7 @@ def extract_lines(pdf_path):
     return lines
 
 def is_amount_str(text):
-    t = str(text).strip().replace(',', '')
-    return bool(re.match(r'^\d+\.\d{2}$', t))
+    return bool(re.match(r'^[\d,]+\.\d{2}$', str(text).strip()))
 
 def clean_amount(text):
     if not text:
