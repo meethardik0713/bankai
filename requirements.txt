@@ -2,3 +2,4 @@ flask
 pymupdf
 openpyxl
 gunicorn
+pdfplumber

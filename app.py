@@ -10,10 +10,9 @@ from collections import defaultdict
 app = Flask(__name__)
 UPLOAD_FOLDER = 'uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024  # 10MB max
+app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# Rate limiting
 request_counts = defaultdict(list)
 RATE_LIMIT = 10
 RATE_WINDOW = 60
@@ -26,51 +25,59 @@ def is_rate_limited(ip):
     request_counts[ip].append(now)
     return False
 
-def extract_transactions(pdf_path):
+def extract_lines(pdf_path):
     doc = fitz.open(pdf_path)
     lines = []
     for page in doc:
-        text = page.get_text()
-        for line in text.split('\n'):
+        for line in page.get_text().split('\n'):
             if line.strip():
                 lines.append(line.strip())
     return lines
 
-def is_amount(text):
-    return bool(re.match(r'^[\d,]+\.\d{2}$', text.strip()))
+def is_amount_str(text):
+    t = str(text).strip().replace(',', '')
+    return bool(re.match(r'^\d+\.\d{2}$', t))
 
-def is_canara_date(text):
-    return bool(re.match(r'^\d{2}-\d{2}-\d{4}$', text.strip()))
+def clean_amount(text):
+    if not text:
+        return None
+    text = str(text).replace(',', '').replace('₹', '').replace(' ', '').strip()
+    if '.' not in text:
+        return None
+    try:
+        val = float(text)
+        return val if val >= 0 else None
+    except:
+        return None
 
-def is_kotak_date(text):
-    return bool(re.match(r'^\d{2}\s+\w{3}\s+\d{4}$', text.strip()))
-
-def is_row_number(text):
-    return bool(re.match(r'^\d{1,4}$', text.strip()))
-
-def detect_type(desc):
-    desc_upper = desc.upper()
-    if 'UPI/DR/' in desc_upper or 'NEFT/DR/' in desc_upper or 'IMPS/DR/' in desc_upper:
-        return 'DR'
-    if 'UPI/CR/' in desc_upper or 'NEFT/CR/' in desc_upper or 'IMPS/CR/' in desc_upper:
-        return 'CR'
-    cr_keywords = ['CREDIT', 'SALARY', 'DEPOSIT', 'REFUND', 'CASHBACK', 'INTEREST', 'INWARD', 'RECEIVED', 'BY CASH', 'BY CLG', 'PAYMENT FROM']
-    dr_keywords = ['DEBIT', 'WITHDRAWAL', 'SENT', 'PAYMENT', 'PURCHASE', 'ATM', 'TRANSFER TO', 'PAY TO', 'PAY VIA']
-    for kw in cr_keywords:
-        if kw in desc_upper:
-            return 'CR'
-    for kw in dr_keywords:
-        if kw in desc_upper:
-            return 'DR'
-    if 'UPI/' in desc_upper:
-        return 'DR'
-    return ''
+def detect_cr_dr_universal(transactions):
+    TOLERANCE = 0.50
+    for i, txn in enumerate(transactions):
+        prev_bal = transactions[i-1].get('balance') if i > 0 else None
+        curr_bal = txn.get('balance')
+        if prev_bal is None or curr_bal is None:
+            if not txn.get('type'):
+                txn['type'] = 'DR'
+            continue
+        diff = curr_bal - prev_bal
+        if diff > TOLERANCE:
+            txn['type'] = 'CR'
+        elif diff < -TOLERANCE:
+            txn['type'] = 'DR'
+        else:
+            txn['type'] = 'DR'
+    return transactions
 
 def detect_bank(lines):
-    for line in lines[:50]:
-        if is_canara_date(line):
+    full_text = ' '.join(lines).upper()  # puri file check karo
+    if 'HDFC' in full_text:
+        return 'hdfc'
+    if 'STATE BANK OF INDIA' in full_text:
+        return 'sbi'
+    for line in lines[:100]:
+        if re.match(r'^\d{2}-\d{2}-\d{4}$', line.strip()):
             return 'canara'
-        if is_kotak_date(line):
+        if re.match(r'^\d{2}\s+\w{3}\s+\d{4}$', line.strip()):
             return 'kotak'
     return 'generic'
 
@@ -78,19 +85,19 @@ def parse_canara(lines):
     transactions = []
     i = 0
     while i < len(lines):
-        if is_canara_date(lines[i]):
+        if re.match(r'^\d{2}-\d{2}-\d{4}$', lines[i]):
             date = lines[i]
             desc_parts = []
             i += 1
             while i < len(lines) and not lines[i].startswith('Chq:'):
-                if is_canara_date(lines[i]):
+                if re.match(r'^\d{2}-\d{2}-\d{4}$', lines[i]):
                     break
                 desc_parts.append(lines[i])
                 i += 1
             if i < len(lines) and lines[i].startswith('Chq:'):
                 i += 1
             amounts_found = []
-            while i < len(lines) and is_amount(lines[i]) and len(amounts_found) < 3:
+            while i < len(lines) and is_amount_str(lines[i]) and len(amounts_found) < 3:
                 amounts_found.append(float(lines[i].replace(',', '')))
                 i += 1
             desc = ' '.join(desc_parts)
@@ -101,8 +108,7 @@ def parse_canara(lines):
                 balance = amounts_found[1]
             elif len(amounts_found) == 1:
                 amount = amounts_found[0]
-            txn_type = detect_type(desc)
-            transactions.append({'date': date, 'desc': desc, 'amount': amount, 'balance': balance, 'type': txn_type})
+            transactions.append({'date': date, 'desc': desc, 'amount': amount, 'balance': balance, 'type': ''})
         else:
             i += 1
     return transactions
@@ -111,59 +117,187 @@ def parse_kotak(lines):
     transactions = []
     i = 0
     while i < len(lines):
-        if is_row_number(lines[i]) and i + 1 < len(lines) and is_kotak_date(lines[i+1]):
+        if re.match(r'^\d{1,4}$', lines[i]) and i+1 < len(lines) and re.match(r'^\d{2}\s+\w{3}\s+\d{4}$', lines[i+1]):
             i += 1
             date = lines[i]
             desc_parts = []
             i += 1
-            while i < len(lines) and not is_amount(lines[i]):
-                if is_row_number(lines[i]) and i + 1 < len(lines) and is_kotak_date(lines[i+1]):
+            while i < len(lines) and not is_amount_str(lines[i]):
+                if re.match(r'^\d{1,4}$', lines[i]) and i+1 < len(lines) and re.match(r'^\d{2}\s+\w{3}\s+\d{4}$', lines[i+1]):
                     break
                 desc_parts.append(lines[i])
                 i += 1
             amounts_found = []
-            while i < len(lines) and is_amount(lines[i]) and len(amounts_found) < 3:
+            while i < len(lines) and is_amount_str(lines[i]) and len(amounts_found) < 3:
                 amounts_found.append(float(lines[i].replace(',', '')))
                 i += 1
             desc = ' '.join(desc_parts)
             amount = None
             balance = None
-            txn_type = ''
             if len(amounts_found) == 2:
                 amount = amounts_found[0]
                 balance = amounts_found[1]
-                txn_type = detect_type(desc)
-                if txn_type == '':
-                    txn_type = 'DR'
             elif len(amounts_found) == 1:
                 amount = amounts_found[0]
-                txn_type = detect_type(desc)
-            transactions.append({'date': date, 'desc': desc, 'amount': amount, 'balance': balance, 'type': txn_type})
+            transactions.append({'date': date, 'desc': desc, 'amount': amount, 'balance': balance, 'type': ''})
+        else:
+            i += 1
+    return transactions
+
+def parse_hdfc(lines):
+    transactions = []
+    i = 0
+    while i < len(lines):
+        line = lines[i].strip()
+        if re.match(r'^\d{2}/\d{2}/\d{2}$', line):
+            date = line
+            i += 1
+            desc_parts = []
+            while i < len(lines):
+                l = lines[i].strip()
+                if re.match(r'^[A-Z0-9]{10,}$', l):
+                    i += 1
+                    continue
+                if re.match(r'^\d{2}/\d{2}/\d{2}$', l):
+                    i += 1
+                    continue
+                if is_amount_str(l):
+                    break
+                desc_parts.append(l)
+                i += 1
+            amounts_found = []
+            while i < len(lines) and is_amount_str(lines[i].strip()) and len(amounts_found) < 3:
+                amounts_found.append(float(lines[i].strip().replace(',', '')))
+                i += 1
+            desc = ' '.join(desc_parts).strip()
+            amount = None
+            balance = None
+            if len(amounts_found) == 2:
+                amount = amounts_found[0]
+                balance = amounts_found[1]
+            elif len(amounts_found) == 1:
+                balance = amounts_found[0]
+            if desc or amount or balance:
+                transactions.append({'date': date, 'desc': desc, 'amount': amount, 'balance': balance, 'type': ''})
+        else:
+            i += 1
+    return transactions
+
+def parse_sbi(lines):
+    transactions = []
+    i = 0
+    found_start = False
+    while i < len(lines):
+        if 'brought forward' in lines[i].lower():
+            i += 1
+            found_start = True
+            while i < len(lines) and is_amount_str(lines[i].strip()):
+                i += 1
+            break
+        i += 1
+    if not found_start:
+        i = 0
+        while i < len(lines):
+            if re.match(r'^\d{2}/\d{2}/\d{2}$', lines[i].strip()):
+                break
+            i += 1
+    while i < len(lines):
+        line = lines[i].strip()
+        if re.match(r'^\d{2}/\d{2}/\d{2}$', line):
+            date = line
+            i += 1
+            if i < len(lines) and re.match(r'^\d{2}/\d{2}/\d{2}$', lines[i].strip()):
+                i += 1
+            desc_parts = []
+            while i < len(lines):
+                l = lines[i].strip()
+                if re.match(r'^\d{2}/\d{2}/\d{2}$', l):
+                    break
+                if is_amount_str(l):
+                    break
+                if re.match(r'^\d{5,}$', l):
+                    i += 1
+                    continue
+                desc_parts.append(l)
+                i += 1
+            amounts_found = []
+            while i < len(lines) and is_amount_str(lines[i].strip()) and len(amounts_found) < 3:
+                amounts_found.append(float(lines[i].strip().replace(',', '')))
+                i += 1
+            desc = ' '.join(desc_parts).strip()
+            amount = None
+            balance = None
+            if len(amounts_found) == 3:
+                debit  = amounts_found[0]
+                credit = amounts_found[1]
+                balance = amounts_found[2]
+                amount = debit if debit > 0 else credit
+            elif len(amounts_found) == 2:
+                amount = amounts_found[0]
+                balance = amounts_found[1]
+            elif len(amounts_found) == 1:
+                balance = amounts_found[0]
+            if desc or amount or balance:
+                transactions.append({'date': date, 'desc': desc, 'amount': amount, 'balance': balance, 'type': ''})
         else:
             i += 1
     return transactions
 
 def parse_generic(lines):
     transactions = []
-    for line in lines:
-        amount = None
-        matches = re.findall(r'[\d,]+\.\d{2}', line)
-        if matches:
-            try:
-                amount = float(matches[-1].replace(',', ''))
-            except:
-                pass
-        transactions.append({'date': '', 'desc': line, 'amount': amount, 'balance': None, 'type': ''})
+    date_pattern = re.compile(
+        r'^\d{2}[-/]\d{2}[-/]\d{2,4}$|^\d{2}\s+\w{3}\s+\d{2,4}$|^\d{4}-\d{2}-\d{2}$'
+    )
+    i = 0
+    while i < len(lines):
+        line = lines[i].strip()
+        if date_pattern.match(line):
+            date = line
+            desc_parts = []
+            i += 1
+            while i < len(lines):
+                l = lines[i].strip()
+                if date_pattern.match(l):
+                    break
+                if is_amount_str(l):
+                    break
+                desc_parts.append(l)
+                i += 1
+            amounts_found = []
+            while i < len(lines) and is_amount_str(lines[i].strip()) and len(amounts_found) < 3:
+                amounts_found.append(float(lines[i].strip().replace(',', '')))
+                i += 1
+            desc = ' '.join(desc_parts).strip()
+            amount = None
+            balance = None
+            if len(amounts_found) == 2:
+                amount = amounts_found[0]
+                balance = amounts_found[1]
+            elif len(amounts_found) == 1:
+                amount = amounts_found[0]
+            if amount or balance:
+                transactions.append({'date': date, 'desc': desc, 'amount': amount, 'balance': balance, 'type': ''})
+        else:
+            i += 1
     return transactions
 
-def parse_transactions(lines):
+def parse_transactions(pdf_path):
+    lines = extract_lines(pdf_path)
     bank = detect_bank(lines)
+    print(f"DETECTED BANK: {bank}")
     if bank == 'canara':
-        return parse_canara(lines)
+        transactions = parse_canara(lines)
     elif bank == 'kotak':
-        return parse_kotak(lines)
+        transactions = parse_kotak(lines)
+    elif bank == 'hdfc':
+        transactions = parse_hdfc(lines)
+    elif bank == 'sbi':
+        transactions = parse_sbi(lines)
     else:
-        return parse_generic(lines)
+        transactions = parse_generic(lines)
+    print(f"TOTAL TRANSACTIONS: {len(transactions)}")
+    transactions = detect_cr_dr_universal(transactions)
+    return transactions
 
 @app.route('/', methods=['GET', 'POST'])
 def home():
@@ -184,10 +318,13 @@ def home():
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
             file.save(filepath)
             try:
-                all_lines = extract_transactions(filepath)
-                all_transactions = parse_transactions(all_lines)
+                all_transactions = parse_transactions(filepath)
                 if keyword:
-                    filtered = [t for t in all_transactions if keyword.lower() in t['desc'].lower() or keyword.lower() in t['date'].lower()]
+                    filtered = [t for t in all_transactions if 
+    keyword.lower() in t['desc'].lower() or 
+    keyword.lower() in t['date'].lower() or
+    keyword.replace(',','') in str(t['amount'] or '') or
+    keyword.replace(',','') in str(t['balance'] or '')]
                 else:
                     filtered = all_transactions
                 for t in filtered:
@@ -251,4 +388,3 @@ def file_too_large(e):
 
 if __name__ == '__main__':
     app.run(debug=True)
-    
