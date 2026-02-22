@@ -15,8 +15,8 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # Rate limiting
 request_counts = defaultdict(list)
-RATE_LIMIT = 10  # requests
-RATE_WINDOW = 60  # per 60 seconds
+RATE_LIMIT = 10
+RATE_WINDOW = 60
 
 def is_rate_limited(ip):
     now = time.time()
@@ -167,23 +167,18 @@ def parse_transactions(lines):
 
 @app.route('/', methods=['GET', 'POST'])
 def home():
-    # Rate limit check
     ip = request.remote_addr
     if request.method == 'POST' and is_rate_limited(ip):
         abort(429)
-
     transaction_data = []
     keyword = ''
     total = 0
     amounts_count = 0
     count = 0
     selected_filename = ''
-
     if request.method == 'POST' and 'pdf_file' in request.files:
-        keyword = request.form.get('keyword', '')[:100]  # Max 100 chars
+        keyword = request.form.get('keyword', '')[:100]
         file = request.files.get('pdf_file')
-
-        # Validate file
         if file and file.filename.endswith('.pdf') and len(file.filename) < 200:
             selected_filename = file.filename
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
@@ -202,10 +197,8 @@ def home():
                         amounts_count += 1
                 count = len(transaction_data)
             finally:
-                # DELETE file after processing — user data protected
                 if os.path.exists(filepath):
                     os.remove(filepath)
-
     return render_template('index.html',
                            transaction_data=transaction_data,
                            keyword=keyword,
@@ -217,6 +210,14 @@ def home():
 @app.route('/about')
 def about():
     return render_template('about.html')
+
+@app.route('/privacy')
+def privacy():
+    return render_template('privacy.html')
+
+@app.route('/terms')
+def terms():
+    return render_template('terms.html')
 
 @app.route('/export', methods=['POST'])
 def export():

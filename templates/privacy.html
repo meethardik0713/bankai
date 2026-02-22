@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Privacy Policy — AarogyamFin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #c9a84c;
+    --gold-light: #e8cc7a;
+    --bg: #060810;
+    --surface: rgba(255,255,255,0.03);
+    --border: rgba(201,168,76,0.15);
+    --text: #e8e4d9;
+    --muted: rgba(232,228,217,0.45);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; font-weight: 300; overflow-x: hidden; cursor: none; }
+  .cursor { position: fixed; width: 8px; height: 8px; background: var(--gold); border-radius: 50%; pointer-events: none; z-index: 9999; mix-blend-mode: difference; }
+  .cursor-ring { position: fixed; width: 36px; height: 36px; border: 1px solid rgba(201,168,76,0.4); border-radius: 50%; pointer-events: none; z-index: 9998; }
+  nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; padding: 28px 60px; display: flex; justify-content: space-between; align-items: center; background: linear-gradient(to bottom, rgba(6,8,16,0.95), transparent); }
+  .nav-logo { font-family: 'Cormorant Garamond', serif; font-size: 1.4rem; font-weight: 500; letter-spacing: 0.12em; color: var(--text); text-decoration: none; }
+  .nav-logo span { color: var(--gold); }
+  .nav-links { display: flex; gap: 40px; list-style: none; }
+  .nav-links a { font-size: 0.78rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); text-decoration: none; transition: color 0.3s; }
+  .nav-links a:hover { color: var(--gold); }
+  .nav-cta { font-size: 0.75rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold); border: 1px solid var(--border); padding: 10px 24px; text-decoration: none; transition: all 0.3s; background: rgba(201,168,76,0.04); }
+  .nav-cta:hover { background: rgba(201,168,76,0.1); }
+
+  .page-hero { padding: 160px 60px 60px; max-width: 860px; margin: 0 auto; }
+  .hero-tag { display: inline-block; font-size: 0.68rem; letter-spacing: 0.28em; text-transform: uppercase; color: var(--gold); border: 1px solid var(--border); padding: 7px 18px; margin-bottom: 32px; background: rgba(201,168,76,0.04); opacity: 0; animation: fadeUp 1s 0.3s forwards; }
+  .hero-headline { font-family: 'Cormorant Garamond', serif; font-size: clamp(2.5rem, 5vw, 4rem); font-weight: 300; line-height: 1.1; margin-bottom: 16px; opacity: 0; animation: fadeUp 1s 0.5s forwards; }
+  .hero-date { font-size: 0.78rem; color: var(--muted); letter-spacing: 0.1em; opacity: 0; animation: fadeUp 1s 0.7s forwards; }
+
+  .content { max-width: 860px; margin: 0 auto; padding: 0 60px 120px; }
+  .section { margin-bottom: 56px; padding: 40px; background: rgba(255,255,255,0.02); border: 1px solid var(--border); position: relative; overflow: hidden; }
+  .section::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, var(--gold), transparent); opacity: 0.5; }
+  .section h2 { font-family: 'Cormorant Garamond', serif; font-size: 1.5rem; font-weight: 400; color: var(--gold); margin-bottom: 20px; display: flex; align-items: center; gap: 12px; }
+  .section h2 span { font-size: 1.2rem; }
+  .section p { font-size: 0.9rem; line-height: 1.95; color: var(--muted); margin-bottom: 14px; }
+  .section p:last-child { margin-bottom: 0; }
+  .section p strong { color: var(--text); font-weight: 500; }
+  .highlight-box { background: rgba(201,168,76,0.06); border: 1px solid rgba(201,168,76,0.25); padding: 20px 24px; margin-top: 16px; }
+  .highlight-box p { color: var(--text); font-size: 0.88rem; }
+
+  footer { padding: 48px 60px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  .footer-logo { font-family: 'Cormorant Garamond', serif; font-size: 1.2rem; font-weight: 500; letter-spacing: 0.1em; }
+  .footer-logo span { color: var(--gold); }
+  .footer-copy { font-size: 0.75rem; color: var(--muted); }
+  .footer-links { display: flex; gap: 32px; list-style: none; }
+  .footer-links a { font-size: 0.72rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); text-decoration: none; transition: color 0.3s; }
+  .footer-links a:hover { color: var(--gold); }
+
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+  .reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.7s ease, transform 0.7s ease; }
+  .reveal.visible { opacity: 1; transform: translateY(0); }
+
+  @media (max-width: 768px) {
+    nav { padding: 20px 24px; } .nav-links { display: none; }
+    .page-hero, .content { padding-left: 24px; padding-right: 24px; }
+    .page-hero { padding-top: 120px; }
+    footer { flex-direction: column; gap: 24px; text-align: center; padding: 40px 24px; }
+    body { cursor: auto; } .cursor, .cursor-ring { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<nav>
+  <a href="/" class="nav-logo">Aarogyam<span>Fin</span></a>
+  <ul class="nav-links">
+    <li><a href="/#analyzer">Analyze</a></li>
+    <li><a href="/about">About</a></li>
+    <li><a href="/terms">Terms</a></li>
+  </ul>
+  <a href="/#analyzer" class="nav-cta">Analyze Statement</a>
+</nav>
+
+<div class="page-hero">
+  <div class="hero-tag">Legal</div>
+  <h1 class="hero-headline">Privacy Policy</h1>
+  <p class="hero-date">Last updated: February 2026</p>
+</div>
+
+<div class="content">
+
+  <div class="section reveal">
+    <h2><span>🔒</span> No Data Storage — Ever</h2>
+    <p>AarogyamFin is built on a simple principle: <strong>your financial data belongs to you, not us.</strong></p>
+    <p>When you upload a bank statement PDF, it is processed entirely in real-time and <strong>permanently deleted from our servers immediately after analysis.</strong> We do not retain, store, archive, or back up any uploaded files.</p>
+    <div class="highlight-box">
+      <p>✓ Your PDF is deleted within seconds of processing — guaranteed by our code, not just policy.</p>
+    </div>
+  </div>
+
+  <div class="section reveal">
+    <h2><span>📋</span> What We Collect</h2>
+    <p>We collect <strong>absolutely no personal information.</strong> There are no user accounts, no login requirements, and no registration process.</p>
+    <p>The only data temporarily processed is the PDF you upload — which is deleted immediately. Your keyword searches and results exist only in your browser session and are never logged or stored on our servers.</p>
+    <p>We do not use cookies, trackers, analytics SDKs, or any third-party data collection tools.</p>
+  </div>
+
+  <div class="section reveal">
+    <h2><span>🚫</span> What We Never Do</h2>
+    <p>We will <strong>never:</strong></p>
+    <p>— Sell, share, or transfer your data to any third party</p>
+    <p>— Use your financial data to train AI models</p>
+    <p>— Send you marketing emails or spam</p>
+    <p>— Store your transaction history anywhere</p>
+    <p>— Share information with advertisers or data brokers</p>
+  </div>
+
+  <div class="section reveal">
+    <h2><span>🔐</span> Security</h2>
+    <p>All data transmitted between your browser and our servers is protected by <strong>256-bit SSL encryption.</strong> Our servers are hosted on Railway's secure cloud infrastructure.</p>
+    <p>File uploads are limited to 10MB and only PDF files are accepted. Rate limiting is enforced to prevent abuse.</p>
+  </div>
+
+  <div class="section reveal">
+    <h2><span>👤</span> Age Restriction</h2>
+    <p>AarogyamFin is intended for users who are <strong>18 years of age or older.</strong> By using this tool, you confirm that you are at least 18 years old.</p>
+    <p>If you are under 18, please do not use this service.</p>
+  </div>
+
+  <div class="section reveal">
+    <h2><span>📝</span> Changes to This Policy</h2>
+    <p>We reserve the right to update this Privacy Policy at any time. Changes will be reflected on this page with an updated date. We encourage you to review this policy periodically.</p>
+    <p>Continued use of AarogyamFin after changes constitutes acceptance of the updated policy.</p>
+  </div>
+
+  <div class="section reveal">
+    <h2><span>📬</span> Contact</h2>
+    <p>Questions about this Privacy Policy? Reach us at <strong>aarogyamfin.com</strong> — we're committed to transparency and will respond promptly.</p>
+  </div>
+
+</div>
+
+<footer>
+  <div class="footer-logo">Aarogyam<span>Fin</span></div>
+  <p class="footer-copy">© 2026 AarogyamFin. All rights reserved.</p>
+  <ul class="footer-links">
+    <li><a href="/">Home</a></li>
+    <li><a href="/terms">Terms</a></li>
+    <li><a href="/about">About</a></li>
+  </ul>
+</footer>
+
+<script>
+const cursor = document.getElementById('cursor');
+const ring = document.getElementById('cursorRing');
+let mx = 0, my = 0, rx = 0, ry = 0;
+document.addEventListener('mousemove', e => {
+  mx = e.clientX; my = e.clientY;
+  cursor.style.left = mx - 4 + 'px'; cursor.style.top = my - 4 + 'px';
+});
+function animateRing() {
+  rx += (mx - rx) * 0.12; ry += (my - ry) * 0.12;
+  ring.style.left = rx - 18 + 'px'; ring.style.top = ry - 18 + 'px';
+  requestAnimationFrame(animateRing);
+}
+animateRing();
+const revealEls = document.querySelectorAll('.reveal');
+const observer = new IntersectionObserver(entries => {
+  entries.forEach((entry, i) => {
+    if (entry.isIntersecting) setTimeout(() => entry.target.classList.add('visible'), i * 100);
+  });
+}, { threshold: 0.1 });
+revealEls.forEach(el => observer.observe(el));
+</script>
+</body>
+</html>
