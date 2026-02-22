@@ -2,13 +2,29 @@ import fitz
 import os
 import re
 import openpyxl
-from flask import Flask, request, render_template, send_file
+import time
+from flask import Flask, request, render_template, send_file, abort
 from io import BytesIO
+from collections import defaultdict
 
 app = Flask(__name__)
 UPLOAD_FOLDER = 'uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024  # 10MB max
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+# Rate limiting
+request_counts = defaultdict(list)
+RATE_LIMIT = 10  # requests
+RATE_WINDOW = 60  # per 60 seconds
+
+def is_rate_limited(ip):
+    now = time.time()
+    request_counts[ip] = [t for t in request_counts[ip] if now - t < RATE_WINDOW]
+    if len(request_counts[ip]) >= RATE_LIMIT:
+        return True
+    request_counts[ip].append(now)
+    return False
 
 def extract_transactions(pdf_path):
     doc = fitz.open(pdf_path)
@@ -151,6 +167,11 @@ def parse_transactions(lines):
 
 @app.route('/', methods=['GET', 'POST'])
 def home():
+    # Rate limit check
+    ip = request.remote_addr
+    if request.method == 'POST' and is_rate_limited(ip):
+        abort(429)
+
     transaction_data = []
     keyword = ''
     total = 0
@@ -159,24 +180,31 @@ def home():
     selected_filename = ''
 
     if request.method == 'POST' and 'pdf_file' in request.files:
-        keyword = request.form.get('keyword', '')
+        keyword = request.form.get('keyword', '')[:100]  # Max 100 chars
         file = request.files.get('pdf_file')
-        if file and file.filename.endswith('.pdf'):
+
+        # Validate file
+        if file and file.filename.endswith('.pdf') and len(file.filename) < 200:
             selected_filename = file.filename
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
             file.save(filepath)
-            all_lines = extract_transactions(filepath)
-            all_transactions = parse_transactions(all_lines)
-            if keyword:
-                filtered = [t for t in all_transactions if keyword.lower() in t['desc'].lower() or keyword.lower() in t['date'].lower()]
-            else:
-                filtered = all_transactions
-            for t in filtered:
-                transaction_data.append(t)
-                if t['amount']:
-                    total += t['amount']
-                    amounts_count += 1
-            count = len(transaction_data)
+            try:
+                all_lines = extract_transactions(filepath)
+                all_transactions = parse_transactions(all_lines)
+                if keyword:
+                    filtered = [t for t in all_transactions if keyword.lower() in t['desc'].lower() or keyword.lower() in t['date'].lower()]
+                else:
+                    filtered = all_transactions
+                for t in filtered:
+                    transaction_data.append(t)
+                    if t['amount']:
+                        total += t['amount']
+                        amounts_count += 1
+                count = len(transaction_data)
+            finally:
+                # DELETE file after processing — user data protected
+                if os.path.exists(filepath):
+                    os.remove(filepath)
 
     return render_template('index.html',
                            transaction_data=transaction_data,
@@ -192,12 +220,15 @@ def about():
 
 @app.route('/export', methods=['POST'])
 def export():
+    ip = request.remote_addr
+    if is_rate_limited(ip):
+        abort(429)
     dates = request.form.getlist('dates')
     descs = request.form.getlist('descs')
     amounts = request.form.getlist('amounts')
     balances = request.form.getlist('balances')
     types = request.form.getlist('types')
-    keyword = request.form.get('keyword', '')
+    keyword = request.form.get('keyword', '')[:100]
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Transactions"
@@ -208,6 +239,14 @@ def export():
     wb.save(output)
     output.seek(0)
     return send_file(output, download_name=f'transactions_{keyword}.xlsx', as_attachment=True)
+
+@app.errorhandler(429)
+def too_many_requests(e):
+    return "Too many requests. Please wait a minute and try again.", 429
+
+@app.errorhandler(413)
+def file_too_large(e):
+    return "File too large. Maximum size is 10MB.", 413
 
 if __name__ == '__main__':
     app.run(debug=True)
