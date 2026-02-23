@@ -75,7 +75,6 @@
   .form-group { margin-bottom: 24px; }
   .form-label { display: block; font-size: 0.72rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; }
 
-  /* CUSTOM FILE UPLOAD */
   input[type="file"] { display: none; }
 
   .file-upload-wrapper { width: 100%; }
@@ -92,19 +91,20 @@
   .form-input:focus { border-color: rgba(201,168,76,0.4); }
   .form-input::placeholder { color: var(--muted); }
 
-  /* CLEAR ALL BUTTON */
   .form-actions { display: flex; gap: 12px; margin-top: 8px; }
   .submit-btn { flex: 1; padding: 18px; background: var(--gold); color: #060810; border: none; font-family: 'DM Sans', sans-serif; font-size: 0.82rem; font-weight: 500; letter-spacing: 0.2em; text-transform: uppercase; cursor: pointer; transition: opacity 0.3s; }
   .submit-btn:hover { opacity: 0.85; }
   .clear-btn { padding: 18px 24px; background: transparent; border: 1px solid rgba(248,113,113,0.3); color: #f87171; font-family: 'DM Sans', sans-serif; font-size: 0.75rem; font-weight: 500; letter-spacing: 0.15em; text-transform: uppercase; cursor: pointer; transition: all 0.3s; white-space: nowrap; }
   .clear-btn:hover { background: rgba(248,113,113,0.08); border-color: rgba(248,113,113,0.5); }
 
-  /* STATS */
-  .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; margin-bottom: 32px; }
-  .stat-box { background: rgba(255,255,255,0.02); border: 1px solid var(--border); padding: 28px 24px; text-align: center; }
-  .stat-number { font-family: 'Cormorant Garamond', serif; font-size: 2.8rem; font-weight: 300; color: var(--gold); line-height: 1; margin-bottom: 8px; }
-  .stat-total { font-family: 'DM Sans', sans-serif; font-size: 1.9rem; font-weight: 500; color: #4ade80; line-height: 1; margin-bottom: 8px; }
-  .stat-label { font-size: 0.68rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); }
+  /* STATS — now 4 columns */
+  .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; margin-bottom: 32px; }
+  .stat-box { background: rgba(255,255,255,0.02); border: 1px solid var(--border); padding: 28px 20px; text-align: center; }
+  .stat-number { font-family: 'Cormorant Garamond', serif; font-size: 2.4rem; font-weight: 300; color: var(--gold); line-height: 1; margin-bottom: 8px; }
+  .stat-total   { font-family: 'DM Sans', sans-serif; font-size: 1.5rem; font-weight: 500; color: var(--gold); line-height: 1; margin-bottom: 4px; }
+  .stat-credit  { font-family: 'DM Sans', sans-serif; font-size: 0.85rem; font-weight: 500; color: #4ade80; line-height: 1.4; }
+  .stat-debit   { font-family: 'DM Sans', sans-serif; font-size: 0.85rem; font-weight: 500; color: #f87171; line-height: 1.4; }
+  .stat-label { font-size: 0.68rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); margin-top: 8px; }
 
   .chart-box { background: rgba(255,255,255,0.02); border: 1px solid var(--border); padding: 32px; margin-bottom: 32px; }
   .chart-box h3 { font-family: 'Cormorant Garamond', serif; font-size: 1.2rem; font-weight: 400; margin-bottom: 24px; color: var(--text); }
@@ -125,7 +125,6 @@
   .date-col { color: var(--muted); white-space: nowrap; font-size: 0.8rem; }
   .balance-col { color: rgba(232,228,217,0.6); font-size: 0.85rem; }
 
-  /* CREDIT / DEBIT */
   .badge-credit { display: inline-flex; align-items: center; gap: 4px; background: rgba(74,222,128,0.1); border: 1px solid rgba(74,222,128,0.25); color: #4ade80; font-size: 0.62rem; letter-spacing: 0.12em; text-transform: uppercase; padding: 3px 8px; border-radius: 2px; font-weight: 500; white-space: nowrap; }
   .badge-debit { display: inline-flex; align-items: center; gap: 4px; background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.25); color: #f87171; font-size: 0.62rem; letter-spacing: 0.12em; text-transform: uppercase; padding: 3px 8px; border-radius: 2px; font-weight: 500; white-space: nowrap; }
   .badge-unknown { color: var(--muted); font-size: 0.8rem; }
@@ -191,9 +190,9 @@
     .steps-grid, .features-grid { grid-template-columns: 1fr; }
     .trust-inner { grid-template-columns: 1fr; gap: 40px; }
     .trust-badges { grid-template-columns: 1fr; }
-    .stats-row { grid-template-columns: 1fr; }
+    .stats-row { grid-template-columns: repeat(2, 1fr); }
     .stat-number { font-size: 2rem; }
-    .stat-total { font-size: 1.4rem; }
+    .stat-total { font-size: 1.2rem; }
     .upload-form { padding: 28px 20px; }
     .form-actions { flex-direction: column; }
     .results-box { overflow-x: auto; }
@@ -258,7 +257,7 @@
       <div class="form-group">
         <label class="form-label">Bank Statement PDF</label>
         <div class="file-upload-wrapper">
-          <div class="file-upload-btn" id="fileUploadBtn" onclick="document.getElementById('pdfInput').click()">
+          <div class="file-upload-btn {% if selected_filename %}has-file{% endif %}" id="fileUploadBtn">
             <svg class="file-upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
               <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
               <polyline points="14 2 14 8 20 8"/>
@@ -268,13 +267,10 @@
             <span class="file-name" id="fileName">
               {% if selected_filename %}{{ selected_filename }}{% else %}Click to choose PDF file{% endif %}
             </span>
-            <span class="file-delete-btn {% if selected_filename %}visible{% endif %}" id="fileDeleteBtn" onclick="clearAll(event)">✕</span>
+            <!-- FIX: stopPropagation prevents click bubbling to parent (which opens file picker) -->
+            <span class="file-delete-btn {% if selected_filename %}visible{% endif %}" id="fileDeleteBtn">✕</span>
           </div>
-          <input type="file" id="pdfInput" name="pdf_file" accept=".pdf" {% if not selected_filename %}required{% endif %}>
-          <!-- FIX 1: Store filename so it shows after analysis -->
-          {% if selected_filename %}
-          <input type="hidden" name="selected_filename" value="{{ selected_filename }}">
-          {% endif %}
+          <input type="file" id="pdfInput" name="pdf_file" accept=".pdf">
         </div>
       </div>
 
@@ -285,25 +281,40 @@
 
       <div class="form-actions">
         <button type="submit" class="submit-btn">⚡ Analyze Statement</button>
-        <button type="button" class="clear-btn" onclick="clearAll(event)">✕ Clear All</button>
+        <button type="button" class="clear-btn" id="clearAllBtn">✕ Clear All</button>
       </div>
     </form>
   </div>
 
   {% if transaction_data %}
+
+  <!-- ── STATS ROW: 4 boxes ── -->
   <div class="stats-row reveal">
+
+    <!-- Box 1: Transactions -->
     <div class="stat-box">
       <div class="stat-number">{{ count }}</div>
       <div class="stat-label">Transactions Found</div>
     </div>
+
+    <!-- Box 2: Total Turnover (debit + credit) -->
     <div class="stat-box">
-      <div class="stat-total">₹{{ "%.2f"|format(total) }}</div>
-      <div class="stat-label">Total Amount</div>
+      <div class="stat-total">₹{{ "{:,.0f}".format(total) }}</div>
+      <div class="stat-label">Total Turnover</div>
     </div>
+
+    <!-- Box 3: Total Credit -->
     <div class="stat-box">
-      <div class="stat-number">{{ amounts_count }}</div>
-      <div class="stat-label">Amounts Detected</div>
+      <div class="stat-credit">↑ ₹{{ "{:,.0f}".format(total_credit) }}</div>
+      <div class="stat-label">Total Credit</div>
     </div>
+
+    <!-- Box 4: Total Debit -->
+    <div class="stat-box">
+      <div class="stat-debit">↓ ₹{{ "{:,.0f}".format(total_debit) }}</div>
+      <div class="stat-label">Total Debit</div>
+    </div>
+
   </div>
 
   {% if amounts_count > 0 %}
@@ -318,11 +329,12 @@
       <h3>Results {% if keyword %}for "{{ keyword }}"{% endif %}</h3>
       <form method="POST" action="/export">
         {% for t in transaction_data %}
-        <input type="hidden" name="dates" value="{{ t.date }}">
-        <input type="hidden" name="descs" value="{{ t.desc }}">
-        <input type="hidden" name="amounts" value="{{ t.amount if t.amount else '' }}">
-        <input type="hidden" name="balances" value="{{ t.balance if t.balance else '' }}">
-        <input type="hidden" name="types" value="{{ t.type if t.type else '' }}">
+        <input type="hidden" name="dates"      value="{{ t.date }}">
+        <input type="hidden" name="descs"      value="{{ t.desc }}">
+        <input type="hidden" name="amounts"    value="{{ t.amount if t.amount else '' }}">
+        <input type="hidden" name="balances"   value="{{ t.balance if t.balance else '' }}">
+        <input type="hidden" name="types"      value="{{ t.type if t.type else '' }}">
+        <input type="hidden" name="categories" value="{{ t.category if t.category else '' }}">
         {% endfor %}
         <input type="hidden" name="keyword" value="{{ keyword }}">
         <button type="submit" class="export-btn">
@@ -455,11 +467,19 @@ function animateRing() {
 }
 animateRing();
 
-// FILE UPLOAD
-const pdfInput = document.getElementById('pdfInput');
-const fileBtn = document.getElementById('fileUploadBtn');
-const fileNameEl = document.getElementById('fileName');
-const deleteBtn = document.getElementById('fileDeleteBtn');
+// ── FILE UPLOAD ────────────────────────────────────────────
+const pdfInput    = document.getElementById('pdfInput');
+const fileBtn     = document.getElementById('fileUploadBtn');
+const fileNameEl  = document.getElementById('fileName');
+const deleteBtn   = document.getElementById('fileDeleteBtn');
+const clearAllBtn = document.getElementById('clearAllBtn');
+
+// Clicking the upload area opens file picker ONLY if no file is selected
+fileBtn.addEventListener('click', function(e) {
+  // If the ✕ button was clicked, do nothing here (it handles itself)
+  if (e.target === deleteBtn) return;
+  pdfInput.click();
+});
 
 pdfInput.addEventListener('change', function() {
   if (this.files && this.files[0]) {
@@ -469,24 +489,32 @@ pdfInput.addEventListener('change', function() {
   }
 });
 
-// FIX 1: Show file as selected if filename exists from backend
-{% if selected_filename %}
-fileBtn.classList.add('has-file');
-deleteBtn.classList.add('visible');
-{% endif %}
+// ── CLEAR FILE (✕ button next to filename) ────────────────
+// FIX 1: stopPropagation so click doesn't bubble to fileBtn and open picker
+// FIX 2: calls /clear to wipe server session, then redirects to /
+deleteBtn.addEventListener('click', function(e) {
+  e.stopPropagation();   // prevent parent div click (file picker)
+  e.preventDefault();
+  clearEverything();
+});
 
-// FIX 2: Clear All — clears file, keyword AND results
-function clearAll(e) {
-  if (e) e.stopPropagation();
-  // Reset file input
+// ── CLEAR ALL button ──────────────────────────────────────
+clearAllBtn.addEventListener('click', function(e) {
+  e.preventDefault();
+  clearEverything();
+});
+
+function clearEverything() {
+  // Reset local UI immediately
   pdfInput.value = '';
   fileNameEl.textContent = 'Click to choose PDF file';
   fileBtn.classList.remove('has-file');
   deleteBtn.classList.remove('visible');
-  // Reset keyword
   document.getElementById('keywordInput').value = '';
-  // Redirect to clean page (removes results)
-  window.location.href = '/';
+
+  // Tell the server to clear session cache, then go to fresh page
+  fetch('/clear', { method: 'POST' })
+    .finally(() => { window.location.href = '/'; });
 }
 
 // THREE.JS
