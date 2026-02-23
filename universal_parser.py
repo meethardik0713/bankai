@@ -1,24 +1,9 @@
 """
 Universal Bank Statement Parser
 ─────────────────────────────────
-Tuned from Kotak Mahindra Bank statement debug output.
-
-Key fixes applied:
-  1. Skip merged title rows (e.g. "Savings Account Transactions")
-  2. Handle null cells from pdfplumber
-  3. Clean \\n inside cells before any processing
-  4. Skip repeated header rows on every page
-  5. Skip reference column (Chq/Ref. No.) correctly
-  6. Handle Value Date noise in descriptions
-  7. Fixed de-duplication — use full desc + balance as key
-
-Bug fixes (Phase 1):
-  B1. _find_amts: len==2 now correctly returns both debit AND credit
-  B2. _looks_like_ref: regex fixed to match UPI-/NEFT- prefixed refs
-  B3. Date normalized to YYYY-MM-DD in dedup key (prevents false dupes)
-  B4. _parse_row: opening-balance skip narrowed — only drops '-' index,
-      not blank index, so banks without row numbers still parse
-  B5. 'reference' added to output dict (was extracted but thrown away)
+Supports:
+  - Kotak Mahindra Bank (table-based, indexed rows)
+  - Canara Bank ePassbook (raw text, no table borders)
 """
 
 import re
@@ -32,43 +17,29 @@ from collections import Counter
 # ═══════════════════════════════════════════════════════════
 
 _DATE_PATTERNS = [
-    # DD Mon YYYY  ← Kotak primary format e.g. "03 Apr 2025"
     (re.compile(r'\b(\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4})\b'),
      ['%d %b %Y', '%d %B %Y']),
-
-    # DD Mon YY
     (re.compile(r'\b(\d{1,2}\s+[A-Za-z]{3,9}\s+\d{2})\b'),
      ['%d %b %y', '%d %B %y']),
-
-    # DDMonYYYY  e.g. "03Apr2025"
     (re.compile(r'\b(\d{2}[A-Za-z]{3}\d{4})\b'),
      ['%d%b%Y']),
-
-    # DDMonYY
     (re.compile(r'\b(\d{2}[A-Za-z]{3}\d{2})\b'),
      ['%d%b%y']),
-
-    # DD/MM/YYYY  DD-MM-YYYY  DD.MM.YYYY
     (re.compile(r'\b(\d{1,2}[/\-\.]\d{1,2}[/\-\.]\d{4})\b'),
      ['%d/%m/%Y', '%d-%m-%Y', '%d.%m.%Y', '%m/%d/%Y']),
-
-    # DD/MM/YY
     (re.compile(r'\b(\d{1,2}[/\-\.]\d{1,2}[/\-\.]\d{2})\b'),
      ['%d/%m/%y', '%d-%m-%y', '%d.%m.%y']),
-
-    # YYYY-MM-DD
     (re.compile(r'\b(\d{4}[/\-\.]\d{1,2}[/\-\.]\d{1,2})\b'),
      ['%Y-%m-%d', '%Y/%m/%d']),
 ]
 
-_RE_VALUE_DATE  = re.compile(
-    r'\(?\s*[Vv]alue\s+[Dd]ate\s*:\s*[\d\-/\.]+\s*\)?'
-)
+_RE_VALUE_DATE  = re.compile(r'\(?\s*[Vv]alue\s+[Dd]ate\s*:\s*[\d\-/\.]+\s*\)?')
 _RE_AMOUNT_JUNK = re.compile(r'[₹$€£,\s]')
 _RE_DR_CR_TAG   = re.compile(r'\s*(dr|cr|DR|CR|Dr|Cr)\.?\s*$')
 _RE_MULTI_SPACE = re.compile(r'\s{2,}')
 _RE_WHITESPACE  = re.compile(r'\s+')
 _RE_PARENS_NUM  = re.compile(r'^\(([0-9.,]+)\)$')
+_RE_CHQ_SUFFIX  = re.compile(r'\s*Chq\s*[:.]?\s*[\dA-Za-z]*\s*$', re.IGNORECASE)
 
 # ═══════════════════════════════════════════════════════════
 #  COLUMN KEYWORDS
@@ -130,9 +101,11 @@ _TITLE_PHRASES = [
     'statement of account',
 ]
 
-_HEADER_MARKER_CELLS = {'date', 'description', 'narration',
-                        'particulars', 'withdrawal', 'deposit',
-                        'balance', 'debit', 'credit'}
+_HEADER_MARKER_CELLS = {
+    'date', 'description', 'narration',
+    'particulars', 'withdrawal', 'deposit',
+    'balance', 'debit', 'credit',
+}
 
 _CATEGORY_MAP = {
     'UPI':           ['upi/', 'upi-', 'phonepe', 'gpay', 'google pay',
@@ -146,7 +119,8 @@ _CATEGORY_MAP = {
                       'branch internat', 'truecredit', 'lazypay',
                       'snapmint', 'emi', 'loan'],
     'POS':           ['pos ', 'point of sale', 'pci/'],
-    'Interest':      ['interest', 'int.pd', 'int pd', 'int cr', 'int.pd:'],
+    'Interest':      ['interest', 'int.pd', 'int pd', 'int cr',
+                      'int.pd:', 'sbint'],
     'Charges':       ['charges', 'fee', 'commission', 'gst',
                       'service charge', 'sms alert', 'annual fee', 'chrg:'],
     'Transfer':      ['transfer', 'trf ', 'fund transfer',
@@ -158,7 +132,7 @@ _CATEGORY_MAP = {
     'Shopping':      ['amazon', 'flipkart', 'myntra', 'meesho', 'ekart',
                       'westside', 'snitch', 'zudio'],
     'Entertainment': ['netflix', 'spotify', 'zee5', 'jiohotstar',
-                      'google play', 'steam', 'valve'],
+                      'google play', 'steam', 'valve', 'bookmyshow'],
     'Travel':        ['aeronfly', 'irctc', 'makemytrip', 'redbus'],
 }
 
@@ -170,29 +144,30 @@ _CATEGORY_MAP = {
 def parse_transactions(pdf_path: str) -> list:
     start = time.time()
     try:
-        pages = _extract_pdf(pdf_path)
-        if not pages:
-            print("[parser] No content extracted from PDF")
-            return []
+        bank = _detect_bank(pdf_path)
+        print(f"[parser] Detected bank: {bank}")
 
-        print(f"[parser] Pages extracted: {len(pages)}")
+        if bank == 'canara':
+            transactions = _parse_canara(pdf_path)
+        else:
+            pages = _extract_pdf(pdf_path)
+            if not pages:
+                print("[parser] No content extracted from PDF")
+                return []
+            print(f"[parser] Pages extracted: {len(pages)}")
+            col_map, hdr_row, hdr_page = _detect_columns(pages)
+            print(f"[parser] col_map  : {col_map}")
+            print(f"[parser] hdr_row  : {hdr_row}  hdr_page: {hdr_page}")
+            if not col_map:
+                print("[parser] Column detection failed")
+                return []
+            raw = _extract_rows(pages, col_map, hdr_row, hdr_page)
+            print(f"[parser] Raw transactions: {len(raw)}")
+            if not raw:
+                return []
+            transactions = _normalize(raw)
 
-        col_map, hdr_row, hdr_page = _detect_columns(pages)
-        print(f"[parser] col_map  : {col_map}")
-        print(f"[parser] hdr_row  : {hdr_row}  hdr_page: {hdr_page}")
-
-        if not col_map:
-            print("[parser] Column detection failed")
-            return []
-
-        raw = _extract_rows(pages, col_map, hdr_row, hdr_page)
-        print(f"[parser] Raw transactions: {len(raw)}")
-        if not raw:
-            return []
-
-        transactions = _normalize(raw)
-        print(f"[parser] Final transactions: {len(transactions)}"
-              f"  ({time.time()-start:.2f}s)")
+        print(f"[parser] Final transactions: {len(transactions)}  ({time.time()-start:.2f}s)")
         return transactions
 
     except Exception as e:
@@ -203,15 +178,190 @@ def parse_transactions(pdf_path: str) -> list:
 
 
 # ═══════════════════════════════════════════════════════════
-#  STAGE 1 — PDF EXTRACTION
+#  BANK DETECTION
+# ═══════════════════════════════════════════════════════════
+
+def _detect_bank(pdf_path: str) -> str:
+    try:
+        with pdfplumber.open(pdf_path) as pdf:
+            if not pdf.pages:
+                return 'generic'
+            text = pdf.pages[0].extract_text() or ''
+            text_low = text.lower()
+
+            if any(k in text_low for k in [
+                'canara bank', 'cnrb', 'canara aspire',
+                'canara savings', 'canarabank'
+            ]):
+                return 'canara'
+
+            if any(k in text_low for k in [
+                'kotak', 'kotak mahindra', '811'
+            ]):
+                return 'kotak'
+
+    except Exception:
+        pass
+    return 'generic'
+
+
+# ═══════════════════════════════════════════════════════════
+#  CANARA BANK PARSER  (raw text based)
+# ═══════════════════════════════════════════════════════════
+
+def _parse_canara(pdf_path: str) -> list:
+    raw_txns = []
+
+    try:
+        with pdfplumber.open(pdf_path) as pdf:
+            for pg_num, page in enumerate(pdf.pages):
+                text  = page.extract_text() or ''
+                lines = [l.strip() for l in text.splitlines()]
+
+                # Reset narration buffer on every new page
+                # so page headers don't bleed into transactions
+                narration_buf = []
+
+                for line in lines:
+                    if not line:
+                        continue
+
+                    if _canara_skip_line(line):
+                        continue
+
+                    txn = _canara_parse_txn_line(line)
+                    if txn:
+                        txn['desc'] = _canara_clean_desc(
+                            ' '.join(narration_buf)
+                        )
+                        narration_buf = []
+                        raw_txns.append(txn)
+                        continue
+
+                    if re.match(r'^Chq\s*:', line, re.IGNORECASE):
+                        continue
+
+                    narration_buf.append(line)
+
+    except Exception as e:
+        import traceback
+        print(f"[canara] Fatal: {e}")
+        traceback.print_exc()
+
+    print(f"[canara] Raw transactions: {len(raw_txns)}")
+    return _normalize(raw_txns)
+
+
+def _canara_skip_line(line: str) -> bool:
+    lo = line.lower().strip()
+
+    # Column header row
+    if re.match(r'^date\s+particulars\s+deposits\s+withdrawals\s+balance', lo):
+        return True
+
+    # Page number lines e.g. "page 6", "Page 6 of 68"
+    if re.match(r'^page\s+\d+', lo):
+        return True
+
+    # Skip phrases
+    if any(p in lo for p in _SKIP_PHRASES):
+        return True
+
+    # Account/branch info lines
+    if any(lo.startswith(p) for p in [
+        'statement for', 'branch code', 'customer id', 'branch name',
+        'phone', 'product code', 'product name', 'address',
+        'ifsc code', 'name ', 'a/c ', 'account no',
+    ]):
+        return True
+
+    # Address continuation lines — city/state/pincode junk
+    # e.g. "VIHAR", "SIDDHARTHAM SIDDHARTH VIHAR GHAZIABAD"
+    # "UTTAR PRADESH IN 201009"
+    # These appear only on page 1 before first transaction
+    # Pattern: pure text OR text+pincode, no UPI/NEFT/amount
+    # Address continuation lines — only skip if they look like
+    # city/state/pincode AND are short (under 25 chars)
+    # e.g. "VIHAR", "UTTAR PRADESH IN 201009"
+    # BUT not "SAHNEWAL", "GAGANDEEP" etc which are narration
+    _address_fragments = [
+        'ghaziabad', 'uttar pradesh', 'delhi', 'noida',
+        'gurugram', 'faridabad', 'mumbai', 'bangalore',
+        'siddharth vihar', 'siddhartham', 'gaur ',
+        'tower ', 'sector-', 'plot no', ' in 2010',
+        'vihar ',
+    ]
+    if any(frag in lo for frag in _address_fragments):
+        return True
+
+    return False
+
+ 
+
+
+def _canara_parse_txn_line(line: str) -> dict:
+    # Must start with DD-MM-YYYY
+    date_match = re.match(r'^(\d{1,2}-\d{2}-\d{4})\s+(.*)', line)
+    if not date_match:
+        return None
+
+    date_str  = date_match.group(1)
+    remainder = date_match.group(2).strip()
+
+    # Find all numbers (including negative) in remainder
+    nums = re.findall(r'-?[\d,]+\.\d{2}', remainder)
+    if len(nums) < 2:
+        return None
+
+    amt_raw = nums[-2]   # second to last = withdrawal or deposit
+    bal_raw = nums[-1]   # last = running balance
+
+    amt     = _parse_amt(amt_raw)
+    balance = _parse_amt(bal_raw)
+
+    if amt == 0:
+        return None
+
+    raw_signed = amt_raw.replace(',', '').strip()
+    try:
+        signed_val = float(raw_signed)
+    except ValueError:
+        signed_val = amt
+
+    if signed_val < 0:
+        typ = 'CR'
+        amt = abs(signed_val)
+    else:
+        typ = 'DR'
+
+    date_parsed = _try_date(date_str)
+    if not date_parsed:
+        return None
+
+    return {
+        'date':      date_parsed,
+        'desc':      '',
+        'amount':    round(amt, 2),
+        'balance':   round(balance, 2),
+        'type':      typ,
+        'reference': '',
+    }
+
+
+def _canara_clean_desc(desc: str) -> str:
+    desc = _RE_VALUE_DATE.sub('', desc)
+    desc = _RE_CHQ_SUFFIX.sub('', desc)
+    desc = re.sub(r'\b\d{2}:\d{2}:\d{2}\b', '', desc)
+    desc = re.sub(r'\b[A-Fa-f0-9]{16,}\b', '', desc)
+    desc = _RE_WHITESPACE.sub(' ', desc).strip()
+    return desc
+
+
+# ═══════════════════════════════════════════════════════════
+#  STAGE 1 — PDF EXTRACTION  (Kotak / generic)
 # ═══════════════════════════════════════════════════════════
 
 def _extract_pdf(pdf_path: str) -> list:
-    """
-    Single-pass extraction: open PDF once, extract table rows AND raw text
-    per page in the same loop. This avoids re-opening and re-reading the PDF
-    a second time for footer row recovery, cutting parse time roughly in half.
-    """
     try:
         pdf = pdfplumber.open(pdf_path)
     except Exception as e:
@@ -223,7 +373,6 @@ def _extract_pdf(pdf_path: str) -> list:
     seen_indices  = set()
 
     for pg_num, page in enumerate(pdf.pages):
-        # Grab raw text NOW while page is already loaded in memory
         try:
             page_text = page.extract_text() or ''
         except Exception:
@@ -241,12 +390,13 @@ def _extract_pdf(pdf_path: str) -> list:
                 if idx.isdigit():
                     seen_indices.add(int(idx))
 
-            # Pass pre-fetched text so _recover_footer_rows doesn't re-read
             extra = _recover_footer_rows_from_text(page_text, seen_indices)
             if extra:
                 print(f"[parser] Recovered {len(extra)} footer rows on page {pg_num+1}")
                 all_pages[-1].extend(extra)
-                all_pages[-1].sort(key=lambda r: int(r[0]) if r and str(r[0]).strip().isdigit() else 0)
+                all_pages[-1].sort(
+                    key=lambda r: int(r[0]) if r and str(r[0]).strip().isdigit() else 0
+                )
                 for row in extra:
                     idx = str(row[0]).strip() if row and row[0] else ''
                     if idx.isdigit():
@@ -256,33 +406,14 @@ def _extract_pdf(pdf_path: str) -> list:
     return all_pages
 
 
-def _recover_footer_rows(page, seen_indices: set) -> list:
-    """Legacy wrapper — prefer _recover_footer_rows_from_text for speed."""
-    try:
-        text = page.extract_text() or ''
-    except Exception:
-        text = ''
-    return _recover_footer_rows_from_text(text, seen_indices)
-
-
 def _recover_footer_rows_from_text(text: str, seen_indices: set) -> list:
-    """
-    Parse raw text lines to recover transaction rows that pdfplumber table
-    extractor missed (they fall below the detected table boundary at page bottom).
-    Only recovers rows whose numeric index is NOT already in seen_indices.
-    Accepts pre-fetched text string to avoid re-reading the page from disk.
-    """
     try:
         lines = text.splitlines()
     except Exception:
         return []
 
-    # Matches: <index> <DD Mon YYYY> <rest of line>
-    _RE_TXN_START = re.compile(
-        r'^(\d+)\s+(\d{1,2}\s+[A-Za-z]{3}\s+\d{4})\s+(.+)$'
-    )
-    # Amount: comma-separated digits with 2 decimal places
-    _RE_AMOUNT = re.compile(r'[\d,]+\.\d{2}')
+    _RE_TXN_START = re.compile(r'^(\d+)\s+(\d{1,2}\s+[A-Za-z]{3}\s+\d{4})\s+(.+)$')
+    _RE_AMOUNT    = re.compile(r'[\d,]+\.\d{2}')
 
     recovered = []
     pending   = None
@@ -291,7 +422,6 @@ def _recover_footer_rows_from_text(text: str, seen_indices: set) -> list:
         line = line.strip()
         if not line:
             continue
-        # Skip page footer/header noise
         if re.search(r'page\s+\d+\s+of\s+\d+', line, re.I):
             continue
         if re.search(r'statement generated|account no|account statement', line, re.I):
@@ -301,23 +431,18 @@ def _recover_footer_rows_from_text(text: str, seen_indices: set) -> list:
         if m:
             idx = int(m.group(1))
             if idx not in seen_indices:
-                # Save previous pending row
                 if pending:
                     recovered.append(_build_recovered_row(pending, _RE_AMOUNT))
-
                 pending = {
                     'idx':  str(idx),
                     'date': m.group(2),
                     'rest': m.group(3),
                 }
             else:
-                # This index is already captured — flush any pending and stop
                 if pending:
                     recovered.append(_build_recovered_row(pending, _RE_AMOUNT))
                     pending = None
         elif pending:
-            # Continuation line for current pending row
-            # Stop if line starts with a new valid transaction
             if not re.match(r'^\d+\s+\d{1,2}\s+[A-Za-z]{3}\s+\d{4}', line):
                 pending['rest'] = pending['rest'] + ' ' + line
 
@@ -328,43 +453,31 @@ def _recover_footer_rows_from_text(text: str, seen_indices: set) -> list:
 
 
 def _build_recovered_row(pending: dict, re_amount) -> list:
-    """
-    From a pending dict {idx, date, rest}, extract amounts and build
-    a 7-column row: [idx, date, desc, ref, withdrawal, deposit, balance]
-
-    The 'rest' string looks like:
-      "UPI/SOMEONE/123/UPI UPI-987654321 500.00 1,234.56"
-    Last amount = balance, second-to-last = debit or credit (need sign from context).
-    We can't determine DR/CR from text alone, so we put the non-balance amount
-    in withdrawal column and leave deposit empty; _normalize() will correct via balance diff.
-    """
-    rest   = pending['rest'].strip()
+    rest    = pending['rest'].strip()
     amounts = re_amount.findall(rest)
 
     balance    = ''
     withdrawal = ''
-    deposit    = ''
 
     if len(amounts) >= 2:
         balance    = amounts[-1]
-        withdrawal = amounts[-2]   # may be corrected to deposit by _normalize()
+        withdrawal = amounts[-2]
     elif len(amounts) == 1:
         balance = amounts[0]
 
-    # Description: everything before the first amount (or the whole rest)
     if amounts:
         first_amt_pos = rest.find(amounts[0])
-        desc_part = rest[:first_amt_pos].strip()
+        desc_part     = rest[:first_amt_pos].strip()
     else:
         desc_part = rest
 
-    # Try to pull reference number from desc_part (last token that looks like a ref)
-    ref = ''
+    ref    = ''
     tokens = desc_part.split()
     if tokens:
         last = tokens[-1]
-        if re.match(r'^[A-Z0-9]{2,12}[-/]\d{5,}$', last) or re.match(r'^[A-Z]{2,10}\d{6,}$', last):
-            ref = last
+        if (re.match(r'^[A-Z0-9]{2,12}[-/]\d{5,}$', last)
+                or re.match(r'^[A-Z]{2,10}\d{6,}$', last)):
+            ref       = last
             desc_part = ' '.join(tokens[:-1])
 
     return [
@@ -373,7 +486,7 @@ def _build_recovered_row(pending: dict, re_amount) -> list:
         desc_part.strip(),
         ref,
         withdrawal,
-        deposit,
+        '',
         balance,
     ]
 
@@ -437,16 +550,14 @@ def _try_words(page) -> list:
             lines.setdefault(y, []).append(w)
         rows = []
         for y in sorted(lines):
-            lw = sorted(lines[y], key=lambda w: w['x0'])
+            lw     = sorted(lines[y], key=lambda w: w['x0'])
             merged = []
             for w in lw:
                 if merged and (w['x0'] - merged[-1]['x1']) < 15:
                     merged[-1]['text'] += ' ' + w['text']
                     merged[-1]['x1']    = w['x1']
                 else:
-                    merged.append({'text': w['text'],
-                                   'x0':   w['x0'],
-                                   'x1':   w['x1']})
+                    merged.append({'text': w['text'], 'x0': w['x0'], 'x1': w['x1']})
             cells = [m['text'].strip() for m in merged if m['text'].strip()]
             if cells:
                 rows.append(cells)
@@ -460,11 +571,10 @@ def _try_lines(page) -> list:
         text = page.extract_text() or ''
         rows = []
         for line in text.split('\n'):
-            line = line.strip()
+            line  = line.strip()
             if not line:
                 continue
-            cells = [c.strip()
-                     for c in _RE_MULTI_SPACE.split(line) if c.strip()]
+            cells = [c.strip() for c in _RE_MULTI_SPACE.split(line) if c.strip()]
             if cells:
                 rows.append(cells)
         return rows
@@ -480,20 +590,17 @@ def _clean_table(table: list) -> list:
             if cell is None:
                 cleaned.append('')
             else:
-                cleaned.append(
-                    str(cell).replace('\n', ' ').replace('\r', '').strip()
-                )
+                cleaned.append(str(cell).replace('\n', ' ').replace('\r', '').strip())
         out.append(cleaned)
     return out
 
 
 def _good_rows(rows: list) -> int:
-    return sum(1 for r in rows
-               if sum(1 for c in r if str(c).strip()) >= 3)
+    return sum(1 for r in rows if sum(1 for c in r if str(c).strip()) >= 3)
 
 
 # ═══════════════════════════════════════════════════════════
-#  STAGE 2 — COLUMN DETECTION
+#  STAGE 2 — COLUMN DETECTION  (Kotak / generic)
 # ═══════════════════════════════════════════════════════════
 
 def _detect_columns(pages: list) -> tuple:
@@ -501,9 +608,6 @@ def _detect_columns(pages: list) -> tuple:
         for row_idx, row in enumerate(page):
             if _is_title_row(row):
                 continue
-            # NOTE: do NOT skip _is_header_row_repeat here —
-            # the very first header IS a "header row repeat" by definition.
-            # We detect it via _match_header scoring instead.
             cmap = _match_header(row)
             if cmap and _valid_map(cmap):
                 print(f"[parser] Header pg={pg_idx} row={row_idx}: {row}")
@@ -514,8 +618,7 @@ def _detect_columns(pages: list) -> tuple:
             merged = _merge_rows(page[row_idx], page[row_idx + 1])
             cmap   = _match_header(merged)
             if cmap and _valid_map(cmap):
-                print(f"[parser] Merged header pg={pg_idx} "
-                      f"rows={row_idx}-{row_idx+1}")
+                print(f"[parser] Merged header pg={pg_idx} rows={row_idx}-{row_idx+1}")
                 return cmap, row_idx + 1, pg_idx
 
     print("[parser] No header — inferring columns")
@@ -562,8 +665,9 @@ def _match_header(row: list) -> dict:
             cmap.setdefault('_index', idx)
             continue
 
-        norm = _norm(raw)
-        best_role, best_score = None, 0
+        norm           = _norm(raw)
+        best_role      = None
+        best_score     = 0
 
         for role, keywords in _COL_KEYWORDS.items():
             for kw in keywords:
@@ -587,15 +691,19 @@ def _match_header(row: list) -> dict:
 
 
 def _valid_map(cmap: dict) -> bool:
-    return ('date' in cmap and
-            any(k in cmap for k in ('debit', 'credit', 'amount')))
+    return (
+        'date' in cmap
+        and any(k in cmap for k in ('debit', 'credit', 'amount'))
+    )
 
 
 def _merge_rows(a: list, b: list) -> list:
     n = max(len(a), len(b))
     return [
-        ((str(a[i]).strip() if i < len(a) else '') + ' ' +
-         (str(b[i]).strip() if i < len(b) else '')).strip()
+        (
+            (str(a[i]).strip() if i < len(a) else '') + ' ' +
+            (str(b[i]).strip() if i < len(b) else '')
+        ).strip()
         for i in range(n)
     ]
 
@@ -618,10 +726,12 @@ def _infer_columns(pages: list) -> tuple:
         n     = len(sample)
         dates = sum(1 for v in vals if _try_date(v))
         nums  = sum(1 for v in vals if _is_num(v))
-        texts = sum(1 for v in vals
-                    if len(v.strip()) > 8
-                    and not _is_num(v)
-                    and not _try_date(v))
+        texts = sum(
+            1 for v in vals
+            if len(v.strip()) > 8
+            and not _is_num(v)
+            and not _try_date(v)
+        )
         idxs  = sum(1 for v in vals if re.match(r'^[\d\-]+$', v.strip()))
 
         if idxs / n > 0.6:
@@ -649,21 +759,18 @@ def _infer_columns(pages: list) -> tuple:
 
 
 # ═══════════════════════════════════════════════════════════
-#  STAGE 3 — ROW EXTRACTION
+#  STAGE 3 — ROW EXTRACTION  (Kotak / generic)
 # ═══════════════════════════════════════════════════════════
 
-def _extract_rows(pages: list, col_map: dict,
-                  hdr_row: int, hdr_page: int) -> list:
+def _extract_rows(pages: list, col_map: dict, hdr_row: int, hdr_page: int) -> list:
     txns    = []
-    ignored = {col_map[k] for k in ('_index', 'reference')
-               if k in col_map}
+    ignored = {col_map[k] for k in ('_index', 'reference') if k in col_map}
 
     for pg_idx, page in enumerate(pages):
-        start = (hdr_row + 1) if pg_idx == hdr_page else 0
+        start     = (hdr_row + 1) if pg_idx == hdr_page else 0
+        data_rows = page[start:]
 
-        for ri in range(start, len(page)):
-            row = page[ri]
-
+        for row in data_rows:
             if _is_title_row(row):
                 continue
             if _is_header_row_repeat(row):
@@ -677,9 +784,7 @@ def _extract_rows(pages: list, col_map: dict,
             elif txns:
                 cont = _get_continuation(row, ignored)
                 if cont:
-                    txns[-1]['desc'] = (
-                        txns[-1]['desc'] + ' ' + cont
-                    ).strip()
+                    txns[-1]['desc'] = (txns[-1]['desc'] + ' ' + cont).strip()
 
     return txns
 
@@ -695,7 +800,6 @@ def _parse_row(row: list, col_map: dict, ignored: set) -> dict:
     if len(row) < 2:
         return None
 
-    # ── Date ──────────────────────────────────────────────
     date = None
     if 'date' in col_map:
         date = _try_date(_cell(row, col_map['date']))
@@ -708,15 +812,11 @@ def _parse_row(row: list, col_map: dict, ignored: set) -> dict:
     if not date:
         return None
 
-    # ── FIX B4: only skip rows where index is literally '-'
-    #    (opening balance marker). A blank index just means
-    #    the bank doesn't use row numbers — keep parsing.
     if '_index' in col_map:
         idx_val = _cell(row, col_map['_index']).strip()
         if idx_val == '-':
             return None
 
-    # ── Description ────────────────────────────────────────
     desc = ''
     if 'description' in col_map:
         desc = _cell(row, col_map['description'])
@@ -735,36 +835,32 @@ def _parse_row(row: list, col_map: dict, ignored: set) -> dict:
         desc = ' '.join(parts)
 
     desc = _RE_VALUE_DATE.sub('', desc)
+    desc = _RE_CHQ_SUFFIX.sub('', desc)
     desc = _RE_WHITESPACE.sub(' ', desc).strip()
 
-    # ── Reference number ───────────────────────────────────
     reference = ''
     if 'reference' in col_map:
         reference = _cell(row, col_map['reference']).strip()
 
-    # ── Amounts ────────────────────────────────────────────
     debit, credit = 0.0, 0.0
 
     if 'debit' in col_map and 'credit' in col_map:
         debit  = _parse_amt(_cell(row, col_map['debit']))
         credit = _parse_amt(_cell(row, col_map['credit']))
     elif 'amount' in col_map:
-        debit, credit = _parse_amt_directed(
-            _cell(row, col_map['amount']))
+        debit, credit = _parse_amt_directed(_cell(row, col_map['amount']))
     else:
         debit, credit = _find_amts(row, col_map, ignored)
 
     if debit == 0 and credit == 0:
         return None
 
-    # ── Balance ────────────────────────────────────────────
     balance = None
     if 'balance' in col_map:
         b = _parse_amt(_cell(row, col_map['balance']))
         if b > 0:
             balance = b
 
-    # ── Type ───────────────────────────────────────────────
     if debit > 0:
         typ, amount = 'DR', debit
     else:
@@ -776,7 +872,7 @@ def _parse_row(row: list, col_map: dict, ignored: set) -> dict:
         'amount':    round(amount, 2),
         'balance':   round(balance, 2) if balance is not None else None,
         'type':      typ,
-        'reference': reference,   # FIX B5: was discarded before
+        'reference': reference,
     }
 
 
@@ -799,11 +895,20 @@ def _get_continuation(row: list, ignored: set) -> str:
 
 
 # ═══════════════════════════════════════════════════════════
-#  STAGE 4 — NORMALIZATION
+#  STAGE 4 — NORMALIZATION  (both banks)
 # ═══════════════════════════════════════════════════════════
 
 def _normalize(txns: list) -> list:
-    # Correct DR/CR using balance diffs
+    # Fix first transaction type using its own balance and amount
+    if txns:
+        first = txns[0]
+        b = first.get('balance')
+        amt = first.get('amount', 0)
+        if b and amt:
+            # If balance roughly equals amount → it's a credit (first deposit)
+            if abs(b - amt) <= max(1.0, amt * 0.01):
+                first['type'] = 'CR'
+
     for i in range(1, len(txns)):
         curr   = txns[i]
         prev   = txns[i - 1]
@@ -819,9 +924,6 @@ def _normalize(txns: list) -> list:
             elif abs(diff + amt) <= tol:
                 curr['type'] = 'DR'
 
-    # ── De-duplicate ──────────────────────────────────────
-    # FIX B3: normalize date string to YYYY-MM-DD for dedup key
-    # so '03 Apr 2025' and '3 Apr 2025' don't create false dupes
     seen, result = set(), []
     for t in txns:
         norm_date = _normalize_date_str(t['date'])
@@ -843,7 +945,6 @@ def _normalize(txns: list) -> list:
 
 
 def _normalize_date_str(date_str: str) -> str:
-    """Convert any parsed date string to YYYY-MM-DD for consistent comparison."""
     if not date_str:
         return ''
     for pattern, fmts in _DATE_PATTERNS:
@@ -858,7 +959,7 @@ def _normalize_date_str(date_str: str) -> str:
                     return dt.strftime('%Y-%m-%d')
             except ValueError:
                 continue
-    return date_str  # fallback: return as-is
+    return date_str
 
 
 def _categorize(desc: str) -> str:
@@ -925,8 +1026,9 @@ def _parse_amt_directed(text: str) -> tuple:
     if amt == 0:
         return 0.0, 0.0
     upper = str(text).strip().upper()
-    if '(' in text or str(text).strip().startswith('-') \
-            or upper.endswith('DR'):
+    if ('(' in text
+            or str(text).strip().startswith('-')
+            or upper.endswith('DR')):
         return amt, 0.0
     if upper.endswith('CR'):
         return 0.0, amt
@@ -943,7 +1045,6 @@ def _find_amts(row: list, col_map: dict, ignored: set) -> tuple:
                 nums.append(v)
     if not nums:       return 0.0, 0.0
     if len(nums) == 1: return nums[0], 0.0
-    # FIX B1: was returning nums[0], 0.0 — now correctly returns both
     if len(nums) == 2: return nums[0], nums[1]
     return nums[0], nums[1]
 
@@ -966,7 +1067,4 @@ def _looks_like_ref(text: str) -> bool:
         return False
     if re.match(r'^[\d,. ]+$', t):
         return False
-    # FIX B2: original regex missed UPI-509479765357 style refs
-    # because UPI is 3 chars and dash was ambiguous.
-    # New pattern: 2-12 alphanum prefix, optional separator, 5+ digits
     return bool(re.match(r'^[A-Za-z0-9]{2,12}[-/]?\d{5,}$', t))
