@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AarogyamFin — Accuracy Tester</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #c9a84c;
+    --gold-light: #e8cc7a;
+    --bg: #060810;
+    --surface: rgba(255,255,255,0.03);
+    --border: rgba(201,168,76,0.15);
+    --text: #e8e4d9;
+    --muted: rgba(232,228,217,0.45);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 300;
+    overflow-x: hidden;
+    cursor: none;
+  }
+
+  .cursor { position: fixed; width: 8px; height: 8px; background: var(--gold); border-radius: 50%; pointer-events: none; z-index: 9999; mix-blend-mode: difference; }
+  .cursor-ring { position: fixed; width: 36px; height: 36px; border: 1px solid rgba(201,168,76,0.4); border-radius: 50%; pointer-events: none; z-index: 9998; }
+
+  nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; padding: 28px 60px; display: flex; justify-content: space-between; align-items: center; background: linear-gradient(to bottom, rgba(6,8,16,0.9), transparent); }
+  .nav-logo { font-family: 'Cormorant Garamond', serif; font-size: 1.4rem; font-weight: 500; letter-spacing: 0.12em; color: var(--text); text-decoration: none; }
+  .nav-logo span { color: var(--gold); }
+  .nav-links { display: flex; gap: 40px; list-style: none; }
+  .nav-links a { font-size: 0.78rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); text-decoration: none; transition: color 0.3s; }
+  .nav-links a:hover { color: var(--gold); }
+  .nav-cta { font-size: 0.75rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold); border: 1px solid var(--border); padding: 10px 24px; text-decoration: none; transition: all 0.3s; background: rgba(201,168,76,0.04); }
+  .nav-cta:hover { background: rgba(201,168,76,0.1); border-color: rgba(201,168,76,0.4); }
+
+  /* PAGE */
+  .page-wrap { padding: 140px 60px 100px; max-width: 1000px; margin: 0 auto; }
+
+  .section-tag { font-size: 0.68rem; letter-spacing: 0.28em; text-transform: uppercase; color: var(--gold); margin-bottom: 20px; display: block; }
+  .section-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(2rem, 4vw, 3.5rem); font-weight: 300; line-height: 1.15; margin-bottom: 48px; max-width: 600px; }
+
+  /* UPLOAD */
+  .upload-form { background: rgba(255,255,255,0.02); border: 1px solid var(--border); padding: 48px; margin-bottom: 40px; }
+  .form-label { display: block; font-size: 0.72rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; }
+
+  input[type="file"] { display: none; }
+  .file-upload-btn { display: flex; align-items: center; gap: 12px; width: 100%; padding: 14px 18px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); color: var(--muted); font-family: 'DM Sans', sans-serif; font-size: 0.9rem; cursor: pointer; transition: all 0.3s; margin-bottom: 20px; }
+  .file-upload-btn:hover { border-color: rgba(201,168,76,0.4); background: rgba(201,168,76,0.04); color: var(--text); }
+  .file-upload-btn.has-file { border-color: rgba(201,168,76,0.5); color: var(--gold); background: rgba(201,168,76,0.06); }
+  .file-upload-icon { width: 16px; height: 16px; flex-shrink: 0; }
+
+  .submit-btn { width: 100%; padding: 18px; background: var(--gold); color: #060810; border: none; font-family: 'DM Sans', sans-serif; font-size: 0.82rem; font-weight: 500; letter-spacing: 0.2em; text-transform: uppercase; cursor: pointer; transition: opacity 0.3s; }
+  .submit-btn:hover { opacity: 0.85; }
+
+  /* ERROR */
+  .error-box { background: rgba(248,113,113,0.06); border: 1px solid rgba(248,113,113,0.25); padding: 20px 28px; color: #f87171; font-size: 0.88rem; margin-bottom: 32px; letter-spacing: 0.04em; }
+
+  /* SCORE BANNER */
+  .score-banner { background: rgba(255,255,255,0.02); border: 1px solid var(--border); padding: 48px; text-align: center; margin-bottom: 32px; position: relative; overflow: hidden; }
+  .score-banner::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, var(--gold), transparent); }
+  .score-filename { font-size: 0.68rem; letter-spacing: 0.28em; text-transform: uppercase; color: var(--muted); margin-bottom: 28px; }
+  .score-number { font-family: 'Cormorant Garamond', serif; font-size: 6rem; font-weight: 300; line-height: 1; margin-bottom: 8px; }
+  .score-good  { color: #4ade80; }
+  .score-ok    { color: var(--gold-light); }
+  .score-bad   { color: #f87171; }
+  .score-label { font-size: 0.72rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); margin-bottom: 28px; }
+  .progress-bg { max-width: 320px; margin: 0 auto; height: 1px; background: rgba(255,255,255,0.08); position: relative; }
+  .progress-fill { height: 1px; transition: width 1s ease; position: absolute; top: 0; left: 0; }
+
+  /* STATS */
+  .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; margin-bottom: 32px; }
+  .stat-box { background: rgba(255,255,255,0.02); border: 1px solid var(--border); padding: 28px 20px; text-align: center; }
+  .stat-number { font-family: 'Cormorant Garamond', serif; font-size: 2.4rem; font-weight: 300; color: var(--gold); line-height: 1; margin-bottom: 8px; }
+  .stat-number.green { color: #4ade80; }
+  .stat-number.red   { color: #f87171; }
+  .stat-number.purple { color: #a78bfa; }
+  .stat-label { font-size: 0.68rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); }
+
+  /* SECTION BOX */
+  .result-section { background: rgba(255,255,255,0.02); border: 1px solid var(--border); margin-bottom: 20px; overflow: hidden; }
+  .result-section-header { padding: 22px 32px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .result-section-header h3 { font-family: 'Cormorant Garamond', serif; font-size: 1.2rem; font-weight: 400; }
+
+  /* CHECK ROWS */
+  .check-row { display: flex; justify-content: space-between; align-items: center; padding: 16px 32px; border-bottom: 1px solid rgba(255,255,255,0.03); font-size: 0.88rem; }
+  .check-row:last-child { border-bottom: none; }
+  .check-label { color: var(--muted); letter-spacing: 0.04em; }
+  .check-value { color: var(--text); }
+
+  /* BADGES */
+  .badge { display: inline-flex; align-items: center; gap: 5px; font-size: 0.65rem; letter-spacing: 0.14em; text-transform: uppercase; padding: 4px 12px; font-weight: 500; }
+  .badge-good   { background: rgba(74,222,128,0.08); border: 1px solid rgba(74,222,128,0.25); color: #4ade80; }
+  .badge-warn   { background: rgba(201,168,76,0.08); border: 1px solid rgba(201,168,76,0.25); color: var(--gold-light); }
+  .badge-bad    { background: rgba(248,113,113,0.08); border: 1px solid rgba(248,113,113,0.25); color: #f87171; }
+
+  /* TABLE */
+  .errors-table { width: 100%; border-collapse: collapse; }
+  .errors-table th { font-size: 0.65rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); padding: 14px 24px; text-align: left; border-bottom: 1px solid var(--border); font-weight: 400; }
+  .errors-table td { font-size: 0.85rem; color: var(--text); padding: 14px 24px; border-bottom: 1px solid rgba(255,255,255,0.03); }
+  .errors-table tr:hover td { background: rgba(201,168,76,0.03); }
+  .diff-high { color: #f87171; font-weight: 500; }
+  .diff-med  { color: var(--gold-light); }
+
+  .more-row td { text-align: center; color: var(--muted); font-size: 0.8rem; padding: 16px; }
+
+  /* BACK LINK */
+  .back-link { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 0.72rem; letter-spacing: 0.16em; text-transform: uppercase; text-decoration: none; transition: color 0.3s; margin-bottom: 40px; }
+  .back-link:hover { color: var(--gold); }
+  .back-link svg { transition: transform 0.3s; }
+  .back-link:hover svg { transform: translateX(-3px); }
+
+  /* FOOTER */
+  footer { padding: 48px 60px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  .footer-logo { font-family: 'Cormorant Garamond', serif; font-size: 1.2rem; font-weight: 500; letter-spacing: 0.1em; }
+  .footer-logo span { color: var(--gold); }
+  .footer-copy { font-size: 0.75rem; color: var(--muted); letter-spacing: 0.05em; }
+  .footer-links { display: flex; gap: 32px; list-style: none; }
+  .footer-links a { font-size: 0.72rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); text-decoration: none; transition: color 0.3s; }
+  .footer-links a:hover { color: var(--gold); }
+
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+  .reveal { opacity: 0; transform: translateY(32px); transition: opacity 0.8s ease, transform 0.8s ease; }
+  .reveal.visible { opacity: 1; transform: translateY(0); }
+
+  @media (max-width: 768px) {
+    nav { padding: 20px 24px; }
+    .nav-links, .nav-cta { display: none; }
+    .page-wrap { padding: 100px 24px 60px; }
+    .upload-form { padding: 28px 20px; }
+    .stats-row { grid-template-columns: repeat(2, 1fr); }
+    .score-number { font-size: 4rem; }
+    .check-row, .result-section-header { padding: 14px 20px; }
+    .errors-table th, .errors-table td { padding: 10px 12px; font-size: 0.75rem; }
+    footer { flex-direction: column; gap: 24px; text-align: center; }
+    .footer-links { flex-wrap: wrap; justify-content: center; }
+    body { cursor: auto; }
+    .cursor, .cursor-ring { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<nav>
+  <a href="/" class="nav-logo">Aarogyam<span>Fin</span></a>
+  <ul class="nav-links">
+    <li><a href="/#analyzer">Analyze</a></li>
+    <li><a href="/#how">How It Works</a></li>
+    <li><a href="/#trust">Security</a></li>
+  </ul>
+  <a href="/#analyzer" class="nav-cta">Analyze Statement</a>
+</nav>
+
+<div class="page-wrap">
+
+  <a href="/" class="back-link reveal">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+    Back to Home
+  </a>
+
+  <span class="section-tag reveal">Parser Diagnostics</span>
+  <h2 class="section-title reveal">Accuracy Tester</h2>
+
+  <!-- Upload -->
+  <div class="upload-form reveal">
+    <label class="form-label">Bank Statement PDF</label>
+    <form method="POST" enctype="multipart/form-data">
+      <div class="file-upload-btn {% if filename %}has-file{% endif %}" id="fileUploadBtn">
+        <svg class="file-upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="12" y1="18" x2="12" y2="12"/>
+          <line x1="9" y1="15" x2="15" y2="15"/>
+        </svg>
+        <span id="fileName">
+          {% if filename %}{{ filename }}{% else %}Click to choose PDF file{% endif %}
+        </span>
+        <input type="file" id="pdfInput" name="pdf_file" accept=".pdf">
+      </div>
+      <button type="submit" class="submit-btn">🎯 Run Accuracy Test</button>
+    </form>
+  </div>
+
+  <!-- Error -->
+  {% if error %}
+  <div class="error-box reveal">⚠ {{ error }}</div>
+  {% endif %}
+
+  <!-- Results -->
+  {% if overall_score is defined and overall_score is not none and not error %}
+
+  <!-- Score Banner -->
+  <div class="score-banner reveal">
+    <div class="score-filename">{{ filename }}</div>
+    <div class="score-number
+      {% if overall_score >= 90 %}score-good
+      {% elif overall_score >= 70 %}score-ok
+      {% else %}score-bad{% endif %}">
+      {{ overall_score }}%
+    </div>
+    <div class="score-label">Overall Accuracy Score</div>
+    <div class="progress-bg">
+      <div class="progress-fill"
+           id="progressFill"
+           style="width: 0%;
+                  background: {% if overall_score >= 90 %}#4ade80{% elif overall_score >= 70 %}#e8cc7a{% else %}#f87171{% endif %};">
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-row reveal">
+    <div class="stat-box">
+      <div class="stat-number">{{ total }}</div>
+      <div class="stat-label">Transactions</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-number {% if balance_errors|length == 0 %}green{% else %}red{% endif %}">
+        {{ balance_errors|length }}
+      </div>
+      <div class="stat-label">Balance Errors</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-number purple">{{ continuity_pct }}%</div>
+      <div class="stat-label">Continuity</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-number purple">{{ fields_pct }}%</div>
+      <div class="stat-label">Fields Complete</div>
+    </div>
+  </div>
+
+  <!-- Missing Fields -->
+  <div class="result-section reveal">
+    <div class="result-section-header">
+      <h3>Missing Fields</h3>
+      {% set total_missing = missing_date + missing_amount + missing_balance + missing_desc %}
+      {% if total_missing == 0 %}
+        <span class="badge badge-good">✓ All fields present</span>
+      {% else %}
+        <span class="badge badge-warn">⚠ {{ total_missing }} missing</span>
+      {% endif %}
+    </div>
+
+    {% for label, count in [('Date', missing_date), ('Amount', missing_amount), ('Balance', missing_balance), ('Description', missing_desc)] %}
+    <div class="check-row">
+      <span class="check-label">{{ label }}</span>
+      {% if count == 0 %}
+        <span class="badge badge-good">✓ All present</span>
+      {% elif count <= 2 %}
+        <span class="badge badge-warn">⚠ {{ count }} missing</span>
+      {% else %}
+        <span class="badge badge-bad">✗ {{ count }} missing</span>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Opening / Closing Balance -->
+  <div class="result-section reveal">
+    <div class="result-section-header">
+      <h3>Opening / Closing Balance Match</h3>
+      {% if balance_match is none %}
+        <span class="badge badge-warn">⚠ N/A</span>
+      {% elif balance_match %}
+        <span class="badge badge-good">✓ Matched</span>
+      {% else %}
+        <span class="badge badge-bad">✗ Mismatch</span>
+      {% endif %}
+    </div>
+
+    <div class="check-row">
+      <span class="check-label">Opening Balance</span>
+      <span class="check-value">{% if opening_bal %}₹{{ "{:,.2f}".format(opening_bal) }}{% else %}—{% endif %}</span>
+    </div>
+    <div class="check-row">
+      <span class="check-label">Total Credits</span>
+      <span style="color:#4ade80; font-size:0.88rem;">+ ₹{{ "{:,.2f}".format(total_credits) }}</span>
+    </div>
+    <div class="check-row">
+      <span class="check-label">Total Debits</span>
+      <span style="color:#f87171; font-size:0.88rem;">− ₹{{ "{:,.2f}".format(total_debits) }}</span>
+    </div>
+    <div class="check-row">
+      <span class="check-label">Calculated Closing</span>
+      <span class="check-value">{% if calculated_closing %}₹{{ "{:,.2f}".format(calculated_closing) }}{% else %}—{% endif %}</span>
+    </div>
+    <div class="check-row">
+      <span class="check-label">Actual Closing Balance</span>
+      <span class="check-value">{% if closing_bal %}₹{{ "{:,.2f}".format(closing_bal) }}{% else %}—{% endif %}</span>
+    </div>
+    <div class="check-row">
+      <span class="check-label">Difference</span>
+      {% if closing_diff is none %}
+        <span class="check-value">—</span>
+      {% elif closing_diff <= 1.0 %}
+        <span class="badge badge-good">₹{{ closing_diff }} — within tolerance</span>
+      {% else %}
+        <span class="badge badge-bad">₹{{ "{:,.2f}".format(closing_diff) }} — mismatch</span>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Balance Continuity -->
+  {% if balance_errors %}
+  <div class="result-section reveal">
+    <div class="result-section-header">
+      <h3>Balance Continuity Issues</h3>
+      <span class="badge badge-bad">✗ {{ balance_errors|length }} found</span>
+    </div>
+    <table class="errors-table">
+      <thead>
+        <tr>
+          <th>Row</th>
+          <th>Date</th>
+          <th>Description</th>
+          <th>Expected</th>
+          <th>Actual</th>
+          <th>Difference</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in balance_errors[:20] %}
+        <tr>
+          <td style="color:var(--muted)">#{{ e.row }}</td>
+          <td style="color:var(--muted); font-size:0.8rem;">{{ e.date }}</td>
+          <td>{{ e.desc }}</td>
+          <td>₹{{ "{:,.2f}".format(e.expected) }}</td>
+          <td>₹{{ "{:,.2f}".format(e.actual) }}</td>
+          <td class="{% if e.diff > 100 %}diff-high{% else %}diff-med{% endif %}">
+            ₹{{ "{:,.2f}".format(e.diff) }}
+          </td>
+        </tr>
+        {% endfor %}
+        {% if balance_errors|length > 20 %}
+        <tr class="more-row">
+          <td colspan="6">… and {{ balance_errors|length - 20 }} more rows</td>
+        </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+
+  {% else %}
+  <div class="result-section reveal">
+    <div class="result-section-header">
+      <h3>Balance Continuity</h3>
+      <span class="badge badge-good">✓ No errors found</span>
+    </div>
+    <div class="check-row">
+      <span class="check-label">All {{ total - 1 }} balance transitions verified</span>
+      <span class="check-value" style="color:#4ade80;">Perfect ✓</span>
+    </div>
+  </div>
+  {% endif %}
+
+  {% endif %}
+</div>
+
+<footer>
+  <div class="footer-logo">Aarogyam<span>Fin</span></div>
+  <p class="footer-copy">© 2026 AarogyamFin. All rights reserved.</p>
+  <ul class="footer-links">
+    <li><a href="/privacy">Privacy</a></li>
+    <li><a href="/terms">Terms</a></li>
+    <li><a href="/#trust">Security</a></li>
+    <li><a href="/about">About</a></li>
+    <li><a href="/#analyzer">Analyze</a></li>
+  </ul>
+</footer>
+
+<script>
+// CURSOR
+const cursor = document.getElementById('cursor');
+const ring   = document.getElementById('cursorRing');
+let mx = 0, my = 0, rx = 0, ry = 0;
+document.addEventListener('mousemove', e => {
+  mx = e.clientX; my = e.clientY;
+  cursor.style.left = mx - 4 + 'px';
+  cursor.style.top  = my - 4 + 'px';
+});
+function animateRing() {
+  rx += (mx - rx) * 0.12; ry += (my - ry) * 0.12;
+  ring.style.left = rx - 18 + 'px'; ring.style.top = ry - 18 + 'px';
+  requestAnimationFrame(animateRing);
+}
+animateRing();
+
+// FILE UPLOAD
+const pdfInput   = document.getElementById('pdfInput');
+const fileBtn    = document.getElementById('fileUploadBtn');
+const fileNameEl = document.getElementById('fileName');
+fileBtn.addEventListener('click', () => pdfInput.click());
+pdfInput.addEventListener('change', function() {
+  if (this.files && this.files[0]) {
+    fileNameEl.textContent = this.files[0].name;
+    fileBtn.classList.add('has-file');
+  }
+});
+
+// PROGRESS BAR ANIMATE
+window.addEventListener('load', () => {
+  const fill = document.getElementById('progressFill');
+  if (fill) {
+    setTimeout(() => {
+      fill.style.width = '{{ overall_score if overall_score else 0 }}%';
+    }, 300);
+  }
+});
+
+// SCROLL REVEAL
+const revealEls = document.querySelectorAll('.reveal');
+const observer  = new IntersectionObserver(entries => {
+  entries.forEach((entry, i) => {
+    if (entry.isIntersecting)
+      setTimeout(() => entry.target.classList.add('visible'), i * 80);
+  });
+}, { threshold: 0.1 });
+revealEls.forEach(el => observer.observe(el));
+</script>
+</body>
+</html>

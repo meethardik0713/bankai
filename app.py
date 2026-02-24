@@ -32,8 +32,6 @@ RATE_LIMIT  = 10
 RATE_WINDOW = 60
 
 # ── In-memory transaction cache ───────────────────────────
-# Stores parsed results keyed by file hash so re-searches are instant.
-# { file_hash: { 'transactions': [...], 'filename': str, 'ts': float } }
 _CACHE      = {}
 _CACHE_LOCK = threading.Lock()
 _CACHE_TTL  = 1800   # 30 minutes
@@ -45,13 +43,12 @@ def _cache_get(file_hash: str):
         if entry and (time.time() - entry['ts']) < _CACHE_TTL:
             return entry
         if entry:
-            del _CACHE[file_hash]   # expired
+            del _CACHE[file_hash]
         return None
 
 
 def _cache_set(file_hash: str, transactions: list, filename: str):
     with _CACHE_LOCK:
-        # Evict oldest entry if cache grows too large (> 10 PDFs)
         if len(_CACHE) >= 10:
             oldest = min(_CACHE, key=lambda k: _CACHE[k]['ts'])
             del _CACHE[oldest]
@@ -63,7 +60,6 @@ def _cache_set(file_hash: str, transactions: list, filename: str):
 
 
 def _file_hash(file_storage) -> str:
-    """MD5 of first 64KB — fast enough to identify the file without reading all."""
     chunk = file_storage.stream.read(65536)
     file_storage.stream.seek(0)
     return hashlib.md5(chunk).hexdigest()
@@ -116,8 +112,6 @@ def home():
     error_message     = ''
     parse_time        = None
 
-    # ── Restore cached state if user is re-searching ──────
-    # If no file uploaded this POST, check if session has a cached hash
     cached_hash = session.get('file_hash')
     cached_name = session.get('file_name', '')
 
@@ -129,7 +123,6 @@ def home():
         all_transactions = []
 
         if file_uploaded:
-            # ── New file uploaded ──────────────────────────
             safe_name = secure_filename(file.filename)
 
             if not safe_name.lower().endswith('.pdf'):
@@ -143,12 +136,10 @@ def home():
                 cached = _cache_get(fhash)
 
                 if cached:
-                    # Same file re-uploaded — use cache, skip parsing
                     all_transactions  = cached['transactions']
                     selected_filename = cached['filename']
                     logger.info("Cache hit for %s", safe_name)
                 else:
-                    # New file — parse and cache
                     selected_filename = safe_name
                     filepath = os.path.join(app.config['UPLOAD_FOLDER'], safe_name)
                     file.save(filepath)
@@ -169,8 +160,6 @@ def home():
                             os.remove(filepath)
 
         elif cached_hash:
-            # ── Keyword-only search — no new file ─────────
-            # User typed a keyword without re-uploading. Use cached transactions.
             cached = _cache_get(cached_hash)
             if cached:
                 all_transactions  = cached['transactions']
@@ -180,7 +169,6 @@ def home():
                 session.pop('file_hash', None)
                 session.pop('file_name', None)
 
-        # ── Apply keyword filter ───────────────────────────
         if all_transactions and not error_message:
             if keyword:
                 kw_lower = keyword.lower()
@@ -209,7 +197,6 @@ def home():
             count = len(transaction_data)
 
     elif request.method == 'GET' and cached_hash:
-        # GET request — restore filename display so UI shows the cached file
         selected_filename = cached_name
 
     return render_template(
@@ -231,7 +218,6 @@ def home():
 
 @app.route('/clear', methods=['POST'])
 def clear_cache():
-    """Let user explicitly clear the cached PDF and start fresh."""
     fhash = session.pop('file_hash', None)
     session.pop('file_name', None)
     if fhash:
@@ -253,6 +239,148 @@ def privacy():
 @app.route('/terms')
 def terms():
     return render_template('terms.html')
+
+
+# ═══════════════════════════════════════════════════════════
+#  ACCURACY ROUTES
+# ═══════════════════════════════════════════════════════════
+
+@app.route('/accuracy', methods=['GET'])
+def accuracy_page():
+    return render_template('accuracy.html', error=None)
+
+
+@app.route('/accuracy', methods=['POST'])
+def accuracy_check():
+    ip = request.remote_addr
+    if is_rate_limited(ip):
+        abort(429)
+
+    file = request.files.get('pdf_file')
+    if not file or not file.filename:
+        return render_template('accuracy.html', error="No file uploaded.")
+
+    safe_name = secure_filename(file.filename)
+
+    if not safe_name.lower().endswith('.pdf'):
+        return render_template('accuracy.html', error="Only PDF files accepted.")
+    if len(safe_name) >= 200:
+        return render_template('accuracy.html', error="Filename too long.")
+    if not _is_valid_pdf(file):
+        return render_template('accuracy.html', error="Invalid PDF file.")
+
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], safe_name)
+    file.save(filepath)
+
+    try:
+        t0 = time.time()
+        transactions = parse_transactions(filepath)
+        parse_time = round(time.time() - t0, 1)
+        logger.info("Accuracy test: parsed %s → %d txns in %.1fs",
+                    safe_name, len(transactions), parse_time)
+    except Exception as e:
+        logger.exception("Accuracy test parse error: %s", safe_name)
+        return render_template('accuracy.html', error=f"Parse error: {e}")
+    finally:
+        if os.path.exists(filepath):
+            os.remove(filepath)
+
+    if not transactions:
+        return render_template('accuracy.html', error="No transactions found in this PDF.")
+
+    total = len(transactions)
+
+    # ── Check 1: Missing fields ───────────────────────────
+    missing_date    = sum(1 for t in transactions if not t.get('date'))
+    missing_amount  = sum(1 for t in transactions if not t.get('amount'))
+    missing_balance = sum(1 for t in transactions if not t.get('balance'))
+    missing_desc    = sum(1 for t in transactions if not t.get('desc'))
+
+    # ── Check 2: Balance continuity ───────────────────────
+    balance_errors = []
+    for i in range(1, len(transactions)):
+        prev = transactions[i - 1]
+        curr = transactions[i]
+
+        prev_bal = prev.get('balance')
+        curr_bal = curr.get('balance')
+        amount   = curr.get('amount')
+        txn_type = curr.get('type', '')
+
+        if prev_bal is None or curr_bal is None or amount is None:
+            continue
+
+        if txn_type == 'CR':
+            expected = round(prev_bal + amount, 2)
+        elif txn_type == 'DR':
+            expected = round(prev_bal - amount, 2)
+        else:
+            continue
+
+        actual = round(curr_bal, 2)
+        diff   = round(abs(expected - actual), 2)
+
+        if diff > 1.0:
+            balance_errors.append({
+                'row'     : i + 1,
+                'date'    : curr.get('date', 'N/A'),
+                'desc'    : (curr.get('desc') or '')[:40],
+                'expected': expected,
+                'actual'  : actual,
+                'diff'    : diff,
+            })
+
+    # ── Check 3: Opening / Closing balance ────────────────
+    opening_bal = transactions[0].get('opening_balance') or transactions[0].get('balance')
+    closing_bal = transactions[-1].get('balance')
+
+    total_credits = sum(
+        t['amount'] for t in transactions
+        if t.get('type') == 'CR' and t.get('amount')
+    )
+    total_debits = sum(
+        t['amount'] for t in transactions
+        if t.get('type') == 'DR' and t.get('amount')
+    )
+
+    if opening_bal is not None and closing_bal is not None:
+        calculated_closing = round(opening_bal + total_credits - total_debits, 2)
+        closing_diff       = round(abs(calculated_closing - closing_bal), 2)
+        balance_match      = closing_diff <= 1.0
+    else:
+        calculated_closing = None
+        closing_diff       = None
+        balance_match      = None
+
+    # ── Accuracy Score ─────────────────────────────────────
+    continuity_ok  = (total - 1) - len(balance_errors)
+    continuity_pct = round((continuity_ok / (total - 1)) * 100, 1) if total > 1 else 100.0
+    fields_ok      = total - max(missing_date, missing_amount, missing_balance)
+    fields_pct     = round((fields_ok / total) * 100, 1)
+    overall_score  = round((continuity_pct + fields_pct) / 2, 1)
+
+    return render_template(
+        'accuracy.html',
+        total              = total,
+        missing_date       = missing_date,
+        missing_amount     = missing_amount,
+        missing_balance    = missing_balance,
+        missing_desc       = missing_desc,
+        balance_errors     = balance_errors,
+        opening_bal        = opening_bal,
+        closing_bal        = closing_bal,
+        calculated_closing = calculated_closing,
+        closing_diff       = closing_diff,
+        balance_match      = balance_match,
+        total_credits      = round(total_credits, 2),
+        total_debits       = round(total_debits, 2),
+        continuity_pct     = continuity_pct,
+        fields_pct         = fields_pct,
+        overall_score      = overall_score,
+        filename           = safe_name,
+        parse_time         = parse_time,
+        error              = None,
+    )
 
 
 # ═══════════════════════════════════════════════════════════
@@ -307,7 +435,6 @@ def debug():
         return "No file selected.", 400
 
     import pdfplumber
-    import json
 
     safe_name = secure_filename(file.filename)
     filepath  = os.path.join(app.config['UPLOAD_FOLDER'], safe_name)

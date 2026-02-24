@@ -66,7 +66,6 @@
   .scroll-line { width: 1px; height: 48px; background: linear-gradient(to bottom, var(--gold), transparent); animation: scrollPulse 2s infinite; }
   .scroll-text { font-size: 0.6rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); }
 
-  /* ANALYZER */
   #analyzer { padding: 120px 60px; max-width: 1000px; margin: 0 auto; }
   .section-tag { font-size: 0.68rem; letter-spacing: 0.28em; text-transform: uppercase; color: var(--gold); margin-bottom: 20px; display: block; }
   .section-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(2rem, 4vw, 3.5rem); font-weight: 300; line-height: 1.15; margin-bottom: 48px; max-width: 600px; }
@@ -97,7 +96,6 @@
   .clear-btn { padding: 18px 24px; background: transparent; border: 1px solid rgba(248,113,113,0.3); color: #f87171; font-family: 'DM Sans', sans-serif; font-size: 0.75rem; font-weight: 500; letter-spacing: 0.15em; text-transform: uppercase; cursor: pointer; transition: all 0.3s; white-space: nowrap; }
   .clear-btn:hover { background: rgba(248,113,113,0.08); border-color: rgba(248,113,113,0.5); }
 
-  /* STATS — now 4 columns */
   .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; margin-bottom: 32px; }
   .stat-box { background: rgba(255,255,255,0.02); border: 1px solid var(--border); padding: 28px 20px; text-align: center; }
   .stat-number { font-family: 'Cormorant Garamond', serif; font-size: 2.4rem; font-weight: 300; color: var(--gold); line-height: 1; margin-bottom: 8px; }
@@ -134,7 +132,6 @@
 
   .no-results { padding: 60px; text-align: center; color: var(--muted); font-family: 'Cormorant Garamond', serif; font-size: 1.4rem; font-weight: 300; }
 
-  /* HOW */
   #how { padding: 120px 60px; max-width: 1200px; margin: 0 auto; }
   .steps-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; }
   .step { padding: 48px 40px; background: var(--surface); border: 1px solid var(--border); position: relative; overflow: hidden; transition: border-color 0.4s; }
@@ -146,7 +143,6 @@
   .step h3 { font-family: 'Cormorant Garamond', serif; font-size: 1.4rem; font-weight: 400; margin-bottom: 12px; }
   .step p { font-size: 0.88rem; line-height: 1.8; color: var(--muted); }
 
-  /* TRUST */
   #trust { padding: 120px 60px; background: rgba(201,168,76,0.02); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
   .trust-inner { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: center; }
   .trust-badges { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
@@ -155,7 +151,6 @@
   .trust-badge h4 { font-family: 'Cormorant Garamond', serif; font-size: 1.1rem; font-weight: 400; margin-bottom: 8px; }
   .trust-badge p { font-size: 0.8rem; color: var(--muted); line-height: 1.7; }
 
-  /* FEATURES */
   #features { padding: 120px 60px; max-width: 1200px; margin: 0 auto; }
   .features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--border); }
   .feature { background: var(--bg); padding: 48px 36px; transition: background 0.3s; }
@@ -164,7 +159,6 @@
   .feature h3 { font-family: 'Cormorant Garamond', serif; font-size: 1.25rem; font-weight: 400; margin-bottom: 12px; }
   .feature p { font-size: 0.85rem; line-height: 1.8; color: var(--muted); }
 
-  /* FOOTER */
   footer { padding: 48px 60px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
   .footer-logo { font-family: 'Cormorant Garamond', serif; font-size: 1.2rem; font-weight: 500; letter-spacing: 0.1em; }
   .footer-logo span { color: var(--gold); }
@@ -216,6 +210,7 @@
     <li><a href="#analyzer">Analyze</a></li>
     <li><a href="#how">How It Works</a></li>
     <li><a href="#trust">Security</a></li>
+    <li><a href="/accuracy">Accuracy Test</a></li>
   </ul>
   <a href="#analyzer" class="nav-cta">Analyze Statement</a>
 </nav>
@@ -267,7 +262,6 @@
             <span class="file-name" id="fileName">
               {% if selected_filename %}{{ selected_filename }}{% else %}Click to choose PDF file{% endif %}
             </span>
-            <!-- FIX: stopPropagation prevents click bubbling to parent (which opens file picker) -->
             <span class="file-delete-btn {% if selected_filename %}visible{% endif %}" id="fileDeleteBtn">✕</span>
           </div>
           <input type="file" id="pdfInput" name="pdf_file" accept=".pdf">
@@ -288,33 +282,23 @@
 
   {% if transaction_data %}
 
-  <!-- ── STATS ROW: 4 boxes ── -->
   <div class="stats-row reveal">
-
-    <!-- Box 1: Transactions -->
     <div class="stat-box">
       <div class="stat-number">{{ count }}</div>
       <div class="stat-label">Transactions Found</div>
     </div>
-
-    <!-- Box 2: Total Turnover (debit + credit) -->
     <div class="stat-box">
       <div class="stat-total">₹{{ "{:,.0f}".format(total) }}</div>
       <div class="stat-label">Total Turnover</div>
     </div>
-
-    <!-- Box 3: Total Credit -->
     <div class="stat-box">
       <div class="stat-credit">↑ ₹{{ "{:,.0f}".format(total_credit) }}</div>
       <div class="stat-label">Total Credit</div>
     </div>
-
-    <!-- Box 4: Total Debit -->
     <div class="stat-box">
       <div class="stat-debit">↓ ₹{{ "{:,.0f}".format(total_debit) }}</div>
       <div class="stat-label">Total Debit</div>
     </div>
-
   </div>
 
   {% if amounts_count > 0 %}
@@ -467,16 +451,14 @@ function animateRing() {
 }
 animateRing();
 
-// ── FILE UPLOAD ────────────────────────────────────────────
+// FILE UPLOAD
 const pdfInput    = document.getElementById('pdfInput');
 const fileBtn     = document.getElementById('fileUploadBtn');
 const fileNameEl  = document.getElementById('fileName');
 const deleteBtn   = document.getElementById('fileDeleteBtn');
 const clearAllBtn = document.getElementById('clearAllBtn');
 
-// Clicking the upload area opens file picker ONLY if no file is selected
 fileBtn.addEventListener('click', function(e) {
-  // If the ✕ button was clicked, do nothing here (it handles itself)
   if (e.target === deleteBtn) return;
   pdfInput.click();
 });
@@ -489,30 +471,23 @@ pdfInput.addEventListener('change', function() {
   }
 });
 
-// ── CLEAR FILE (✕ button next to filename) ────────────────
-// FIX 1: stopPropagation so click doesn't bubble to fileBtn and open picker
-// FIX 2: calls /clear to wipe server session, then redirects to /
 deleteBtn.addEventListener('click', function(e) {
-  e.stopPropagation();   // prevent parent div click (file picker)
+  e.stopPropagation();
   e.preventDefault();
   clearEverything();
 });
 
-// ── CLEAR ALL button ──────────────────────────────────────
 clearAllBtn.addEventListener('click', function(e) {
   e.preventDefault();
   clearEverything();
 });
 
 function clearEverything() {
-  // Reset local UI immediately
   pdfInput.value = '';
   fileNameEl.textContent = 'Click to choose PDF file';
   fileBtn.classList.remove('has-file');
   deleteBtn.classList.remove('visible');
   document.getElementById('keywordInput').value = '';
-
-  // Tell the server to clear session cache, then go to fresh page
   fetch('/clear', { method: 'POST' })
     .finally(() => { window.location.href = '/'; });
 }

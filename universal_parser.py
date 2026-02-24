@@ -163,11 +163,32 @@ def parse_transactions(pdf_path: str) -> list:
                 return []
             raw = _extract_rows(pages, col_map, hdr_row, hdr_page)
             print(f"[parser] Raw transactions: {len(raw)}")
+
+            # ── DEBUG: first two rows to confirm opening balance ──
+            if raw:
+                r0 = raw[0]
+                print(f"[DEBUG] First row  → date={r0['date']}  "
+                      f"amt={r0['amount']}  bal={r0['balance']}  type={r0['type']}")
+            if len(raw) > 1:
+                r1 = raw[1]
+                print(f"[DEBUG] Second row → date={r1['date']}  "
+                      f"amt={r1['amount']}  bal={r1['balance']}  type={r1['type']}")
+                if r0.get('balance') and r1.get('balance'):
+                    print(f"[DEBUG] Balance diff (row1-row0): "
+                          f"{round(r1['balance'] - r0['balance'], 2)}")
+
             if not raw:
                 return []
             transactions = _normalize(raw)
 
-        print(f"[parser] Final transactions: {len(transactions)}  ({time.time()-start:.2f}s)")
+        print(f"[parser] Final transactions: {len(transactions)}  "
+              f"({time.time()-start:.2f}s)")
+
+        # Surface opening balance in logs
+        if transactions and transactions[0].get('opening_balance') is not None:
+            print(f"[parser] Opening balance: "
+                  f"₹{transactions[0]['opening_balance']:,.2f}")
+
         return transactions
 
     except Exception as e:
@@ -206,11 +227,45 @@ def _detect_bank(pdf_path: str) -> str:
 
 
 # ═══════════════════════════════════════════════════════════
+#  OPENING BALANCE EXTRACTOR  (scans PDF header text)
+# ═══════════════════════════════════════════════════════════
+
+def _extract_opening_balance_from_pdf(pdf_path: str) -> float:
+    """
+    Scans the first 2 pages of the PDF for an explicitly stated
+    opening balance line and returns it as a float.
+    Returns None if not found.
+    """
+    _RE_OB = re.compile(
+        r'(?:opening\s+balance|open(?:ing)?\s+bal\.?|ob\s*:?|'
+        r'brought\s+forward|b/?f)\s*[:\-]?\s*'
+        r'([\d,]+\.\d{2})',
+        re.IGNORECASE
+    )
+    try:
+        with pdfplumber.open(pdf_path) as pdf:
+            for page in pdf.pages[:2]:
+                text = page.extract_text() or ''
+                m = _RE_OB.search(text)
+                if m:
+                    val = _parse_amt(m.group(1))
+                    if val > 0:
+                        print(f"[parser] Found opening balance in PDF text: ₹{val:,.2f}")
+                        return val
+    except Exception:
+        pass
+    return None
+
+
+# ═══════════════════════════════════════════════════════════
 #  CANARA BANK PARSER  (raw text based)
 # ═══════════════════════════════════════════════════════════
 
 def _parse_canara(pdf_path: str) -> list:
     raw_txns = []
+
+    # Try to grab opening balance from PDF header first
+    pdf_opening_bal = _extract_opening_balance_from_pdf(pdf_path)
 
     try:
         with pdfplumber.open(pdf_path) as pdf:
@@ -218,8 +273,6 @@ def _parse_canara(pdf_path: str) -> list:
                 text  = page.extract_text() or ''
                 lines = [l.strip() for l in text.splitlines()]
 
-                # Reset narration buffer on every new page
-                # so page headers don't bleed into transactions
                 narration_buf = []
 
                 for line in lines:
@@ -249,25 +302,29 @@ def _parse_canara(pdf_path: str) -> list:
         traceback.print_exc()
 
     print(f"[canara] Raw transactions: {len(raw_txns)}")
-    return _normalize(raw_txns)
+    result = _normalize(raw_txns)
+
+    # Override inferred opening balance with PDF-stated one if found
+    if result and pdf_opening_bal is not None:
+        result[0]['opening_balance'] = round(pdf_opening_bal, 2)
+        print(f"[canara] Opening balance overridden from PDF: "
+              f"₹{pdf_opening_bal:,.2f}")
+
+    return result
 
 
 def _canara_skip_line(line: str) -> bool:
     lo = line.lower().strip()
 
-    # Column header row
     if re.match(r'^date\s+particulars\s+deposits\s+withdrawals\s+balance', lo):
         return True
 
-    # Page number lines e.g. "page 6", "Page 6 of 68"
     if re.match(r'^page\s+\d+', lo):
         return True
 
-    # Skip phrases
     if any(p in lo for p in _SKIP_PHRASES):
         return True
 
-    # Account/branch info lines
     if any(lo.startswith(p) for p in [
         'statement for', 'branch code', 'customer id', 'branch name',
         'phone', 'product code', 'product name', 'address',
@@ -275,15 +332,6 @@ def _canara_skip_line(line: str) -> bool:
     ]):
         return True
 
-    # Address continuation lines — city/state/pincode junk
-    # e.g. "VIHAR", "SIDDHARTHAM SIDDHARTH VIHAR GHAZIABAD"
-    # "UTTAR PRADESH IN 201009"
-    # These appear only on page 1 before first transaction
-    # Pattern: pure text OR text+pincode, no UPI/NEFT/amount
-    # Address continuation lines — only skip if they look like
-    # city/state/pincode AND are short (under 25 chars)
-    # e.g. "VIHAR", "UTTAR PRADESH IN 201009"
-    # BUT not "SAHNEWAL", "GAGANDEEP" etc which are narration
     _address_fragments = [
         'ghaziabad', 'uttar pradesh', 'delhi', 'noida',
         'gurugram', 'faridabad', 'mumbai', 'bangalore',
@@ -296,11 +344,8 @@ def _canara_skip_line(line: str) -> bool:
 
     return False
 
- 
-
 
 def _canara_parse_txn_line(line: str) -> dict:
-    # Must start with DD-MM-YYYY
     date_match = re.match(r'^(\d{1,2}-\d{2}-\d{4})\s+(.*)', line)
     if not date_match:
         return None
@@ -308,13 +353,12 @@ def _canara_parse_txn_line(line: str) -> dict:
     date_str  = date_match.group(1)
     remainder = date_match.group(2).strip()
 
-    # Find all numbers (including negative) in remainder
     nums = re.findall(r'-?[\d,]+\.\d{2}', remainder)
     if len(nums) < 2:
         return None
 
-    amt_raw = nums[-2]   # second to last = withdrawal or deposit
-    bal_raw = nums[-1]   # last = running balance
+    amt_raw = nums[-2]
+    bal_raw = nums[-1]
 
     amt     = _parse_amt(amt_raw)
     balance = _parse_amt(bal_raw)
@@ -899,16 +943,37 @@ def _get_continuation(row: list, ignored: set) -> str:
 # ═══════════════════════════════════════════════════════════
 
 def _normalize(txns: list) -> list:
-    # Fix first transaction type using its own balance and amount
-    if txns:
-        first = txns[0]
-        b = first.get('balance')
-        amt = first.get('amount', 0)
-        if b and amt:
-            # If balance roughly equals amount → it's a credit (first deposit)
-            if abs(b - amt) <= max(1.0, amt * 0.01):
-                first['type'] = 'CR'
+    if not txns:
+        return []
 
+    # ── Step 1: infer opening balance from first transaction ──────────
+    first = txns[0]
+    b0    = first.get('balance')
+    amt0  = first.get('amount', 0)
+
+    opening_balance = None
+
+    if b0 is not None and amt0:
+        implied_cr = round(b0 - amt0, 2)   # OB if first txn was a credit
+        implied_dr = round(b0 + amt0, 2)   # OB if first txn was a debit
+
+        if abs(b0 - amt0) <= max(1.0, amt0 * 0.01):
+            # Balance ≈ amount → truly the first-ever deposit, OB was 0
+            opening_balance  = 0.0
+            first['type']    = 'CR'
+            print(f"[normalize] First txn looks like opening deposit → OB=0.00")
+        elif implied_cr >= 0:
+            # Opening balance was positive; first txn was a credit
+            opening_balance  = implied_cr
+            first['type']    = 'CR'
+            print(f"[normalize] Inferred OB (CR path): ₹{opening_balance:,.2f}")
+        elif implied_dr >= 0:
+            # Opening balance was positive; first txn was a debit
+            opening_balance  = implied_dr
+            first['type']    = 'DR'
+            print(f"[normalize] Inferred OB (DR path): ₹{opening_balance:,.2f}")
+
+    # ── Step 2: fix transaction types using sequential balance diff ───
     for i in range(1, len(txns)):
         curr   = txns[i]
         prev   = txns[i - 1]
@@ -916,7 +981,7 @@ def _normalize(txns: list) -> list:
         b_prev = prev.get('balance')
         amt    = curr.get('amount', 0)
 
-        if b_curr and b_prev and amt:
+        if b_curr is not None and b_prev is not None and amt:
             diff = round(b_curr - b_prev, 2)
             tol  = max(1.0, round(amt * 0.01, 2))
             if abs(diff - amt) <= tol:
@@ -924,6 +989,7 @@ def _normalize(txns: list) -> list:
             elif abs(diff + amt) <= tol:
                 curr['type'] = 'DR'
 
+    # ── Step 3: deduplicate ───────────────────────────────────────────
     seen, result = set(), []
     for t in txns:
         norm_date = _normalize_date_str(t['date'])
@@ -937,9 +1003,16 @@ def _normalize(txns: list) -> list:
         if key in seen:
             continue
         seen.add(key)
+        t['date']     = norm_date or t['date']
         t['desc']     = _RE_WHITESPACE.sub(' ', t.get('desc') or '').strip()
         t['category'] = _categorize(t['desc'])
         result.append(t)
+
+    # ── Step 4: attach opening balance to first transaction ───────────
+    if result and opening_balance is not None:
+        result[0]['opening_balance'] = round(opening_balance, 2)
+    elif result:
+        result[0].setdefault('opening_balance', None)
 
     return result
 
