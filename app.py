@@ -145,6 +145,9 @@ def debug_auth():
         'access_token_in_session': session.get('access_token') is not None,
         'session_keys': list(session.keys()),
     }
+
+@app.route('/logout')
+def logout():
     supabase.auth.sign_out()
     session.clear()
     return redirect('/')
