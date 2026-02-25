@@ -4,3 +4,4 @@ openpyxl
 gunicorn
 pdfplumber
 flask-talisman
+supabase

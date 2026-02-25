@@ -4,12 +4,17 @@ import openpyxl
 import time
 import hashlib
 import threading
-from flask import Flask, request, render_template, send_file, abort, session
+from flask import Flask, request, render_template, send_file, abort, session, redirect
 from flask_talisman import Talisman
 from io import BytesIO
 from collections import defaultdict
 from werkzeug.utils import secure_filename
 from universal_parser import parse_transactions
+from supabase import create_client, Client
+
+SUPABASE_URL = os.environ.get('SUPABASE_URL')
+SUPABASE_KEY = os.environ.get('SUPABASE_KEY')
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ── Logging ───────────────────────────────────────────────
 logging.basicConfig(
@@ -100,7 +105,31 @@ def _sanitize_desc(value: str) -> str:
         value = "'" + value
     return value
 
+# ── Auth Routes ───────────────────────────────────────────
 
+@app.route('/login')
+def login():
+    redirect_url = request.host_url + 'auth/callback'
+    response = supabase.auth.sign_in_with_oauth({
+        "provider": "google",
+        "options": {"redirect_to": redirect_url}
+    })
+    return redirect(response.url)
+
+
+@app.route('/auth/callback')
+def auth_callback():
+    code = request.args.get('code')
+    if code:
+        supabase.auth.exchange_code_for_session({"auth_code": code})
+    return redirect('/')
+
+
+@app.route('/logout')
+def logout():
+    supabase.auth.sign_out()
+    session.clear()
+    return redirect('/')
 # ═══════════════════════════════════════════════════════════
 #  ROUTES
 # ═══════════════════════════════════════════════════════════
