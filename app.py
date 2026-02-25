@@ -124,10 +124,18 @@ def login():
 def auth_callback():
     code = request.args.get('code')
     if code:
-        result = supabase.auth.exchange_code_for_session({"auth_code": code})
-        if result and result.session:
-            session['access_token'] = result.session.access_token
-            session['user_email'] = result.user.email
+        try:
+            result = supabase.auth.exchange_code_for_session({"auth_code": code})
+            if result and result.session:
+                session['access_token'] = result.session.access_token
+                session['user_email'] = result.user.email
+                logger.info("Login success: %s", result.user.email)
+            else:
+                logger.error("No session in result: %s", result)
+        except Exception as e:
+            logger.exception("Auth callback error: %s", e)
+    else:
+        logger.warning("No code in callback. Args: %s", request.args)
     return redirect('/')
 
 
