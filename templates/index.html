@@ -212,7 +212,13 @@
     <li><a href="#trust">Security</a></li>
     <li><a href="/accuracy">Accuracy Test</a></li>
   </ul>
-  <a href="#analyzer" class="nav-cta">Analyze Statement</a>
+  {% if is_logged_in %}
+<span style="font-size:0.75rem; color:var(--muted); margin-right:16px;">{{ user_email }}</span>
+<a href="/logout" class="nav-cta">Logout</a>
+{% else %}
+<a href="/login" class="nav-cta" style="margin-right:8px;">Sign In</a>
+<a href="/login" class="nav-cta">Sign Up</a>
+{% endif %}
 </nav>
 
 <section id="hero">
@@ -274,7 +280,11 @@
       </div>
 
       <div class="form-actions">
-        <button type="submit" class="submit-btn">⚡ Analyze Statement</button>
+        {% if is_logged_in %}
+<button type="submit" class="submit-btn">⚡ Analyze Statement</button>
+{% else %}
+<a href="/login" class="submit-btn" style="text-align:center; text-decoration:none;">🔐 Login to Analyze</a>
+{% endif %}
         <button type="button" class="clear-btn" id="clearAllBtn">✕ Clear All</button>
       </div>
     </form>
