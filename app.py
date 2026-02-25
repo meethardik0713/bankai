@@ -109,7 +109,10 @@ def _sanitize_desc(value: str) -> str:
 
 @app.route('/login')
 def login():
-    redirect_url = request.host_url + 'auth/callback'
+    if os.environ.get('RAILWAY_ENVIRONMENT'):
+        redirect_url = 'https://www.aarogyamfin.com/auth/callback'
+    else:
+        redirect_url = request.host_url + 'auth/callback'
     response = supabase.auth.sign_in_with_oauth({
         "provider": "google",
         "options": {"redirect_to": redirect_url}
