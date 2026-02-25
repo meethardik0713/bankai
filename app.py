@@ -143,6 +143,15 @@ def home():
     if request.method == 'POST' and is_rate_limited(ip):
         abort(429)
 
+    # ── Check login ──
+    try:
+        user = supabase.auth.get_user()
+        is_logged_in = user is not None
+        user_email = user.user.email if user else None
+    except:
+        is_logged_in = False
+        user_email = None
+
     transaction_data  = []
     keyword           = ''
     total             = 0.0
@@ -255,6 +264,8 @@ def home():
         parse_time        = parse_time,
         has_cached_file   = bool(session.get('file_hash')),
         cached_filename   = session.get('file_name', ''),
+        is_logged_in      = is_logged_in,
+        user_email        = user_email,
     )
 
 
