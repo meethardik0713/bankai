@@ -131,8 +131,12 @@ def auth_callback():
     return redirect('/')
 
 
-@app.route('/logout')
-def logout():
+@app.route('/debug-auth')
+def debug_auth():
+    return {
+        'access_token_in_session': session.get('access_token') is not None,
+        'session_keys': list(session.keys()),
+    }
     supabase.auth.sign_out()
     session.clear()
     return redirect('/')
