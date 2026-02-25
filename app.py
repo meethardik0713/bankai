@@ -2,10 +2,10 @@ import os
 import logging
 import openpyxl
 import time
-import json
 import hashlib
 import threading
 from flask import Flask, request, render_template, send_file, abort, session
+from flask_talisman import Talisman
 from io import BytesIO
 from collections import defaultdict
 from werkzeug.utils import secure_filename
@@ -19,8 +19,18 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ── App setup ─────────────────────────────────────────────
+
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', os.urandom(32))
+
+is_prod = os.environ.get('RAILWAY_ENVIRONMENT') is not None
+
+Talisman(app,
+    force_https=is_prod,
+    strict_transport_security=is_prod,
+    session_cookie_secure=is_prod,
+    content_security_policy=False
+)
 UPLOAD_FOLDER = 'uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024
@@ -381,180 +391,6 @@ def accuracy_check():
         parse_time         = parse_time,
         error              = None,
     )
-
-
-# ═══════════════════════════════════════════════════════════
-#  DEBUG ROUTE
-#  Remove this route before going to production!
-# ═══════════════════════════════════════════════════════════
-
-@app.route('/debug', methods=['GET', 'POST'])
-def debug():
-    if request.method == 'GET':
-        return '''
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>PDF Debug Tool</title>
-            <style>
-                body { font-family: Arial, sans-serif; padding: 30px; }
-                h2   { color: #333; }
-                form { margin-top: 20px; }
-                input[type=file] { padding: 10px; }
-                button {
-                    margin-top: 15px;
-                    padding: 10px 25px;
-                    background: #4CAF50;
-                    color: white;
-                    border: none;
-                    border-radius: 4px;
-                    cursor: pointer;
-                    font-size: 15px;
-                }
-                button:hover { background: #45a049; }
-            </style>
-        </head>
-        <body>
-            <h2>🔍 PDF Debug Tool</h2>
-            <p>Upload your bank statement PDF to see exactly
-               how pdfplumber extracts it.</p>
-            <form method="POST" enctype="multipart/form-data">
-                <input type="file" name="pdf_file" accept=".pdf">
-                <br>
-                <button type="submit">Analyze PDF</button>
-            </form>
-        </body>
-        </html>
-        '''
-
-    if 'pdf_file' not in request.files:
-        return "No file uploaded.", 400
-
-    file = request.files['pdf_file']
-    if not file or not file.filename:
-        return "No file selected.", 400
-
-    import pdfplumber
-
-    safe_name = secure_filename(file.filename)
-    filepath  = os.path.join(app.config['UPLOAD_FOLDER'], safe_name)
-    file.save(filepath)
-
-    results = []
-
-    try:
-        with pdfplumber.open(filepath) as pdf:
-            total_pages = len(pdf.pages)
-
-            for i, page in enumerate(pdf.pages[:3]):
-                page_info = {
-                    'page_number': i + 1,
-                    'total_pages': total_pages,
-                }
-
-                try:
-                    tables = page.extract_tables()
-                    if tables:
-                        biggest = max(tables, key=len)
-                        page_info['default_table'] = {
-                            'tables_found'     : len(tables),
-                            'rows_in_biggest'  : len(biggest),
-                            'columns_in_row_0' : len(biggest[0]) if biggest else 0,
-                            'first_3_rows'     : biggest[:3],
-                            'last_2_rows'      : biggest[-2:],
-                        }
-                    else:
-                        page_info['default_table'] = 'NO TABLES FOUND'
-                except Exception as e:
-                    page_info['default_table'] = f'ERROR: {e}'
-
-                try:
-                    tables_r = page.extract_tables({
-                        "vertical_strategy":   "text",
-                        "horizontal_strategy": "text",
-                        "snap_tolerance":      5,
-                        "join_tolerance":      5,
-                    })
-                    if tables_r:
-                        biggest_r = max(tables_r, key=len)
-                        page_info['relaxed_table'] = {
-                            'tables_found'     : len(tables_r),
-                            'rows_in_biggest'  : len(biggest_r),
-                            'columns_in_row_0' : len(biggest_r[0]) if biggest_r else 0,
-                            'first_3_rows'     : biggest_r[:3],
-                        }
-                    else:
-                        page_info['relaxed_table'] = 'NO TABLES FOUND'
-                except Exception as e:
-                    page_info['relaxed_table'] = f'ERROR: {e}'
-
-                try:
-                    raw = page.extract_text() or ''
-                    page_info['raw_text_lines'] = raw.splitlines()[:20]
-                except Exception as e:
-                    page_info['raw_text_lines'] = f'ERROR: {e}'
-
-                try:
-                    words = page.extract_words()
-                    page_info['first_10_words'] = [
-                        {'text': w['text'], 'x0': round(w['x0'], 1),
-                         'top': round(w['top'], 1)}
-                        for w in (words[:10] if words else [])
-                    ]
-                except Exception as e:
-                    page_info['first_10_words'] = f'ERROR: {e}'
-
-                results.append(page_info)
-
-    except Exception as e:
-        results = [{'fatal_error': str(e)}]
-
-    finally:
-        if os.path.exists(filepath):
-            os.remove(filepath)
-
-    html = '''
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Debug Results</title>
-        <style>
-            body  { font-family: Arial, sans-serif; padding: 20px;
-                    background: #f9f9f9; }
-            h2    { color: #222; }
-            h3    { color: #444; border-bottom: 2px solid #ddd;
-                    padding-bottom: 5px; }
-            pre   { background: #1e1e1e; color: #d4d4d4;
-                    padding: 15px; border-radius: 6px;
-                    overflow-x: auto; font-size: 13px;
-                    line-height: 1.5; }
-            .box  { background: white; border: 1px solid #ddd;
-                    border-radius: 8px; padding: 20px;
-                    margin-bottom: 25px; }
-            .back { display:inline-block; margin-bottom:20px;
-                    padding: 8px 18px; background:#555;
-                    color:white; border-radius:4px;
-                    text-decoration:none; }
-        </style>
-    </head>
-    <body>
-        <a class="back" href="/debug">← Upload Another</a>
-        <h2>🔍 PDF Debug Results</h2>
-    '''
-
-    for page_data in results:
-        pg  = page_data.get('page_number', '?')
-        tot = page_data.get('total_pages', '?')
-        html += f'<div class="box">'
-        html += f'<h3>Page {pg} of {tot}</h3>'
-        html += '<pre>'
-        html += json.dumps(page_data, indent=2,
-                           ensure_ascii=False, default=str)
-        html += '</pre>'
-        html += '</div>'
-
-    html += '</body></html>'
-    return html
 
 
 # ═══════════════════════════════════════════════════════════

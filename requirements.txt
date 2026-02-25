@@ -3,3 +3,4 @@ pymupdf
 openpyxl
 gunicorn
 pdfplumber
+flask-talisman
