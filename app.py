@@ -124,7 +124,10 @@ def login():
 def auth_callback():
     code = request.args.get('code')
     if code:
-        supabase.auth.exchange_code_for_session({"auth_code": code})
+        result = supabase.auth.exchange_code_for_session({"auth_code": code})
+        if result and result.session:
+            session['access_token'] = result.session.access_token
+            session['user_email'] = result.user.email
     return redirect('/')
 
 
@@ -145,9 +148,14 @@ def home():
 
     # ── Check login ──
     try:
-        user = supabase.auth.get_user()
-        is_logged_in = user is not None and user.user is not None
-        user_email = user.user.email if is_logged_in else None
+        access_token = session.get('access_token')
+        if access_token:
+            user = supabase.auth.get_user(access_token)
+            is_logged_in = user is not None and user.user is not None
+            user_email = user.user.email if is_logged_in else None
+        else:
+            is_logged_in = False
+            user_email = None
     except:
         is_logged_in = False
         user_email = None
