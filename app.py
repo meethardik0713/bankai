@@ -146,8 +146,8 @@ def home():
     # ── Check login ──
     try:
         user = supabase.auth.get_user()
-        is_logged_in = user is not None
-        user_email = user.user.email if user else None
+        is_logged_in = user is not None and user.user is not None
+        user_email = user.user.email if is_logged_in else None
     except:
         is_logged_in = False
         user_email = None
