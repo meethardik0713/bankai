@@ -5,3 +5,4 @@ gunicorn
 pdfplumber
 flask-talisman
 supabase
+python-dotenv
