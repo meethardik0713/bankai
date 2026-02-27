@@ -52,6 +52,7 @@ RATE_WINDOW = 60
 _CACHE      = {}
 _CACHE_LOCK = threading.Lock()
 _CACHE_TTL  = 1800   # 30 minutes
+PAGE_SIZE   = 100
 
 
 def _cache_get(file_hash: str):
@@ -266,7 +267,6 @@ def home():
                 filtered = all_transactions
 
             for t in filtered:
-                transaction_data.append(t)
                 if t.get('amount'):
                     amounts_count += 1
                     if t.get('type') == 'DR':
@@ -274,8 +274,15 @@ def home():
                     else:
                         total_credit += t['amount']
 
-            total = total_debit + total_credit
-            count = len(transaction_data)
+            total       = total_debit + total_credit
+            total_count = len(filtered)
+
+            page_num         = int(request.form.get('page', 1))
+            total_pages      = max(1, (total_count + PAGE_SIZE - 1) // PAGE_SIZE)
+            page_num         = max(1, min(page_num, total_pages))
+            start            = (page_num - 1) * PAGE_SIZE
+            transaction_data = filtered[start : start + PAGE_SIZE]
+            count            = total_count
 
     elif request.method == 'GET' and cached_hash:
         selected_filename = cached_name
@@ -296,7 +303,12 @@ def home():
         cached_filename   = session.get('file_name', ''),
         is_logged_in      = is_logged_in,
         user_email        = user_email,
+        page_num          = page_num if 'page_num' in dir() else 1,
+    total_pages       = total_pages if 'total_pages' in dir() else 1,
+    total_count       = total_count if 'total_count' in dir() else 0,
     )
+
+         
 
 
 @app.route('/clear', methods=['POST'])
@@ -376,7 +388,7 @@ def accuracy_check():
     # ── Check 1: Missing fields ───────────────────────────
     missing_date    = sum(1 for t in transactions if not t.get('date'))
     missing_amount  = sum(1 for t in transactions if not t.get('amount'))
-    missing_balance = sum(1 for t in transactions if not t.get('balance'))
+    missing_balance = sum(1 for t in transactions if t.get('balance') is None)
     missing_desc    = sum(1 for t in transactions if not t.get('desc'))
 
     # ── Check 2: Balance continuity ───────────────────────
@@ -426,8 +438,18 @@ def accuracy_check():
         if t.get('type') == 'DR' and t.get('amount')
     )
 
+    # HDFC fix: agar opening balance 0 hai aur pehla txn CR hai
+    # toh wo account opening entry hai, credits se bahar rakhna chahiye
+    if opening_bal == 0 and transactions[0].get('type') == 'CR':
+        total_credits -= transactions[0].get('amount', 0)
+        opening_bal    = transactions[0].get('amount', 0)
+
     if opening_bal is not None and closing_bal is not None:
-        calculated_closing = round(opening_bal + total_credits - total_debits, 2)
+        # If opening balance is also counted in credits, subtract it
+        adjusted_credits = total_credits
+        if opening_bal > 0 and abs(total_credits - opening_bal - (closing_bal - opening_bal + total_debits)) <= 1.0:
+            adjusted_credits = total_credits - opening_bal
+        calculated_closing = round(opening_bal + adjusted_credits - total_debits, 2)
         closing_diff       = round(abs(calculated_closing - closing_bal), 2)
         balance_match      = closing_diff <= 1.0
     else:

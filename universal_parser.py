@@ -194,7 +194,26 @@ def parse_transactions(pdf_path: str) -> list:
             print(f"[parser] Opening balance: "
                   f"₹{transactions[0]['opening_balance']:,.2f}")
 
+        # Fix missing balance using prev balance ± amount
+        for i, txn in enumerate(transactions):
+            if txn.get('balance') is None or txn.get('balance') == 0:
+                print(f"[DEBUG MISSING BAL] index={i} txn={txn}")
+            if not txn.get('date'):
+                print(f"[DEBUG MISSING DATE] index={i} txn={txn}")
+            if not txn.get('description'):
+                print(f"[DEBUG MISSING DESC] index={i} txn={txn}")
+            if txn.get('balance') is None and txn.get('amount') is not None:
+                if i == 0:
+                    prev_bal = ob if ob is not None else 0
+                else:
+                    prev_bal = transactions[i-1].get('balance', 0)
+                if txn.get('type') == 'CR':
+                    txn['balance'] = round(prev_bal + txn['amount'], 2)
+                else:
+                    txn['balance'] = round(prev_bal - txn['amount'], 2)
+
         return transactions
+
 
     except Exception as e:
         import traceback
@@ -1027,7 +1046,7 @@ def _get_continuation(row: list, ignored: set) -> str:
         str(c).strip() for ci, c in enumerate(row)
         if ci not in ignored and str(c).strip()
     )
-    if len(text) < 3 or _should_skip_row([text]):
+    if len(text) < 3 or len(text) > 150 or _should_skip_row([text]):
         return ''
     return text
 
@@ -1103,7 +1122,14 @@ def _normalize(txns: list, opening_balance: float = None) -> list:
             continue
         seen.add(key)
         t['date']     = norm_date or t['date']
-        t['desc']     = _RE_WHITESPACE.sub(' ', t.get('desc') or '').strip()
+        raw_desc = _RE_WHITESPACE.sub(' ', t.get('desc') or '').strip()
+        # Strip junk — anything after common legal/bank footer keywords
+        for _junk in ['rbi mandate', 'important information', 'account no.', 
+                      'kotak mahindra bank', 'statement generated']:
+            _ji = raw_desc.lower().find(_junk)
+            if _ji > 10:
+                raw_desc = raw_desc[:_ji].strip()
+        t['desc'] = raw_desc[:200].strip()
         t['category'] = _categorize(t['desc'])
         result.append(t)
 

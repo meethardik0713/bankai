@@ -371,6 +371,30 @@
     </table>
   </div>
 
+  {% if total_pages is defined and total_pages > 1 %}
+  <div style="display:flex; gap:12px; align-items:center; justify-content:center; margin-bottom:40px;">
+    <form method="POST" action="/">
+      <input type="hidden" name="keyword" value="{{ keyword }}">
+      <input type="hidden" name="page" value="{{ page_num - 1 }}">
+      {% if page_num > 1 %}
+      <button type="submit" class="export-btn">← Prev</button>
+      {% endif %}
+    </form>
+
+    <span style="font-size:0.78rem; letter-spacing:0.15em; color:var(--muted); text-transform:uppercase;">
+      Page {{ page_num }} of {{ total_pages }} &nbsp;·&nbsp; {{ total_count }} transactions
+    </span>
+
+    <form method="POST" action="/">
+      <input type="hidden" name="keyword" value="{{ keyword }}">
+      <input type="hidden" name="page" value="{{ page_num + 1 }}">
+      {% if page_num < total_pages %}
+      <button type="submit" class="export-btn">Next →</button>
+      {% endif %}
+    </form>
+  </div>
+  {% endif %}
+
   {% elif keyword %}
   <div class="results-box reveal">
     <p class="no-results">No transactions found for "{{ keyword }}"</p>
