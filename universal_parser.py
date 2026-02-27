@@ -149,8 +149,13 @@ def parse_transactions(pdf_path: str) -> list:
 
         if bank == 'canara':
             transactions = _parse_canara(pdf_path)
+        elif bank == 'hdfc':
+            transactions = _parse_hdfc(pdf_path)
         else:
+            ob = _extract_opening_balance_from_pdf(pdf_path)
             pages = _extract_pdf(pdf_path)
+            if ob is None:
+                ob = _extract_opening_balance_from_table(pages)
             if not pages:
                 print("[parser] No content extracted from PDF")
                 return []
@@ -179,7 +184,7 @@ def parse_transactions(pdf_path: str) -> list:
 
             if not raw:
                 return []
-            transactions = _normalize(raw)
+            transactions = _normalize(raw, opening_balance=ob)
 
         print(f"[parser] Final transactions: {len(transactions)}  "
               f"({time.time()-start:.2f}s)")
@@ -215,6 +220,11 @@ def _detect_bank(pdf_path: str) -> str:
                 'canara savings', 'canarabank'
             ]):
                 return 'canara'
+
+            if any(k in text_low for k in [
+                'hdfc bank', 'hdfcbank', 'hdfc bank ltd', 'hdfc bank limited'
+            ]):
+                return 'hdfc'
 
             if any(k in text_low for k in [
                 'kotak', 'kotak mahindra', '811'
@@ -255,6 +265,76 @@ def _extract_opening_balance_from_pdf(pdf_path: str) -> float:
     except Exception:
         pass
     return None
+
+
+# ═══════════════════════════════════════════════════════════
+#  HDFC BANK PARSER  (collapsed table layout)
+# ═══════════════════════════════════════════════════════════
+
+def _parse_hdfc(pdf_path: str) -> list:
+    DATE_PAT = re.compile(r'^\d{2}/\d{2}/\d{2}$')
+
+    def _clean_amt(s):
+        if not s:
+            return 0.0
+        s = re.sub(r'[₹,\s]', '', str(s).strip())
+        try:
+            return float(s)
+        except:
+            return 0.0
+
+    all_dates      = []
+    all_balances   = []
+    all_narrations = []
+
+    try:
+        with pdfplumber.open(pdf_path) as pdf:
+            for page in pdf.pages:
+                tables = page.extract_tables()
+                if not tables:
+                    continue
+                for row in tables[0]:
+                    if not row or not row[0]:
+                        continue
+                    if 'date' in str(row[0]).lower():
+                        continue
+                    if len(row) < 7:
+                        continue
+                    dates    = [d.strip() for d in str(row[0]).split('\n') if DATE_PAT.match(d.strip())]
+                    balances = [b.strip() for b in str(row[6] or '').split('\n') if b.strip()]
+                    if not dates or len(dates) != len(balances):
+                        continue
+                    narr_lines = [n.strip() for n in str(row[1] or '').split('\n') if n.strip()]
+                    chunk      = max(1, len(narr_lines) // len(dates))
+                    for i, (d, b) in enumerate(zip(dates, balances)):
+                        all_dates.append(d)
+                        all_balances.append(_clean_amt(b))
+                        start = i * chunk
+                        narr  = ' '.join(narr_lines[start:start + chunk])
+                        all_narrations.append(narr)
+    except Exception as e:
+        import traceback
+        print(f"[hdfc] Fatal: {e}")
+        traceback.print_exc()
+        return []
+
+    transactions = []
+    for i, (date, bal) in enumerate(zip(all_dates, all_balances)):
+        prev_bal = all_balances[i - 1] if i > 0 else 0.0
+        diff     = round(bal - prev_bal, 2)
+        txn_type = 'CR' if diff >= 0 else 'DR'
+        amount   = abs(diff)
+        narr     = all_narrations[i] if i < len(all_narrations) else ''
+        transactions.append({
+            'date':    date,
+            'desc':    narr,
+            'amount':  amount,
+            'type':    txn_type,
+            'balance': bal,
+        })
+
+    print(f"[hdfc] Transactions parsed: {len(transactions)}")
+    return _normalize(transactions)
 
 
 # ═══════════════════════════════════════════════════════════
@@ -405,6 +485,18 @@ def _canara_clean_desc(desc: str) -> str:
 #  STAGE 1 — PDF EXTRACTION  (Kotak / generic)
 # ═══════════════════════════════════════════════════════════
 
+def _extract_opening_balance_from_table(pages: list) -> float:
+    for page in pages:
+        for row in page:
+            combined = ' '.join(str(c) for c in row).lower()
+            if 'opening balance' in combined:
+                for cell in row:
+                    val = _parse_amt(str(cell))
+                    if val > 0:
+                        print(f"[parser] OB from table: ₹{val:,.2f}")
+                        return val
+    return None
+
 def _extract_pdf(pdf_path: str) -> list:
     try:
         pdf = pdfplumber.open(pdf_path)
@@ -497,7 +589,7 @@ def _recover_footer_rows_from_text(text: str, seen_indices: set) -> list:
 
 
 def _build_recovered_row(pending: dict, re_amount) -> list:
-    rest    = pending['rest'].strip()
+    rest    = pending['rest'].strip()[:300]
     amounts = re_amount.findall(rest)
 
     balance    = ''
@@ -881,6 +973,8 @@ def _parse_row(row: list, col_map: dict, ignored: set) -> dict:
     desc = _RE_VALUE_DATE.sub('', desc)
     desc = _RE_CHQ_SUFFIX.sub('', desc)
     desc = _RE_WHITESPACE.sub(' ', desc).strip()
+    if len(desc) > 200:
+        desc = desc[:200].strip()
 
     reference = ''
     if 'reference' in col_map:
@@ -942,7 +1036,7 @@ def _get_continuation(row: list, ignored: set) -> str:
 #  STAGE 4 — NORMALIZATION  (both banks)
 # ═══════════════════════════════════════════════════════════
 
-def _normalize(txns: list) -> list:
+def _normalize(txns: list, opening_balance: float = None) -> list:
     if not txns:
         return []
 
@@ -951,27 +1045,32 @@ def _normalize(txns: list) -> list:
     b0    = first.get('balance')
     amt0  = first.get('amount', 0)
 
-    opening_balance = None
-
-    if b0 is not None and amt0:
-        implied_cr = round(b0 - amt0, 2)   # OB if first txn was a credit
-        implied_dr = round(b0 + amt0, 2)   # OB if first txn was a debit
-
-        if abs(b0 - amt0) <= max(1.0, amt0 * 0.01):
-            # Balance ≈ amount → truly the first-ever deposit, OB was 0
-            opening_balance  = 0.0
-            first['type']    = 'CR'
-            print(f"[normalize] First txn looks like opening deposit → OB=0.00")
-        elif implied_cr >= 0:
-            # Opening balance was positive; first txn was a credit
-            opening_balance  = implied_cr
-            first['type']    = 'CR'
-            print(f"[normalize] Inferred OB (CR path): ₹{opening_balance:,.2f}")
-        elif implied_dr >= 0:
-            # Opening balance was positive; first txn was a debit
-            opening_balance  = implied_dr
-            first['type']    = 'DR'
-            print(f"[normalize] Inferred OB (DR path): ₹{opening_balance:,.2f}")
+    if opening_balance is None:
+        if b0 is not None and amt0:
+            implied_cr = round(b0 - amt0, 2)
+            implied_dr = round(b0 + amt0, 2)
+            if abs(b0 - amt0) <= max(1.0, amt0 * 0.01):
+                opening_balance = 0.0
+                first['type']   = 'CR'
+                print(f"[normalize] First txn looks like opening deposit → OB=0.00")
+            elif implied_cr >= 0:
+                opening_balance = implied_cr
+                first['type']   = 'CR'
+                print(f"[normalize] Inferred OB (CR path): ₹{opening_balance:,.2f}")
+            elif implied_dr >= 0:
+                opening_balance = implied_dr
+                first['type']   = 'DR'
+                print(f"[normalize] Inferred OB (DR path): ₹{opening_balance:,.2f}")
+    else:
+        if b0 is not None and amt0:
+            diff = round(b0 - opening_balance, 2)
+            tol  = max(1.0, round(amt0 * 0.01, 2))
+            if abs(diff - amt0) <= tol:
+                first['type'] = 'CR'
+                print(f"[normalize] OB from PDF → first txn CR")
+            elif abs(diff + amt0) <= tol:
+                first['type'] = 'DR'
+                print(f"[normalize] OB from PDF → first txn DR")
 
     # ── Step 2: fix transaction types using sequential balance diff ───
     for i in range(1, len(txns)):

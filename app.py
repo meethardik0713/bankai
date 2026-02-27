@@ -162,6 +162,8 @@ def home():
     ip = request.remote_addr
     if request.method == 'POST' and is_rate_limited(ip):
         abort(429)
+    if request.method == 'POST':
+        print(f"[DEBUG] POST received, files: {request.files}, form: {request.form.keys()}")
 
     # ── Check login ──
     try:
@@ -231,6 +233,9 @@ def home():
                     except Exception as e:
                         logger.exception("Error parsing %s", safe_name)
                         error_message = f'Could not parse the file: {e}'
+                        print(f"[ERROR] {e}")
+                        import traceback
+                        traceback.print_exc()
                     finally:
                         if os.path.exists(filepath):
                             os.remove(filepath)
