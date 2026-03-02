@@ -12,6 +12,7 @@ from io import BytesIO
 from collections import defaultdict
 from werkzeug.utils import secure_filename
 from universal_parser import parse_transactions
+from core.verifier import run_accuracy_check
 from supabase import create_client, Client
 
 SUPABASE_URL = os.environ.get('SUPABASE_URL')
@@ -19,25 +20,21 @@ SUPABASE_KEY = os.environ.get('SUPABASE_KEY')
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ── Logging ───────────────────────────────────────────────
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s %(levelname)s %(message)s',
-)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
 logger = logging.getLogger(__name__)
 
 # ── App setup ─────────────────────────────────────────────
-
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', os.urandom(32))
 
 is_prod = os.environ.get('RAILWAY_ENVIRONMENT') is not None
-
 Talisman(app,
     force_https=is_prod,
     strict_transport_security=is_prod,
     session_cookie_secure=is_prod,
     content_security_policy=False
 )
+
 UPLOAD_FOLDER = 'uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024
@@ -48,11 +45,12 @@ request_counts = defaultdict(list)
 RATE_LIMIT  = 10
 RATE_WINDOW = 60
 
-# ── In-memory transaction cache ───────────────────────────
+# ── In-memory cache ───────────────────────────────────────
 _CACHE      = {}
 _CACHE_LOCK = threading.Lock()
-_CACHE_TTL  = 1800   # 30 minutes
+_CACHE_TTL  = 1800
 PAGE_SIZE   = 100
+_PDF_MAGIC  = b'%PDF'
 
 
 def _cache_get(file_hash: str):
@@ -70,11 +68,7 @@ def _cache_set(file_hash: str, transactions: list, filename: str):
         if len(_CACHE) >= 10:
             oldest = min(_CACHE, key=lambda k: _CACHE[k]['ts'])
             del _CACHE[oldest]
-        _CACHE[file_hash] = {
-            'transactions': transactions,
-            'filename':     filename,
-            'ts':           time.time(),
-        }
+        _CACHE[file_hash] = {'transactions': transactions, 'filename': filename, 'ts': time.time()}
 
 
 def _file_hash(file_storage) -> str:
@@ -83,13 +77,9 @@ def _file_hash(file_storage) -> str:
     return hashlib.md5(chunk).hexdigest()
 
 
-_PDF_MAGIC = b'%PDF'
-
-
 def is_rate_limited(ip: str) -> bool:
     now = time.time()
-    request_counts[ip] = [t for t in request_counts[ip]
-                           if now - t < RATE_WINDOW]
+    request_counts[ip] = [t for t in request_counts[ip] if now - t < RATE_WINDOW]
     if len(request_counts[ip]) >= RATE_LIMIT:
         return True
     request_counts[ip].append(now)
@@ -108,17 +98,30 @@ def _sanitize_desc(value: str) -> str:
         value = "'" + value
     return value
 
-# ── Auth Routes ───────────────────────────────────────────
+
+def _get_current_user():
+    try:
+        access_token = session.get('access_token')
+        if access_token:
+            user = supabase.auth.get_user(access_token)
+            if user and user.user:
+                return True, user.user.email
+    except Exception:
+        pass
+    return False, None
+
+
+# ═══════════════════════════════════════════════════════════
+#  AUTH ROUTES
+# ═══════════════════════════════════════════════════════════
 
 @app.route('/login')
 def login():
-    if os.environ.get('RAILWAY_ENVIRONMENT'):
-        redirect_url = 'https://www.aarogyamfin.com/auth/callback'
-    else:
-        redirect_url = request.host_url + 'auth/callback'
+    redirect_url = ('https://www.aarogyamfin.com/auth/callback'
+                    if is_prod else request.host_url + 'auth/callback')
     response = supabase.auth.sign_in_with_oauth({
         "provider": "google",
-        "options": {"redirect_to": redirect_url}
+        "options":  {"redirect_to": redirect_url}
     })
     return redirect(response.url)
 
@@ -131,31 +134,28 @@ def auth_callback():
             result = supabase.auth.exchange_code_for_session({"auth_code": code})
             if result and result.session:
                 session['access_token'] = result.session.access_token
-                session['user_email'] = result.user.email
+                session['user_email']   = result.user.email
                 logger.info("Login success: %s", result.user.email)
-            else:
-                logger.error("No session in result: %s", result)
         except Exception as e:
             logger.exception("Auth callback error: %s", e)
-    else:
-        logger.warning("No code in callback. Args: %s", request.args)
     return redirect('/')
 
 
 @app.route('/debug-auth')
 def debug_auth():
-    return {
-        'access_token_in_session': session.get('access_token') is not None,
-        'session_keys': list(session.keys()),
-    }
+    return {'access_token_in_session': session.get('access_token') is not None,
+            'session_keys': list(session.keys())}
+
 
 @app.route('/logout')
 def logout():
     supabase.auth.sign_out()
     session.clear()
     return redirect('/')
+
+
 # ═══════════════════════════════════════════════════════════
-#  ROUTES
+#  MAIN ROUTE
 # ═══════════════════════════════════════════════════════════
 
 @app.route('/', methods=['GET', 'POST'])
@@ -163,22 +163,8 @@ def home():
     ip = request.remote_addr
     if request.method == 'POST' and is_rate_limited(ip):
         abort(429)
-    if request.method == 'POST':
-        print(f"[DEBUG] POST received, files: {request.files}, form: {request.form.keys()}")
 
-    # ── Check login ──
-    try:
-        access_token = session.get('access_token')
-        if access_token:
-            user = supabase.auth.get_user(access_token)
-            is_logged_in = user is not None and user.user is not None
-            user_email = user.user.email if is_logged_in else None
-        else:
-            is_logged_in = False
-            user_email = None
-    except:
-        is_logged_in = False
-        user_email = None
+    is_logged_in, user_email = _get_current_user()
 
     transaction_data  = []
     keyword           = ''
@@ -190,20 +176,21 @@ def home():
     selected_filename = ''
     error_message     = ''
     parse_time        = None
+    page_num          = 1
+    total_pages       = 1
+    total_count       = 0
 
     cached_hash = session.get('file_hash')
     cached_name = session.get('file_name', '')
 
     if request.method == 'POST':
-        keyword = request.form.get('keyword', '')[:100]
-        file    = request.files.get('pdf_file')
+        keyword       = request.form.get('keyword', '')[:100]
+        file          = request.files.get('pdf_file')
         file_uploaded = file and file.filename
-
         all_transactions = []
 
         if file_uploaded:
             safe_name = secure_filename(file.filename)
-
             if not safe_name.lower().endswith('.pdf'):
                 error_message = 'Only PDF files are accepted.'
             elif len(safe_name) >= 200:
@@ -211,9 +198,8 @@ def home():
             elif not _is_valid_pdf(file):
                 error_message = 'Uploaded file does not appear to be a valid PDF.'
             else:
-                fhash = _file_hash(file)
+                fhash  = _file_hash(file)
                 cached = _cache_get(fhash)
-
                 if cached:
                     all_transactions  = cached['transactions']
                     selected_filename = cached['filename']
@@ -223,9 +209,9 @@ def home():
                     filepath = os.path.join(app.config['UPLOAD_FOLDER'], safe_name)
                     file.save(filepath)
                     try:
-                        t0 = time.time()
+                        t0               = time.time()
                         all_transactions = parse_transactions(filepath)
-                        parse_time = round(time.time() - t0, 1)
+                        parse_time       = round(time.time() - t0, 1)
                         _cache_set(fhash, all_transactions, safe_name)
                         session['file_hash'] = fhash
                         session['file_name'] = safe_name
@@ -234,9 +220,6 @@ def home():
                     except Exception as e:
                         logger.exception("Error parsing %s", safe_name)
                         error_message = f'Could not parse the file: {e}'
-                        print(f"[ERROR] {e}")
-                        import traceback
-                        traceback.print_exc()
                     finally:
                         if os.path.exists(filepath):
                             os.remove(filepath)
@@ -276,12 +259,11 @@ def home():
 
             total       = total_debit + total_credit
             total_count = len(filtered)
-
-            page_num         = int(request.form.get('page', 1))
-            total_pages      = max(1, (total_count + PAGE_SIZE - 1) // PAGE_SIZE)
-            page_num         = max(1, min(page_num, total_pages))
+            page_num    = int(request.form.get('page', 1))
+            total_pages = max(1, (total_count + PAGE_SIZE - 1) // PAGE_SIZE)
+            page_num    = max(1, min(page_num, total_pages))
             start            = (page_num - 1) * PAGE_SIZE
-            transaction_data = filtered[start : start + PAGE_SIZE]
+            transaction_data = filtered[start: start + PAGE_SIZE]
             count            = total_count
 
     elif request.method == 'GET' and cached_hash:
@@ -303,12 +285,10 @@ def home():
         cached_filename   = session.get('file_name', ''),
         is_logged_in      = is_logged_in,
         user_email        = user_email,
-        page_num          = page_num if 'page_num' in dir() else 1,
-    total_pages       = total_pages if 'total_pages' in dir() else 1,
-    total_count       = total_count if 'total_count' in dir() else 0,
+        page_num          = page_num,
+        total_pages       = total_pages,
+        total_count       = total_count,
     )
-
-         
 
 
 @app.route('/clear', methods=['POST'])
@@ -356,7 +336,6 @@ def accuracy_check():
         return render_template('accuracy.html', error="No file uploaded.")
 
     safe_name = secure_filename(file.filename)
-
     if not safe_name.lower().endswith('.pdf'):
         return render_template('accuracy.html', error="Only PDF files accepted.")
     if len(safe_name) >= 200:
@@ -368,9 +347,9 @@ def accuracy_check():
     file.save(filepath)
 
     try:
-        t0 = time.time()
+        t0           = time.time()
         transactions = parse_transactions(filepath)
-        parse_time = round(time.time() - t0, 1)
+        parse_time   = round(time.time() - t0, 1)
         logger.info("Accuracy test: parsed %s → %d txns in %.1fs",
                     safe_name, len(transactions), parse_time)
     except Exception as e:
@@ -383,109 +362,10 @@ def accuracy_check():
     if not transactions:
         return render_template('accuracy.html', error="No transactions found in this PDF.")
 
-    total = len(transactions)
+    # ── All accuracy logic now in core/verifier.py ────────
+    report = run_accuracy_check(transactions)
 
-    # ── Check 1: Missing fields ───────────────────────────
-    missing_date    = sum(1 for t in transactions if not t.get('date'))
-    missing_amount  = sum(1 for t in transactions if not t.get('amount'))
-    missing_balance = sum(1 for t in transactions if t.get('balance') is None)
-    missing_desc    = sum(1 for t in transactions if not t.get('desc'))
-
-    # ── Check 2: Balance continuity ───────────────────────
-    balance_errors = []
-    for i in range(1, len(transactions)):
-        prev = transactions[i - 1]
-        curr = transactions[i]
-
-        prev_bal = prev.get('balance')
-        curr_bal = curr.get('balance')
-        amount   = curr.get('amount')
-        txn_type = curr.get('type', '')
-
-        if prev_bal is None or curr_bal is None or amount is None:
-            continue
-
-        if txn_type == 'CR':
-            expected = round(prev_bal + amount, 2)
-        elif txn_type == 'DR':
-            expected = round(prev_bal - amount, 2)
-        else:
-            continue
-
-        actual = round(curr_bal, 2)
-        diff   = round(abs(expected - actual), 2)
-
-        if diff > 1.0:
-            balance_errors.append({
-                'row'     : i + 1,
-                'date'    : curr.get('date', 'N/A'),
-                'desc'    : (curr.get('desc') or '')[:40],
-                'expected': expected,
-                'actual'  : actual,
-                'diff'    : diff,
-            })
-
-    # ── Check 3: Opening / Closing balance ────────────────
-    opening_bal = transactions[0].get('opening_balance') or transactions[0].get('balance')
-    closing_bal = transactions[-1].get('balance')
-
-    total_credits = sum(
-        t['amount'] for t in transactions
-        if t.get('type') == 'CR' and t.get('amount')
-    )
-    total_debits = sum(
-        t['amount'] for t in transactions
-        if t.get('type') == 'DR' and t.get('amount')
-    )
-
-    # HDFC fix: agar opening balance 0 hai aur pehla txn CR hai
-    # toh wo account opening entry hai, credits se bahar rakhna chahiye
-    if opening_bal == 0 and transactions[0].get('type') == 'CR':
-        total_credits -= transactions[0].get('amount', 0)
-        opening_bal    = transactions[0].get('amount', 0)
-
-    if opening_bal is not None and closing_bal is not None:
-        # If opening balance is also counted in credits, subtract it
-        adjusted_credits = total_credits
-        if opening_bal > 0 and abs(total_credits - opening_bal - (closing_bal - opening_bal + total_debits)) <= 1.0:
-            adjusted_credits = total_credits - opening_bal
-        calculated_closing = round(opening_bal + adjusted_credits - total_debits, 2)
-        closing_diff       = round(abs(calculated_closing - closing_bal), 2)
-        balance_match      = closing_diff <= 1.0
-    else:
-        calculated_closing = None
-        closing_diff       = None
-        balance_match      = None
-
-    # ── Accuracy Score ─────────────────────────────────────
-    continuity_ok  = (total - 1) - len(balance_errors)
-    continuity_pct = round((continuity_ok / (total - 1)) * 100, 1) if total > 1 else 100.0
-    fields_ok      = total - max(missing_date, missing_amount, missing_balance)
-    fields_pct     = round((fields_ok / total) * 100, 1)
-    overall_score  = round((continuity_pct + fields_pct) / 2, 1)
-
-    return render_template(
-        'accuracy.html',
-        total              = total,
-        missing_date       = missing_date,
-        missing_amount     = missing_amount,
-        missing_balance    = missing_balance,
-        missing_desc       = missing_desc,
-        balance_errors     = balance_errors,
-        opening_bal        = opening_bal,
-        closing_bal        = closing_bal,
-        calculated_closing = calculated_closing,
-        closing_diff       = closing_diff,
-        balance_match      = balance_match,
-        total_credits      = round(total_credits, 2),
-        total_debits       = round(total_debits, 2),
-        continuity_pct     = continuity_pct,
-        fields_pct         = fields_pct,
-        overall_score      = overall_score,
-        filename           = safe_name,
-        parse_time         = parse_time,
-        error              = None,
-    )
+    return render_template('accuracy.html', filename=safe_name, parse_time=parse_time, **report)
 
 
 # ═══════════════════════════════════════════════════════════
@@ -509,21 +389,15 @@ def export():
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Transactions"
-    ws.append(["#", "Date", "Description", "Type",
-               "Amount (₹)", "Balance (₹)", "Category"])
+    ws.append(["#", "Date", "Description", "Type", "Amount (₹)", "Balance (₹)", "Category"])
 
     for i, (d, desc, a, b, tp, cat) in enumerate(
             zip(dates, descs, amounts, balances, types,
                 cats or [''] * len(dates)), 1):
-        try:
-            amt = float(a) if a else ''
-        except ValueError:
-            amt = ''
-        try:
-            bal = float(b) if b else ''
-        except ValueError:
-            bal = ''
-
+        try:    amt = float(a) if a else ''
+        except: amt = ''
+        try:    bal = float(b) if b else ''
+        except: bal = ''
         ws.append([i, d, _sanitize_desc(desc), tp, amt, bal, cat])
 
     output = BytesIO()
@@ -531,11 +405,7 @@ def export():
     output.seek(0)
 
     safe_kw = secure_filename(keyword) if keyword else 'transactions'
-    return send_file(
-        output,
-        download_name=f'transactions_{safe_kw}.xlsx',
-        as_attachment=True,
-    )
+    return send_file(output, download_name=f'transactions_{safe_kw}.xlsx', as_attachment=True)
 
 
 # ═══════════════════════════════════════════════════════════
@@ -551,10 +421,6 @@ def too_many_requests(e):
 def file_too_large(e):
     return "File too large. Maximum size is 10 MB.", 413
 
-
-# ═══════════════════════════════════════════════════════════
-#  ENTRY POINT
-# ═══════════════════════════════════════════════════════════
 
 if __name__ == '__main__':
     debug_mode = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
