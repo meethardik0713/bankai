@@ -14,6 +14,7 @@ from parsers.canara  import CanaraParser
 from parsers.sbi     import SBIParser
 from parsers.kotak   import KotakParser
 from parsers.generic import GenericParser
+from parsers.pnb     import PNBParser
 
 # ── Registry — order matters ──────────────────────────────
 PARSERS = [
@@ -21,6 +22,7 @@ PARSERS = [
     HDFCParser(),
     SBIParser(),
     KotakParser(),
+    PNBParser(),
 ]
 
 _FALLBACK = GenericParser()
