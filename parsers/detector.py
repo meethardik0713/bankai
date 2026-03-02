@@ -15,6 +15,8 @@ from parsers.sbi     import SBIParser
 from parsers.kotak   import KotakParser
 from parsers.generic import GenericParser
 from parsers.pnb     import PNBParser
+from parsers.bob import BOBParser
+
 
 # ── Registry — order matters ──────────────────────────────
 PARSERS = [
@@ -23,6 +25,7 @@ PARSERS = [
     SBIParser(),
     KotakParser(),
     PNBParser(),
+    BOBParser(),
 ]
 
 _FALLBACK = GenericParser()
