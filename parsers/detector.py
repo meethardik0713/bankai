@@ -9,17 +9,20 @@ Order matters — more specific checks should come first.
 
 import pdfplumber
 
-from parsers.hdfc    import HDFCParser
-from parsers.canara  import CanaraParser
-from parsers.sbi     import SBIParser
-from parsers.kotak   import KotakParser
-from parsers.generic import GenericParser
+from parsers.hdfc      import HDFCParser
+from parsers.canara    import CanaraParser
+from parsers.sbi       import SBIParser
+from parsers.kotak     import KotakParser
+from parsers.generic   import GenericParser
+from parsers.axis_bank import AxisBankParser
 from parsers.pnb     import PNBParser
 from parsers.bob import BOBParser
+from parsers.axis_bank import AxisBankParser
 
 
 # ── Registry — order matters ──────────────────────────────
 PARSERS = [
+    AxisBankParser(),
     CanaraParser(),
     HDFCParser(),
     SBIParser(),
