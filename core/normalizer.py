@@ -139,7 +139,7 @@ def _resolve_opening_balance(txns: list, opening_balance: float) -> float:
     amt0  = first.get('amount', 0)
 
     if opening_balance is None:
-        if b0 is not None and amt0:
+        if b0 is not None and amt0 and not first.get('_type_locked'):
             implied_cr = round(b0 - amt0, 2)
             implied_dr = round(b0 + amt0, 2)
             if abs(b0 - amt0) <= max(1.0, amt0 * 0.01):
@@ -155,7 +155,7 @@ def _resolve_opening_balance(txns: list, opening_balance: float) -> float:
                 first['type']   = 'DR'
                 print(f"[normalize] Inferred OB (DR path): ₹{opening_balance:,.2f}")
     else:
-        if b0 is not None and amt0:
+        if b0 is not None and amt0 and not first.get('_type_locked'):
             diff = round(b0 - opening_balance, 2)
             tol  = max(1.0, round(amt0 * 0.01, 2))
             if abs(diff - amt0) <= tol:
@@ -177,7 +177,7 @@ def _fix_types(txns: list):
         b_prev = prev.get('balance')
         amt    = curr.get('amount', 0)
 
-        if b_curr is not None and b_prev is not None and amt:
+        if b_curr is not None and b_prev is not None and amt and not curr.get('_type_locked'):
             diff = round(b_curr - b_prev, 2)
             tol  = max(1.0, round(amt * 0.01, 2))
             if abs(diff - amt) <= tol:
