@@ -35,11 +35,15 @@ _ADDRESS_FRAGMENTS = [
 
 class CanaraParser(BaseParser):
 
-    _DETECT_KEYWORDS = ['canara bank', 'cnrb', 'canara aspire',
-                        'canara savings', 'canarabank']
+    _IFSC_PREFIX = 'cnrb'
+    _COLUMN_SIGNAL = 'particulars'
 
     def detect_from_text(self, text_low: str) -> bool:
-        return any(k in text_low for k in self._DETECT_KEYWORDS)
+        has_ifsc = self._IFSC_PREFIX in text_low
+        has_columns = (self._COLUMN_SIGNAL in text_low
+                       and 'deposits' in text_low
+                       and 'withdrawals' in text_low)
+        return has_ifsc and has_columns
 
     def detect(self, pdf_path: str) -> bool:
         try:

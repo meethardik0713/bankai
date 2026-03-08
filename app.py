@@ -211,6 +211,7 @@ def home():
                     try:
                         t0               = time.time()
                         all_transactions = parse_transactions(filepath)
+                        print(f"[DEBUG] Transactions returned: {len(all_transactions)}")
                         parse_time       = round(time.time() - t0, 1)
                         _cache_set(fhash, all_transactions, safe_name)
                         session['file_hash'] = fhash

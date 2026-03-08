@@ -13,10 +13,11 @@ from core.utils      import extract_opening_balance_from_pdf, extract_opening_ba
 
 class KotakParser(BaseParser):
 
-    _DETECT_KEYWORDS = ['kotak', 'kotak mahindra', '811']
+    _IFSC_PREFIX = 'kkbk'
+    _COLUMN_SIGNAL = 'withdrawal (dr.)'
 
     def detect_from_text(self, text_low: str) -> bool:
-        return any(k in text_low for k in self._DETECT_KEYWORDS)
+        return self._IFSC_PREFIX in text_low and self._COLUMN_SIGNAL in text_low
 
     def detect(self, pdf_path: str) -> bool:
         try:
@@ -30,4 +31,3 @@ class KotakParser(BaseParser):
         # Kotak uses the same generic table engine — just delegates
         self._log("Delegating to GenericParser engine")
         return GenericParser().parse(pdf_path)
-    

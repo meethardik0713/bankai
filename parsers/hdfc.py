@@ -14,11 +14,14 @@ from core.normalizer   import normalize
 
 class HDFCParser(BaseParser):
 
-    _DETECT_KEYWORDS = ['hdfc bank', 'hdfcbank', 'hdfc bank ltd', 'hdfc bank limited']
-    _DATE_PAT        = re.compile(r'^\d{2}/\d{2}/\d{2}$')
+    _IFSC_PREFIX = 'hdfc0'
+    _COLUMN_SIGNALS = ['narration', 'closing balance']
+    _DATE_PAT = re.compile(r'^\d{2}/\d{2}/\d{2}$')
 
     def detect_from_text(self, text_low: str) -> bool:
-        return any(k in text_low for k in self._DETECT_KEYWORDS)
+        has_ifsc = self._IFSC_PREFIX in text_low
+        has_columns = all(c in text_low for c in self._COLUMN_SIGNALS)
+        return has_ifsc and has_columns
 
     def detect(self, pdf_path: str) -> bool:
         try:
