@@ -1,7 +1,7 @@
 """
 parsers/sbi.py
 ───────────────
-State Bank of India Statement Parser v6.
+State Bank of India Statement Parser v6.1
 Handles TWO distinct SBI statement formats:
 
   FORMAT A — Branch-printed (legacy)
@@ -17,6 +17,10 @@ Handles TWO distinct SBI statement formats:
     • Extraction: pdfplumber table extraction
 
 Auto-detects format from first page content.
+
+v6.1 fix: Page boundary duplicate transactions fixed.
+          _flush() now called ONCE after all pages processed,
+          not once per page (which caused splits to flush twice).
 """
 
 import re
@@ -277,6 +281,9 @@ class SBIParser(BaseParser):
                 break
 
         # Pass 2: block-based extraction
+        # FIX v6.1: flush called ONCE after ALL pages, not once per page.
+        # Flushing inside the page loop caused page-boundary-split transactions
+        # to be added twice (once incomplete at page end, once complete at page start).
         current_date  = None
         current_lines = []
 
@@ -303,7 +310,8 @@ class SBIParser(BaseParser):
                     if current_date is not None:
                         current_lines.append(line)
 
-            self._flush(current_date, current_lines, raw_txns)
+        # Flush the final transaction ONCE after all pages are done
+        self._flush(current_date, current_lines, raw_txns)
 
         self._log(f"Raw transactions parsed: {len(raw_txns)}")
 

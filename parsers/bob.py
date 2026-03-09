@@ -12,6 +12,9 @@ Actual PDF format (bob World app): 5 columns
 
 Date format: DD-MM-YYYY
 Opening Balance: Row with description "Opening Balance"
+
+v1.1 fix: Handles malformed dates like '02-092022' (missing hyphen)
+          that appear as PDF extraction artifacts in bob World statements.
 """
 
 import re
@@ -21,7 +24,10 @@ from core.normalizer import normalize
 from core.utils      import parse_amt
 
 
-_DATE_RE = re.compile(r'\b(\d{2}-\d{2}-\d{4})\b')
+# Primary: DD-MM-YYYY
+# Fallback: DD-MMYYYY (missing second hyphen, e.g. 02-092022)
+_DATE_RE = re.compile(r'\b(\d{2}-\d{2}-\d{4}|\d{2}-\d{2}\d{4})\b')
+
 _SKIP_RE = re.compile(
     r'(no\s+date\s+date|transaction\s+date|value\s+date|cheque\s+number|'
     r'serial\s+no|computer.generated|do\'s\s+and\s+don|scan\s+qr|'
@@ -30,6 +36,23 @@ _SKIP_RE = re.compile(
 )
 # Trailing PDF artifacts to strip from descriptions
 _TRAILING_JUNK = re.compile(r'\s+[a-zA-Z0-9]{1,2}$')
+
+
+def _normalize_date(raw: str) -> str:
+    """
+    Normalize any matched date string to DD-MM-YYYY.
+    Handles:
+      '02-09-2022' → '02-09-2022'  (already correct)
+      '02-092022'  → '02-09-2022'  (missing hyphen fix)
+    """
+    # Already correct format
+    if re.match(r'^\d{2}-\d{2}-\d{4}$', raw):
+        return raw
+    # Missing second hyphen: DD-MMYYYY → DD-MM-YYYY
+    m = re.match(r'^(\d{2})-(\d{2})(\d{4})$', raw)
+    if m:
+        return f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
+    return raw
 
 
 class BOBParser(BaseParser):
@@ -115,12 +138,12 @@ class BOBParser(BaseParser):
         if 'opening balance' in col0.lower():
             return 'opening'
 
-        # Must contain a valid date
+        # Must contain a valid date (including malformed ones)
         dates = _DATE_RE.findall(col0)
         if not dates:
             return None
 
-        date_str   = dates[0]                     # first date = transaction date
+        date_str   = _normalize_date(dates[0])   # fix malformed dates
         desc       = self._extract_desc(col0)
 
         debit_raw  = str(row[2] or '').strip() if len(row) > 2 else ''
@@ -155,6 +178,7 @@ class BOBParser(BaseParser):
           "12 07-06-2022 07-06-2022 MBK/200740880173/18:34:43/surbhai"
           "IMPS/P2A/.../ok\n11 07-06-2022 07-06-2022"
           "i UPI/208183687875/.../euronetgpay.pay@ic\n243 02-12-2022 02-12-2022"
+          "UPI/208184645072/...\n244 02-092022 02-092022"  ← malformed date
         """
         lines  = col0.split('\n')
         parts  = []
