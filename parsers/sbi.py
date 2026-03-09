@@ -79,14 +79,20 @@ class SBIParser(BaseParser):
         'sbin0', 'sbi bank', 'sbchq', 'sbnchq',
     ]
 
-    def detect_from_text(self, text_low: str) -> bool:
-        return any(k in text_low for k in self._DETECT_KEYWORDS)
-
     def detect(self, pdf_path: str) -> bool:
         try:
             with pdfplumber.open(pdf_path) as pdf:
                 text = (pdf.pages[0].extract_text() or '').lower()
-                return self.detect_from_text(text)
+
+                has_ifsc = 'sbin' in text
+
+                has_columns = (
+                    ('post date' in text and 'value date' in text and 'debit' in text and 'credit' in text)
+                    or
+                    ('txn date' in text and 'debit' in text and 'credit' in text)
+                )
+
+                return has_ifsc and has_columns
         except Exception:
             return False
 

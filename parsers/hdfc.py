@@ -18,17 +18,16 @@ class HDFCParser(BaseParser):
     _COLUMN_SIGNALS = ['narration', 'closing balance']
     _DATE_PAT = re.compile(r'^\d{2}/\d{2}/\d{2}$')
 
-    def detect_from_text(self, text_low: str) -> bool:
-        has_ifsc = self._IFSC_PREFIX in text_low
-        has_columns = all(c in text_low for c in self._COLUMN_SIGNALS)
-        return has_ifsc and has_columns
-
     def detect(self, pdf_path: str) -> bool:
         try:
             with pdfplumber.open(pdf_path) as pdf:
                 text = (pdf.pages[0].extract_text() or '').lower()
-                return self.detect_from_text(text)
-        except Exception:
+                has_ifsc = 'hdfc0' in text
+                has_columns = 'narration' in text and (
+                    'closing balance' in text or 'closingbalance' in text
+                )
+                return has_ifsc and has_columns
+        except Exception as e:
             return False
 
     def parse(self, pdf_path: str) -> list:

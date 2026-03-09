@@ -39,14 +39,18 @@ class BOBParser(BaseParser):
         'बैंक ऑफ़ बड़ौदा', 'बैंक ऑफ बड़ौदा'
     ]
 
-    def detect_from_text(self, text_low: str) -> bool:
-        return any(k in text_low for k in self._DETECT_KEYWORDS)
-
     def detect(self, pdf_path: str) -> bool:
         try:
             with pdfplumber.open(pdf_path) as pdf:
                 text = (pdf.pages[0].extract_text() or '').lower()
-                return self.detect_from_text(text)
+
+                has_ifsc = 'barb' in text
+
+                has_columns = all(h in text for h in [
+                    'debit', 'credit', 'balance', 'description'
+                ])
+
+                return has_ifsc and has_columns
         except Exception:
             return False
 

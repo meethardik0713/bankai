@@ -49,9 +49,12 @@ class ICICIBankParser(BaseParser):
         try:
             with pdfplumber.open(pdf_path) as pdf:
                 text = (pdf.pages[0].extract_text() or '').upper()
-                return ('ICICI' in text and
-                        'DEPOSITS' in text and
-                        'WITHDRAWALS' in text)
+                has_icici = (
+                    'ICICIBANK.COM' in text or
+                    'KHAYAAL AAPKA' in text
+                )
+                has_columns = 'DEPOSITS' in text and 'WITHDRAWALS' in text
+                return has_icici and has_columns
         except Exception:
             return False
 

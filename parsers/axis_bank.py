@@ -110,10 +110,15 @@ class AxisBankParser(BaseParser):
     _IFSC_PREFIX = 'utib'
     _COLUMN_SIGNALS = ['transaction particulars', 'dr/cr']
 
-    def detect_from_text(self, text_low: str) -> bool:
-        has_ifsc = self._IFSC_PREFIX in text_low
-        has_columns = all(c in text_low for c in self._COLUMN_SIGNALS)
-        return has_ifsc and has_columns
+    def detect(self, pdf_path: str) -> bool:
+        try:
+            with pdfplumber.open(pdf_path) as pdf:
+                text = (pdf.pages[0].extract_text() or '').lower()
+                has_ifsc = self._IFSC_PREFIX in text
+                has_columns = all(c in text for c in self._COLUMN_SIGNALS)
+                return has_ifsc and has_columns
+        except Exception:
+            return False
 
     def parse(self, pdf_path: str) -> list:
         transactions  = []

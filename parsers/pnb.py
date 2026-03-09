@@ -44,15 +44,16 @@ class PNBParser(BaseParser):
         'punjab national',
     ]
 
-    def detect_from_text(self, text_low: str) -> bool:
-        return any(k in text_low for k in self._DETECT_KEYWORDS)
-
     def detect(self, pdf_path: str) -> bool:
         try:
             with pdfplumber.open(pdf_path) as pdf:
                 text = (pdf.pages[0].extract_text() or '').lower()
-                return self.detect_from_text(text)
-        except Exception:
+                has_ifsc = 'punb' in text
+                has_columns = all(h in text for h in [
+                    'withdrawal', 'deposit', 'narration', 'cheque'
+                ])
+                return has_ifsc and has_columns
+        except Exception as e:    
             return False
 
     def parse(self, pdf_path: str) -> list:
