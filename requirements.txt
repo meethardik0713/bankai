@@ -6,3 +6,4 @@ pdfplumber
 flask-talisman
 supabase
 python-dotenv
+razorpay

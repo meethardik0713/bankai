@@ -6,7 +6,9 @@ import openpyxl
 import time
 import hashlib
 import threading
-from flask import Flask, request, render_template, send_file, abort, session, redirect
+import hmac
+import razorpay
+from flask import Flask, request, render_template, send_file, abort, session, redirect, jsonify
 from flask_talisman import Talisman
 from io import BytesIO
 from collections import defaultdict
@@ -18,6 +20,10 @@ from supabase import create_client, Client
 SUPABASE_URL = os.environ.get('SUPABASE_URL')
 SUPABASE_KEY = os.environ.get('SUPABASE_KEY')
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+RAZORPAY_KEY_ID     = os.environ.get('RAZORPAY_KEY_ID')
+RAZORPAY_KEY_SECRET = os.environ.get('RAZORPAY_KEY_SECRET')
+rzp_client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
 
 # ── Logging ───────────────────────────────────────────────
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
@@ -39,6 +45,9 @@ UPLOAD_FOLDER = 'uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+CHAT_MESSAGE_LIMIT = 10
+CHAT_SESSION_HOURS = 48
 
 # ── Rate limiting ─────────────────────────────────────────
 request_counts = defaultdict(list)
@@ -105,10 +114,28 @@ def _get_current_user():
         if access_token:
             user = supabase.auth.get_user(access_token)
             if user and user.user:
-                return True, user.user.email
+                return True, user.user.email, user.user.id
     except Exception:
         pass
-    return False, None
+    return False, None, None
+
+
+def _get_active_chat_session(user_id: str):
+    """Check if user has an active paid chat session."""
+    try:
+        result = supabase.table('chat_sessions').select('*').eq(
+            'user_id', user_id
+        ).eq('is_active', True).gt(
+            'expires_at', 'now()'
+        ).lt('messages_used', CHAT_MESSAGE_LIMIT).order(
+            'created_at', desc=True
+        ).limit(1).execute()
+
+        if result.data:
+            return result.data[0]
+    except Exception as e:
+        logger.exception("Error checking chat session: %s", e)
+    return None
 
 
 # ═══════════════════════════════════════════════════════════
@@ -135,6 +162,14 @@ def auth_callback():
             if result and result.session:
                 session['access_token'] = result.session.access_token
                 session['user_email']   = result.user.email
+                session['user_id']      = result.user.id
+
+                # Upsert user in users table
+                supabase.table('users').upsert({
+                    'id':    result.user.id,
+                    'email': result.user.email,
+                }).execute()
+
                 logger.info("Login success: %s", result.user.email)
         except Exception as e:
             logger.exception("Auth callback error: %s", e)
@@ -155,6 +190,141 @@ def logout():
 
 
 # ═══════════════════════════════════════════════════════════
+#  PAYMENT ROUTES
+# ═══════════════════════════════════════════════════════════
+
+@app.route('/pay')
+def pay_page():
+    is_logged_in, user_email, user_id = _get_current_user()
+    if not is_logged_in:
+        return redirect('/login')
+
+    # Check if already has active session
+    active = _get_active_chat_session(user_id)
+    if active:
+        return redirect('/chat')
+
+    return render_template('payment.html',
+        razorpay_key_id = RAZORPAY_KEY_ID,
+        user_email      = user_email,
+        is_logged_in    = is_logged_in,
+    )
+
+
+@app.route('/payment/create-order', methods=['POST'])
+def create_order():
+    is_logged_in, user_email, user_id = _get_current_user()
+    if not is_logged_in:
+        return jsonify({'error': 'Not logged in'}), 401
+
+    try:
+        # Create Razorpay order — ₹10 = 1000 paise
+        order = rzp_client.order.create({
+            'amount':   1000,
+            'currency': 'INR',
+            'payment_capture': 1,
+        })
+
+        # Save pending payment in Supabase
+        supabase.table('payments').insert({
+            'user_id':           user_id,
+            'amount':            10,
+            'status':            'pending',
+            'razorpay_order_id': order['id'],
+        }).execute()
+
+        logger.info("Order created: %s for %s", order['id'], user_email)
+        return jsonify({
+            'order_id': order['id'],
+            'amount':   1000,
+            'currency': 'INR',
+            'key_id':   RAZORPAY_KEY_ID,
+            'email':    user_email,
+        })
+
+    except Exception as e:
+        logger.exception("Order creation failed: %s", e)
+        return jsonify({'error': 'Order creation failed'}), 500
+
+
+@app.route('/payment/verify', methods=['POST'])
+def verify_payment():
+    is_logged_in, user_email, user_id = _get_current_user()
+    if not is_logged_in:
+        return jsonify({'error': 'Not logged in'}), 401
+
+    data               = request.get_json()
+    razorpay_order_id  = data.get('razorpay_order_id')
+    razorpay_payment_id = data.get('razorpay_payment_id')
+    razorpay_signature = data.get('razorpay_signature')
+
+    # Verify signature
+    try:
+        msg = f"{razorpay_order_id}|{razorpay_payment_id}"
+        expected = hmac.new(
+            RAZORPAY_KEY_SECRET.encode(),
+            msg.encode(),
+            hashlib.sha256
+        ).hexdigest()
+
+        if not hmac.compare_digest(expected, razorpay_signature):
+            logger.warning("Signature mismatch for order %s", razorpay_order_id)
+            return jsonify({'error': 'Payment verification failed'}), 400
+
+    except Exception as e:
+        logger.exception("Signature verification error: %s", e)
+        return jsonify({'error': 'Verification error'}), 500
+
+    try:
+        # Update payment status
+        result = supabase.table('payments').update({
+            'status':               'paid',
+            'razorpay_payment_id':  razorpay_payment_id,
+        }).eq('razorpay_order_id', razorpay_order_id).execute()
+
+        payment_id = result.data[0]['id'] if result.data else None
+
+        # Create chat session — 48 hours, 10 messages
+        supabase.table('chat_sessions').insert({
+            'user_id':      user_id,
+            'payment_id':   payment_id,
+            'messages_used': 0,
+            'is_active':    True,
+        }).execute()
+
+        logger.info("Payment verified + session created for %s", user_email)
+        return jsonify({'success': True, 'redirect': '/chat'})
+
+    except Exception as e:
+        logger.exception("Post-payment DB error: %s", e)
+        return jsonify({'error': 'Session creation failed'}), 500
+
+
+# ═══════════════════════════════════════════════════════════
+#  CHAT ROUTE (gated behind payment)
+# ═══════════════════════════════════════════════════════════
+
+@app.route('/chat')
+def chat_page():
+    is_logged_in, user_email, user_id = _get_current_user()
+    if not is_logged_in:
+        return redirect('/login')
+
+    active_session = _get_active_chat_session(user_id)
+    if not active_session:
+        return redirect('/pay')
+
+    messages_left = CHAT_MESSAGE_LIMIT - active_session['messages_used']
+
+    return render_template('chat.html',
+        is_logged_in  = is_logged_in,
+        user_email    = user_email,
+        messages_left = messages_left,
+        session_id    = active_session['id'],
+    )
+
+
+# ═══════════════════════════════════════════════════════════
 #  MAIN ROUTE
 # ═══════════════════════════════════════════════════════════
 
@@ -164,7 +334,7 @@ def home():
     if request.method == 'POST' and is_rate_limited(ip):
         abort(429)
 
-    is_logged_in, user_email = _get_current_user()
+    is_logged_in, user_email, user_id = _get_current_user()
 
     transaction_data  = []
     keyword           = ''
@@ -211,7 +381,6 @@ def home():
                     try:
                         t0               = time.time()
                         all_transactions = parse_transactions(filepath)
-                        print(f"[DEBUG] Transactions returned: {len(all_transactions)}")
                         parse_time       = round(time.time() - t0, 1)
                         _cache_set(fhash, all_transactions, safe_name)
                         session['file_hash'] = fhash
@@ -363,9 +532,7 @@ def accuracy_check():
     if not transactions:
         return render_template('accuracy.html', error="No transactions found in this PDF.")
 
-    # ── All accuracy logic now in core/verifier.py ────────
     report = run_accuracy_check(transactions)
-
     return render_template('accuracy.html', filename=safe_name, parse_time=parse_time, **report)
 
 
