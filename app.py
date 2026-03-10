@@ -15,6 +15,8 @@ from collections import defaultdict
 from werkzeug.utils import secure_filename
 from universal_parser import parse_transactions
 from core.verifier import run_accuracy_check
+from core.sqlite_indexer import build_index, drop_index, get_db
+from core.chat_engine import verify_data, chat as ai_chat
 from supabase import create_client, Client
 
 SUPABASE_URL = os.environ.get('SUPABASE_URL')
@@ -125,14 +127,21 @@ def _get_active_chat_session(user_id: str):
     try:
         result = supabase.table('chat_sessions').select('*').eq(
             'user_id', user_id
-        ).eq('is_active', True).gt(
-            'expires_at', 'now()'
-        ).lt('messages_used', CHAT_MESSAGE_LIMIT).order(
+        ).eq('is_active', True).lt(
+            'messages_used', CHAT_MESSAGE_LIMIT
+        ).order(
             'created_at', desc=True
         ).limit(1).execute()
 
         if result.data:
-            return result.data[0]
+            from datetime import datetime, timezone
+            session_data = result.data[0]
+            expires_at = session_data.get('expires_at')
+            if expires_at:
+                exp = datetime.fromisoformat(expires_at.replace('Z', '+00:00'))
+                if exp < datetime.now(timezone.utc):
+                    return None
+            return session_data
     except Exception as e:
         logger.exception("Error checking chat session: %s", e)
     return None
@@ -164,7 +173,6 @@ def auth_callback():
                 session['user_email']   = result.user.email
                 session['user_id']      = result.user.id
 
-                # Upsert user in users table
                 supabase.table('users').upsert({
                     'id':    result.user.id,
                     'email': result.user.email,
@@ -199,7 +207,6 @@ def pay_page():
     if not is_logged_in:
         return redirect('/login')
 
-    # Check if already has active session
     active = _get_active_chat_session(user_id)
     if active:
         return redirect('/chat')
@@ -218,14 +225,12 @@ def create_order():
         return jsonify({'error': 'Not logged in'}), 401
 
     try:
-        # Create Razorpay order — ₹10 = 1000 paise
         order = rzp_client.order.create({
-            'amount':   1000,
-            'currency': 'INR',
+            'amount':          1000,
+            'currency':        'INR',
             'payment_capture': 1,
         })
 
-        # Save pending payment in Supabase
         supabase.table('payments').insert({
             'user_id':           user_id,
             'amount':            10,
@@ -253,14 +258,13 @@ def verify_payment():
     if not is_logged_in:
         return jsonify({'error': 'Not logged in'}), 401
 
-    data               = request.get_json()
-    razorpay_order_id  = data.get('razorpay_order_id')
+    data                = request.get_json()
+    razorpay_order_id   = data.get('razorpay_order_id')
     razorpay_payment_id = data.get('razorpay_payment_id')
-    razorpay_signature = data.get('razorpay_signature')
+    razorpay_signature  = data.get('razorpay_signature')
 
-    # Verify signature
     try:
-        msg = f"{razorpay_order_id}|{razorpay_payment_id}"
+        msg      = f"{razorpay_order_id}|{razorpay_payment_id}"
         expected = hmac.new(
             RAZORPAY_KEY_SECRET.encode(),
             msg.encode(),
@@ -276,20 +280,18 @@ def verify_payment():
         return jsonify({'error': 'Verification error'}), 500
 
     try:
-        # Update payment status
         result = supabase.table('payments').update({
-            'status':               'paid',
-            'razorpay_payment_id':  razorpay_payment_id,
+            'status':              'paid',
+            'razorpay_payment_id': razorpay_payment_id,
         }).eq('razorpay_order_id', razorpay_order_id).execute()
 
         payment_id = result.data[0]['id'] if result.data else None
 
-        # Create chat session — 48 hours, 10 messages
         supabase.table('chat_sessions').insert({
-            'user_id':      user_id,
-            'payment_id':   payment_id,
+            'user_id':       user_id,
+            'payment_id':    payment_id,
             'messages_used': 0,
-            'is_active':    True,
+            'is_active':     True,
         }).execute()
 
         logger.info("Payment verified + session created for %s", user_email)
@@ -301,10 +303,10 @@ def verify_payment():
 
 
 # ═══════════════════════════════════════════════════════════
-#  CHAT ROUTE (gated behind payment)
+#  CHAT ROUTES
 # ═══════════════════════════════════════════════════════════
 
-@app.route('/chat')
+@app.route('/chat', methods=['GET', 'POST'])
 def chat_page():
     is_logged_in, user_email, user_id = _get_current_user()
     if not is_logged_in:
@@ -315,13 +317,100 @@ def chat_page():
         return redirect('/pay')
 
     messages_left = CHAT_MESSAGE_LIMIT - active_session['messages_used']
+    session_id    = str(active_session['id'])
+
+    db_ready      = get_db(session_id) is not None
+    upload_error  = None
+    verify_report = None
+
+    # ── PDF uploaded directly on /chat ────────────────────
+    if request.method == 'POST' and 'pdf_file' in request.files:
+        file = request.files.get('pdf_file')
+        if file and file.filename:
+            safe_name = secure_filename(file.filename)
+            if not safe_name.lower().endswith('.pdf'):
+                upload_error = 'Only PDF files accepted.'
+            elif not _is_valid_pdf(file):
+                upload_error = 'Invalid PDF file.'
+            else:
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], safe_name)
+                file.save(filepath)
+                try:
+                    transactions = parse_transactions(filepath)
+                    if transactions:
+                        row_count     = build_index(session_id, transactions)
+                        verify_report = verify_data(session_id)
+                        db_ready      = True
+                        logger.info("Chat DB built: %d rows for session %s", row_count, session_id)
+                    else:
+                        upload_error = 'No transactions found in PDF.'
+                except Exception as e:
+                    upload_error = f'Parse error: {e}'
+                finally:
+                    if os.path.exists(filepath):
+                        os.remove(filepath)
+
+    # ── Auto-load from main page cache ───────────────────
+    elif not db_ready:
+        cached_hash = session.get('file_hash')
+        if cached_hash:
+            cached = _cache_get(cached_hash)
+            if cached and cached.get('transactions'):
+                row_count     = build_index(session_id, cached['transactions'])
+                verify_report = verify_data(session_id)
+                db_ready      = True
+                logger.info("Chat DB auto-loaded from cache: %d rows", row_count)
 
     return render_template('chat.html',
         is_logged_in  = is_logged_in,
         user_email    = user_email,
         messages_left = messages_left,
-        session_id    = active_session['id'],
+        session_id    = session_id,
+        db_ready      = db_ready,
+        verify_report = verify_report,
+        upload_error  = upload_error,
     )
+
+
+@app.route('/chat/message', methods=['POST'])
+def chat_message():
+    is_logged_in, user_email, user_id = _get_current_user()
+    if not is_logged_in:
+        return jsonify({'error': 'Not logged in'}), 401
+
+    active_session = _get_active_chat_session(user_id)
+    if not active_session:
+        return jsonify({'error': 'No active session. Please pay to continue.'}), 403
+
+    messages_left = CHAT_MESSAGE_LIMIT - active_session['messages_used']
+    if messages_left <= 0:
+        return jsonify({'error': 'Message limit reached. Please purchase a new session.'}), 403
+
+    data       = request.get_json()
+    user_msg   = (data.get('message') or '').strip()[:500]
+    history    = data.get('history') or []
+    session_id = str(active_session['id'])
+
+    if not user_msg:
+        return jsonify({'error': 'Empty message'}), 400
+
+    if not get_db(session_id):
+        return jsonify({'error': 'No statement loaded. Please upload a PDF first.'}), 400
+
+    result = ai_chat(session_id, user_msg, history)
+
+    try:
+        supabase.table('chat_sessions').update({
+            'messages_used': active_session['messages_used'] + 1
+        }).eq('id', active_session['id']).execute()
+    except Exception as e:
+        logger.exception("Failed to update message count: %s", e)
+
+    return jsonify({
+        'reply':         result['reply'],
+        'messages_left': messages_left - 1,
+        'tokens_used':   result.get('tokens_used', 0),
+    })
 
 
 # ═══════════════════════════════════════════════════════════
@@ -354,9 +443,9 @@ def home():
     cached_name = session.get('file_name', '')
 
     if request.method == 'POST':
-        keyword       = request.form.get('keyword', '')[:100]
-        file          = request.files.get('pdf_file')
-        file_uploaded = file and file.filename
+        keyword          = request.form.get('keyword', '')[:100]
+        file             = request.files.get('pdf_file')
+        file_uploaded    = file and file.filename
         all_transactions = []
 
         if file_uploaded:
@@ -593,4 +682,3 @@ def file_too_large(e):
 if __name__ == '__main__':
     debug_mode = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
     app.run(debug=debug_mode)
-    

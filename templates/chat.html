@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AI Chat — AarogyamFin</title>
+<title>AarogyamFin — AI Chat</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
   :root {
     --gold: #c9a84c;
@@ -14,82 +14,124 @@
     --border: rgba(201,168,76,0.15);
     --text: #e8e4d9;
     --muted: rgba(232,228,217,0.45);
+    --surface: rgba(255,255,255,0.02);
   }
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; font-weight: 300; min-height: 100vh; display: flex; flex-direction: column; cursor: none; }
+  html, body { height: 100%; }
+  body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; font-weight: 300; display: flex; flex-direction: column; cursor: none; }
+
   .cursor { position: fixed; width: 8px; height: 8px; background: var(--gold); border-radius: 50%; pointer-events: none; z-index: 9999; mix-blend-mode: difference; }
   .cursor-ring { position: fixed; width: 36px; height: 36px; border: 1px solid rgba(201,168,76,0.4); border-radius: 50%; pointer-events: none; z-index: 9998; }
 
-  nav { padding: 28px 60px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); }
-  .nav-logo { font-family: 'Cormorant Garamond', serif; font-size: 1.4rem; font-weight: 500; letter-spacing: 0.12em; color: var(--text); text-decoration: none; }
+  /* NAV */
+  nav { flex-shrink: 0; padding: 20px 40px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); background: rgba(6,8,16,0.95); }
+  .nav-logo { font-family: 'Cormorant Garamond', serif; font-size: 1.3rem; font-weight: 500; letter-spacing: 0.12em; color: var(--text); text-decoration: none; }
   .nav-logo span { color: var(--gold); }
-  .nav-right { display: flex; align-items: center; gap: 20px; }
+  .nav-right { display: flex; align-items: center; gap: 24px; }
+  .msg-counter { font-size: 0.72rem; letter-spacing: 0.15em; text-transform: uppercase; }
+  .msg-counter span { color: var(--gold); font-weight: 500; }
   .nav-email { font-size: 0.75rem; color: var(--muted); }
-  .nav-link { font-size: 0.72rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--gold); text-decoration: none; border: 1px solid var(--border); padding: 8px 18px; transition: all 0.3s; }
-  .nav-link:hover { background: rgba(201,168,76,0.08); }
+  .nav-back { font-size: 0.72rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); text-decoration: none; transition: color 0.3s; }
+  .nav-back:hover { color: var(--gold); }
 
-  .page { flex: 1; display: flex; align-items: center; justify-content: center; padding: 60px 24px; }
+  /* LAYOUT */
+  .chat-layout { flex: 1; display: flex; overflow: hidden; }
 
-  .card {
-    width: 100%; max-width: 520px;
-    background: rgba(255,255,255,0.02);
-    border: 1px solid var(--border);
-    padding: 56px 48px;
-    text-align: center;
-    position: relative;
-    overflow: hidden;
-    opacity: 0;
-    animation: fadeUp 0.8s 0.2s forwards;
-  }
-  .card::before {
-    content: '';
-    position: absolute; top: 0; left: 0; right: 0; height: 1px;
-    background: linear-gradient(90deg, transparent, var(--gold), transparent);
-  }
+  /* SIDEBAR */
+  .sidebar { width: 280px; flex-shrink: 0; border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 24px; gap: 20px; overflow-y: auto; }
+  .sidebar-title { font-family: 'Cormorant Garamond', serif; font-size: 1.1rem; font-weight: 400; color: var(--gold); margin-bottom: 4px; }
+  .sidebar-sub { font-size: 0.75rem; color: var(--muted); line-height: 1.6; }
 
-  .session-badge {
-    display: inline-flex; align-items: center; gap: 8px;
-    background: rgba(74,222,128,0.08); border: 1px solid rgba(74,222,128,0.25);
-    color: #4ade80; font-size: 0.65rem; letter-spacing: 0.18em;
-    text-transform: uppercase; padding: 6px 16px; margin-bottom: 36px;
-  }
-  .session-badge::before { content: '●'; font-size: 0.5rem; animation: pulse 2s infinite; }
+  /* UPLOAD AREA */
+  .upload-area { background: var(--surface); border: 1px dashed var(--border); padding: 20px; text-align: center; cursor: pointer; transition: all 0.3s; }
+  .upload-area:hover { border-color: rgba(201,168,76,0.4); background: rgba(201,168,76,0.04); }
+  .upload-area.has-file { border-color: rgba(74,222,128,0.4); background: rgba(74,222,128,0.04); border-style: solid; }
+  .upload-icon { font-size: 1.5rem; margin-bottom: 8px; }
+  .upload-text { font-size: 0.78rem; color: var(--muted); line-height: 1.5; }
+  .upload-text strong { color: var(--text); display: block; margin-bottom: 4px; }
+  input[type="file"] { display: none; }
 
-  .icon { font-size: 3rem; margin-bottom: 24px; display: block; }
+  .upload-btn { width: 100%; padding: 12px; background: var(--gold); color: #060810; border: none; font-family: 'DM Sans', sans-serif; font-size: 0.75rem; font-weight: 500; letter-spacing: 0.15em; text-transform: uppercase; cursor: pointer; transition: opacity 0.3s; margin-top: 12px; }
+  .upload-btn:hover { opacity: 0.85; }
+  .upload-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-  h1 { font-family: 'Cormorant Garamond', serif; font-size: 2.2rem; font-weight: 300; line-height: 1.2; margin-bottom: 16px; }
-  h1 em { font-style: italic; color: var(--gold-light); }
+  /* VERIFY REPORT */
+  .verify-report { background: var(--surface); border: 1px solid var(--border); padding: 16px; font-size: 0.8rem; line-height: 1.7; }
+  .verify-report.ok { border-color: rgba(74,222,128,0.3); }
+  .verify-report.warn { border-color: rgba(248,113,113,0.3); }
+  .verify-title { font-size: 0.65rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold); margin-bottom: 8px; }
+  .verify-text { color: var(--muted); }
+  .verify-stat { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 0.75rem; }
+  .verify-stat:last-child { border-bottom: none; }
+  .verify-val { color: var(--text); }
 
-  .sub { font-size: 0.9rem; color: var(--muted); line-height: 1.8; margin-bottom: 40px; }
+  /* SUGGESTIONS */
+  .suggestions { display: flex; flex-direction: column; gap: 6px; }
+  .suggestion-title { font-size: 0.65rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+  .suggestion-btn { text-align: left; background: var(--surface); border: 1px solid var(--border); padding: 10px 12px; font-family: 'DM Sans', sans-serif; font-size: 0.78rem; color: var(--muted); cursor: pointer; transition: all 0.3s; line-height: 1.4; }
+  .suggestion-btn:hover { border-color: rgba(201,168,76,0.3); color: var(--text); background: rgba(201,168,76,0.03); }
 
-  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; margin-bottom: 40px; }
-  .stat { background: rgba(255,255,255,0.02); border: 1px solid var(--border); padding: 20px; }
-  .stat-num { font-family: 'Cormorant Garamond', serif; font-size: 2rem; font-weight: 300; color: var(--gold); line-height: 1; margin-bottom: 4px; }
-  .stat-label { font-size: 0.65rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
+  /* MAIN CHAT */
+  .chat-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 
-  .coming-soon {
-    background: rgba(201,168,76,0.06); border: 1px solid rgba(201,168,76,0.2);
-    padding: 20px 24px; margin-bottom: 28px;
-  }
-  .coming-soon p { font-size: 0.85rem; color: var(--muted); line-height: 1.7; }
-  .coming-soon p strong { color: var(--text); }
+  /* MESSAGES */
+  .messages { flex: 1; overflow-y: auto; padding: 32px 40px; display: flex; flex-direction: column; gap: 24px; }
+  .messages::-webkit-scrollbar { width: 4px; }
+  .messages::-webkit-scrollbar-track { background: transparent; }
+  .messages::-webkit-scrollbar-thumb { background: rgba(201,168,76,0.2); }
 
-  .btn { display: inline-flex; align-items: center; gap: 8px; background: var(--gold); color: #060810; font-family: 'DM Sans', sans-serif; font-size: 0.78rem; font-weight: 500; letter-spacing: 0.16em; text-transform: uppercase; padding: 14px 32px; text-decoration: none; transition: opacity 0.3s; }
-  .btn:hover { opacity: 0.85; }
+  /* WELCOME */
+  .welcome { text-align: center; padding: 60px 20px; }
+  .welcome h2 { font-family: 'Cormorant Garamond', serif; font-size: 2rem; font-weight: 300; margin-bottom: 12px; }
+  .welcome h2 em { font-style: italic; color: var(--gold-light); }
+  .welcome p { font-size: 0.88rem; color: var(--muted); line-height: 1.8; max-width: 400px; margin: 0 auto; }
 
-  footer { padding: 32px 60px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
-  .footer-logo { font-family: 'Cormorant Garamond', serif; font-size: 1.1rem; font-weight: 500; }
-  .footer-logo span { color: var(--gold); }
-  .footer-copy { font-size: 0.72rem; color: var(--muted); }
+  /* MESSAGE BUBBLES */
+  .message { display: flex; gap: 12px; max-width: 80%; }
+  .message.user { align-self: flex-end; flex-direction: row-reverse; }
+  .message.assistant { align-self: flex-start; }
 
-  @keyframes fadeUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
-  @keyframes pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+  .msg-avatar { width: 32px; height: 32px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 500; }
+  .msg-avatar.ai { background: rgba(201,168,76,0.12); border: 1px solid var(--border); color: var(--gold); font-family: 'Cormorant Garamond', serif; font-size: 1rem; }
+  .msg-avatar.user { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: var(--muted); }
 
-  @media (max-width: 600px) {
-    nav { padding: 20px 24px; }
-    .card { padding: 36px 24px; }
-    footer { flex-direction: column; gap: 12px; text-align: center; padding: 24px; }
-    body { cursor: auto; } .cursor, .cursor-ring { display: none; }
+  .msg-bubble { padding: 14px 18px; font-size: 0.88rem; line-height: 1.75; }
+  .message.user .msg-bubble { background: rgba(201,168,76,0.08); border: 1px solid rgba(201,168,76,0.2); color: var(--text); }
+  .message.assistant .msg-bubble { background: var(--surface); border: 1px solid var(--border); color: var(--text); }
+
+  /* TYPING */
+  .typing-indicator { display: flex; gap: 4px; align-items: center; padding: 14px 18px; background: var(--surface); border: 1px solid var(--border); width: fit-content; }
+  .typing-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--gold); opacity: 0.4; animation: typingPulse 1.2s infinite; }
+  .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+  /* INPUT AREA */
+  .input-area { flex-shrink: 0; padding: 20px 40px; border-top: 1px solid var(--border); background: rgba(6,8,16,0.8); }
+  .input-wrap { display: flex; gap: 12px; align-items: flex-end; }
+  .msg-input { flex: 1; background: var(--surface); border: 1px solid var(--border); color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 0.9rem; padding: 14px 18px; outline: none; resize: none; min-height: 48px; max-height: 120px; transition: border-color 0.3s; line-height: 1.5; }
+  .msg-input:focus { border-color: rgba(201,168,76,0.4); }
+  .msg-input::placeholder { color: var(--muted); }
+  .send-btn { width: 48px; height: 48px; background: var(--gold); border: none; color: #060810; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: opacity 0.3s; }
+  .send-btn:hover { opacity: 0.85; }
+  .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .input-hint { font-size: 0.68rem; color: var(--muted); margin-top: 8px; letter-spacing: 0.05em; }
+
+  /* ERROR */
+  .error-banner { background: rgba(248,113,113,0.08); border: 1px solid rgba(248,113,113,0.25); padding: 12px 16px; color: #f87171; font-size: 0.82rem; }
+
+  /* NO DB */
+  .no-db-notice { background: rgba(201,168,76,0.06); border: 1px solid rgba(201,168,76,0.2); padding: 16px; font-size: 0.82rem; color: var(--muted); text-align: center; line-height: 1.6; }
+  .no-db-notice strong { color: var(--gold); display: block; margin-bottom: 4px; }
+
+  @keyframes typingPulse { 0%, 100% { opacity: 0.2; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1); } }
+
+  @media (max-width: 768px) {
+    .sidebar { display: none; }
+    .messages { padding: 20px; }
+    .input-area { padding: 16px 20px; }
+    nav { padding: 16px 20px; }
+    body { cursor: auto; }
+    .cursor, .cursor-ring { display: none; }
   }
 </style>
 </head>
@@ -99,53 +141,127 @@
 <div class="cursor-ring" id="cursorRing"></div>
 
 <nav>
-  <a href="/" class="nav-logo">Aarogyam<span>Fin</span></a>
+  <a href="/" class="nav-logo">Aarogyam<span>Fin</span> <span style="font-size:0.7rem; color:var(--muted); letter-spacing:0.2em;">AI</span></a>
   <div class="nav-right">
+    <span class="msg-counter"><span id="msgsLeft">{{ messages_left }}</span> messages left</span>
     <span class="nav-email">{{ user_email }}</span>
-    <a href="/" class="nav-link">← Analyzer</a>
+    <a href="/" class="nav-back">← Home</a>
   </div>
 </nav>
 
-<div class="page">
-  <div class="card">
+<div class="chat-layout">
 
-    <div class="session-badge">Session Active</div>
-
-    <span class="icon">🤖</span>
-
-    <h1>AI Chat is<br><em>coming soon</em></h1>
-
-    <p class="sub">Your payment was successful and your session is active. The AI financial assistant is being built right now — it'll be ready very soon.</p>
-
-    <div class="stats">
-      <div class="stat">
-        <div class="stat-num">{{ messages_left }}</div>
-        <div class="stat-label">Questions Left</div>
-      </div>
-      <div class="stat">
-        <div class="stat-num">48h</div>
-        <div class="stat-label">Session Valid</div>
-      </div>
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div>
+      <div class="sidebar-title">Statement</div>
+      <div class="sidebar-sub">Upload your bank statement PDF to start chatting with your data.</div>
     </div>
 
-    <div class="coming-soon">
-      <p><strong>Your ₹10 is saved.</strong> When AI Chat launches, your session will be ready — no need to pay again. You'll get all {{ messages_left }} questions.</p>
+    <!-- Upload -->
+    <form method="POST" enctype="multipart/form-data" id="uploadForm">
+      <div class="upload-area {% if db_ready %}has-file{% endif %}" id="uploadArea">
+        <div class="upload-icon">{% if db_ready %}✅{% else %}📄{% endif %}</div>
+        <div class="upload-text">
+          {% if db_ready %}
+            <strong>Statement Loaded</strong>Ready to answer questions
+          {% else %}
+            <strong>Upload PDF</strong>Click to choose your bank statement
+          {% endif %}
+        </div>
+        <input type="file" id="pdfFile" name="pdf_file" accept=".pdf">
+      </div>
+      {% if not db_ready %}
+      <button type="submit" class="upload-btn" id="uploadBtn" disabled>Upload & Analyze</button>
+      {% else %}
+      <button type="submit" class="upload-btn">Replace Statement</button>
+      {% endif %}
+    </form>
+
+    {% if upload_error %}
+    <div class="error-banner">⚠ {{ upload_error }}</div>
+    {% endif %}
+
+    <!-- Verify Report -->
+    {% if verify_report %}
+    <div class="verify-report {% if verify_report.verified %}ok{% else %}warn{% endif %}">
+      <div class="verify-title">Verification Report</div>
+      <div class="verify-stat"><span>Transactions</span><span class="verify-val">{{ verify_report.summary.total }}</span></div>
+      <div class="verify-stat"><span>Credits</span><span class="verify-val" style="color:#4ade80;">₹{{ "{:,.0f}".format(verify_report.summary.total_cr or 0) }}</span></div>
+      <div class="verify-stat"><span>Debits</span><span class="verify-val" style="color:#f87171;">₹{{ "{:,.0f}".format(verify_report.summary.total_dr or 0) }}</span></div>
+      <div class="verify-stat"><span>From</span><span class="verify-val">{{ verify_report.summary.from_date }}</span></div>
+      <div class="verify-stat"><span>To</span><span class="verify-val">{{ verify_report.summary.to_date }}</span></div>
+      {% if verify_report.issues %}
+      <div style="margin-top:10px; color:#f87171; font-size:0.75rem;">⚠ {{ verify_report.issues|join(', ') }}</div>
+      {% endif %}
+      <div style="margin-top:10px; color:var(--muted); font-size:0.75rem; line-height:1.6;">{{ verify_report.verdict }}</div>
+    </div>
+    {% endif %}
+
+    <!-- Suggestions -->
+    {% if db_ready %}
+    <div class="suggestions">
+      <div class="suggestion-title">Try asking</div>
+      <button class="suggestion-btn" onclick="fillInput(this)">Kitna total debit hua is mahine?</button>
+      <button class="suggestion-btn" onclick="fillInput(this)">Top 5 sabse bade expenses dikhao</button>
+      <button class="suggestion-btn" onclick="fillInput(this)">UPI transactions ka total kya hai?</button>
+      <button class="suggestion-btn" onclick="fillInput(this)">Salary kab kab aayi?</button>
+      <button class="suggestion-btn" onclick="fillInput(this)">50000 se upar ke saare transactions</button>
+    </div>
+    {% endif %}
+  </aside>
+
+  <!-- MAIN CHAT -->
+  <main class="chat-main">
+    <div class="messages" id="messages">
+
+      {% if not db_ready %}
+      <div class="welcome">
+        <h2>Apni statement se <em>baat karo</em></h2>
+        <p>Left mein apni bank statement PDF upload karo — phir koi bhi financial question poochho.</p>
+      </div>
+      <div class="no-db-notice">
+        <strong>⚡ No Statement Loaded</strong>
+        Upload a PDF on the left to begin. Your data stays private — only SQL query results go to AI.
+      </div>
+      {% else %}
+      <div class="welcome">
+        <h2>Statement <em>ready hai</em> — poochho kuch bhi</h2>
+        <p>Transactions indexed hain. Ab koi bhi financial question karo — Hindi, English, ya Hinglish mein.</p>
+      </div>
+      {% endif %}
+
     </div>
 
-    <a href="/" class="btn">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-      Back to Analyzer
-    </a>
+    <div class="input-area">
+      <div class="input-wrap">
+        <textarea
+          class="msg-input"
+          id="msgInput"
+          placeholder="{% if db_ready %}Kuch bhi poochho... (Enter to send){% else %}Pehle statement upload karo →{% endif %}"
+          {% if not db_ready %}disabled{% endif %}
+          rows="1"
+        ></textarea>
+        <button class="send-btn" id="sendBtn" {% if not db_ready %}disabled{% endif %}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+          </svg>
+        </button>
+      </div>
+      <div class="input-hint">Enter to send · Shift+Enter for new line · {{ messages_left }} messages remaining</div>
+    </div>
+  </main>
 
-  </div>
 </div>
 
-<footer>
-  <div class="footer-logo">Aarogyam<span>Fin</span></div>
-  <p class="footer-copy">© 2026 AarogyamFin. All rights reserved.</p>
-</footer>
-
 <script>
+const SESSION_ID   = "{{ session_id }}";
+const msgsLeftEl   = document.getElementById('msgsLeft');
+let   messagesLeft = {{ messages_left }};
+let   history      = [];
+let   isTyping     = false;
+
+// ── CURSOR ─────────────────────────────────────────────
 const cursor = document.getElementById('cursor');
 const ring   = document.getElementById('cursorRing');
 let mx = 0, my = 0, rx = 0, ry = 0;
@@ -159,6 +275,137 @@ function animateRing() {
   requestAnimationFrame(animateRing);
 }
 animateRing();
+
+// ── FILE UPLOAD ────────────────────────────────────────
+const uploadArea = document.getElementById('uploadArea');
+const pdfFile    = document.getElementById('pdfFile');
+const uploadBtn  = document.getElementById('uploadBtn');
+
+if (uploadArea && pdfFile) {
+  uploadArea.addEventListener('click', () => pdfFile.click());
+  pdfFile.addEventListener('change', function() {
+    if (this.files && this.files[0] && uploadBtn) {
+      uploadBtn.disabled = false;
+      uploadBtn.textContent = `Upload: ${this.files[0].name}`;
+    }
+  });
+}
+
+// ── TEXTAREA AUTO-RESIZE ───────────────────────────────
+const msgInput = document.getElementById('msgInput');
+if (msgInput) {
+  msgInput.addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+  });
+  msgInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+}
+
+// ── SUGGESTIONS ────────────────────────────────────────
+function fillInput(btn) {
+  if (msgInput) {
+    msgInput.value = btn.textContent.trim();
+    msgInput.focus();
+  }
+}
+
+// ── SEND MESSAGE ───────────────────────────────────────
+const sendBtn  = document.getElementById('sendBtn');
+const messagesEl = document.getElementById('messages');
+
+if (sendBtn) sendBtn.addEventListener('click', sendMessage);
+
+function sendMessage() {
+  if (!msgInput || isTyping) return;
+  const text = msgInput.value.trim();
+  if (!text) return;
+  if (messagesLeft <= 0) {
+    alert('Message limit reached. Please purchase a new session.');
+    return;
+  }
+
+  // Add user message
+  appendMessage('user', text);
+  history.push({ role: 'user', content: text });
+  msgInput.value = '';
+  msgInput.style.height = 'auto';
+
+  // Show typing
+  const typingEl = showTyping();
+  isTyping = true;
+  if (sendBtn) sendBtn.disabled = true;
+
+  fetch('/chat/message', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: text, history: history.slice(-6) })
+  })
+  .then(r => r.json())
+  .then(data => {
+    typingEl.remove();
+    isTyping = false;
+    if (sendBtn) sendBtn.disabled = false;
+
+    if (data.error) {
+      appendMessage('assistant', `⚠️ ${data.error}`);
+    } else {
+      appendMessage('assistant', data.reply);
+      history.push({ role: 'assistant', content: data.reply });
+      messagesLeft = data.messages_left;
+      if (msgsLeftEl) msgsLeftEl.textContent = messagesLeft;
+    }
+  })
+  .catch(err => {
+    typingEl.remove();
+    isTyping = false;
+    if (sendBtn) sendBtn.disabled = false;
+    appendMessage('assistant', '⚠️ Network error. Please try again.');
+  });
+}
+
+function appendMessage(role, text) {
+  // Remove welcome screen on first message
+  const welcome = messagesEl.querySelector('.welcome');
+  if (welcome) welcome.remove();
+  const noDb = messagesEl.querySelector('.no-db-notice');
+  if (noDb) noDb.remove();
+
+  const div = document.createElement('div');
+  div.className = `message ${role}`;
+
+  const avatar = document.createElement('div');
+  avatar.className = `msg-avatar ${role === 'assistant' ? 'ai' : 'user'}`;
+  avatar.textContent = role === 'assistant' ? 'A' : '👤';
+
+  const bubble = document.createElement('div');
+  bubble.className = 'msg-bubble';
+  bubble.innerHTML = text.replace(/\n/g, '<br>').replace(/₹([\d,]+(\.\d+)?)/g, '<strong style="color:var(--gold)">₹$1</strong>');
+
+  div.appendChild(avatar);
+  div.appendChild(bubble);
+  messagesEl.appendChild(div);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function showTyping() {
+  const div = document.createElement('div');
+  div.className = 'message assistant';
+  div.innerHTML = `
+    <div class="msg-avatar ai">A</div>
+    <div class="typing-indicator">
+      <div class="typing-dot"></div>
+      <div class="typing-dot"></div>
+      <div class="typing-dot"></div>
+    </div>`;
+  messagesEl.appendChild(div);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+  return div;
+}
 </script>
 </body>
 </html>
