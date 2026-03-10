@@ -28,9 +28,10 @@ CRITICAL RULES:
    transactions(id, date TEXT, desc TEXT, type TEXT, amount REAL, balance REAL)
    - type is 'CR' for credit, 'DR' for debit
    - amounts are always positive numbers
-4. Respond in the same language the user writes in (Hindi, English, or Hinglish).
-5. Be concise and helpful. Format numbers with ₹ symbol.
-6. If user asks something not related to their statement, politely redirect.
+4. LANGUAGE RULE — Mirror exactly what language user writes in. Hinglish = Hinglish reply. English = English reply. Hindi = Hindi reply. Never mix.
+5. FORMATTING RULE — Never use ** bold, never use markdown, never use bullet points with *, no headers. Plain conversational text only.
+6. Be concise and helpful. Format numbers with ₹ symbol.
+7. If user asks something not related to their statement, politely redirect.
 
 RESPONSE FORMAT (always):
 First output your SQL query in this exact format:
@@ -169,10 +170,14 @@ def chat(session_id: str, user_message: str, history: list) -> dict:
             )
             final_reply = final_response.content[0].text
 
+        total_tokens = response.usage.input_tokens + response.usage.output_tokens
+        if 'final_response' in dir():
+            total_tokens += final_response.usage.input_tokens + final_response.usage.output_tokens
+
         return {
             'reply': final_reply,
             'sql_used': sql_used,
-            'tokens_used': response.usage.input_tokens + response.usage.output_tokens
+            'tokens_used': total_tokens
         }
 
     except Exception as e:
