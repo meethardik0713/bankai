@@ -666,6 +666,52 @@ def export():
 
 
 # ═══════════════════════════════════════════════════════════
+#  MOBILE API ROUTES
+# ═══════════════════════════════════════════════════════════
+
+@app.route('/api/parse', methods=['POST'])
+def api_parse():
+    ip = request.remote_addr
+    if is_rate_limited(ip):
+        return jsonify({'error': 'Too many requests'}), 429
+
+    file = request.files.get('pdf_file')
+    if not file or not file.filename:
+        return jsonify({'error': 'No file uploaded'}), 400
+
+    safe_name = secure_filename(file.filename)
+    if not safe_name.lower().endswith('.pdf'):
+        return jsonify({'error': 'Only PDF files accepted'}), 400
+    if not _is_valid_pdf(file):
+        return jsonify({'error': 'Invalid PDF'}), 400
+
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], safe_name)
+    file.save(filepath)
+
+    try:
+        t0           = time.time()
+        transactions = parse_transactions(filepath)
+        parse_time   = round(time.time() - t0, 1)
+        logger.info("API parse: %s → %d txns in %.1fs", safe_name, len(transactions), parse_time)
+    except Exception as e:
+        logger.exception("API parse error: %s", safe_name)
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if os.path.exists(filepath):
+            os.remove(filepath)
+
+    if not transactions:
+        return jsonify({'error': 'No transactions found'}), 400
+
+    return jsonify({
+        'transactions': transactions,
+        'count':        len(transactions),
+        'parse_time':   parse_time,
+        'filename':     safe_name,
+    }), 200
+
+
+# ═══════════════════════════════════════════════════════════
 #  ERROR HANDLERS
 # ═══════════════════════════════════════════════════════════
 
