@@ -4,6 +4,7 @@ openpyxl
 gunicorn
 pdfplumber
 flask-talisman
+flask-cors
 supabase
 python-dotenv
 razorpay

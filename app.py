@@ -9,6 +9,7 @@ import threading
 import hmac
 import razorpay
 from flask import Flask, request, render_template, send_file, abort, session, redirect, jsonify
+from flask_cors import CORS
 from flask_talisman import Talisman
 from io import BytesIO
 from collections import defaultdict
@@ -34,6 +35,7 @@ logger = logging.getLogger(__name__)
 # ── App setup ─────────────────────────────────────────────
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', os.urandom(32))
+CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 is_prod = os.environ.get('RAILWAY_ENVIRONMENT') is not None
 Talisman(app,
