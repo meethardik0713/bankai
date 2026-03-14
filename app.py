@@ -714,6 +714,82 @@ def api_parse():
 
 
 # ═══════════════════════════════════════════════════════════
+#  MOBILE CHAT API
+# ═══════════════════════════════════════════════════════════
+
+@app.route('/api/chat/upload', methods=['POST'])
+def api_chat_upload():
+    ip = request.remote_addr
+    if is_rate_limited(ip):
+        return jsonify({'error': 'Too many requests'}), 429
+
+    file = request.files.get('pdf_file')
+    session_id = request.form.get('session_id', '')
+
+    if not file or not file.filename:
+        return jsonify({'error': 'No file uploaded'}), 400
+    if not session_id:
+        return jsonify({'error': 'No session_id provided'}), 400
+
+    safe_name = secure_filename(file.filename)
+    if not safe_name.lower().endswith('.pdf'):
+        return jsonify({'error': 'Only PDF files accepted'}), 400
+    if not _is_valid_pdf(file):
+        return jsonify({'error': 'Invalid PDF'}), 400
+
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], safe_name)
+    file.save(filepath)
+
+    try:
+        transactions = parse_transactions(filepath)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if os.path.exists(filepath):
+            os.remove(filepath)
+
+    if not transactions:
+        return jsonify({'error': 'No transactions found'}), 400
+
+    from core.sqlite_indexer import build_index
+    row_count = build_index(session_id, transactions)
+
+    return jsonify({
+        'success': True,
+        'session_id': session_id,
+        'transaction_count': row_count,
+    }), 200
+
+
+@app.route('/api/chat/message', methods=['POST'])
+def api_chat_message():
+    ip = request.remote_addr
+    if is_rate_limited(ip):
+        return jsonify({'error': 'Too many requests'}), 429
+
+    data = request.get_json()
+    session_id = data.get('session_id', '')
+    user_message = (data.get('message') or '').strip()[:500]
+    history = data.get('history') or []
+
+    if not session_id:
+        return jsonify({'error': 'No session_id'}), 400
+    if not user_message:
+        return jsonify({'error': 'Empty message'}), 400
+
+    from core.sqlite_indexer import get_db
+    if not get_db(session_id):
+        return jsonify({'error': 'No statement loaded. Upload PDF first.'}), 400
+
+    result = ai_chat(session_id, user_message, history)
+
+    return jsonify({
+        'reply': result['reply'],
+        'tokens_used': result.get('tokens_used', 0),
+    }), 200
+
+
+# ═══════════════════════════════════════════════════════════
 #  ERROR HANDLERS
 # ═══════════════════════════════════════════════════════════
 
