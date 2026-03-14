@@ -714,6 +714,131 @@ def api_parse():
 
 
 # ═══════════════════════════════════════════════════════════
+#  MOBILE PAYMENT API
+# ═══════════════════════════════════════════════════════════
+
+@app.route('/api/payment/create-order', methods=['POST'])
+def api_create_order():
+    ip = request.remote_addr
+    if is_rate_limited(ip):
+        return jsonify({'error': 'Too many requests'}), 429
+
+    data = request.get_json()
+    firebase_uid = data.get('firebase_uid', '')
+    email = data.get('email', '')
+
+    if not firebase_uid:
+        return jsonify({'error': 'No user ID'}), 400
+
+    try:
+        order = rzp_client.order.create({
+            'amount': 1000,
+            'currency': 'INR',
+            'payment_capture': 1,
+        })
+
+        supabase.table('payments').insert({
+            'user_id': firebase_uid,
+            'amount': 10,
+            'status': 'pending',
+            'razorpay_order_id': order['id'],
+        }).execute()
+
+        return jsonify({
+            'order_id': order['id'],
+            'amount': 1000,
+            'currency': 'INR',
+            'key_id': RAZORPAY_KEY_ID,
+            'email': email,
+        })
+    except Exception as e:
+        logger.exception("Mobile order creation failed: %s", e)
+        return jsonify({'error': 'Order creation failed'}), 500
+
+
+@app.route('/api/payment/verify', methods=['POST'])
+def api_verify_payment():
+    ip = request.remote_addr
+    if is_rate_limited(ip):
+        return jsonify({'error': 'Too many requests'}), 429
+
+    data = request.get_json()
+    firebase_uid = data.get('firebase_uid', '')
+    razorpay_order_id = data.get('razorpay_order_id', '')
+    razorpay_payment_id = data.get('razorpay_payment_id', '')
+    razorpay_signature = data.get('razorpay_signature', '')
+
+    if not firebase_uid:
+        return jsonify({'error': 'No user ID'}), 400
+
+    try:
+        msg = f"{razorpay_order_id}|{razorpay_payment_id}"
+        expected = hmac.new(
+            RAZORPAY_KEY_SECRET.encode(),
+            msg.encode(),
+            hashlib.sha256
+        ).hexdigest()
+
+        if not hmac.compare_digest(expected, razorpay_signature):
+            return jsonify({'error': 'Payment verification failed'}), 400
+
+    except Exception as e:
+        return jsonify({'error': 'Verification error'}), 500
+
+    try:
+        result = supabase.table('payments').update({
+            'status': 'paid',
+            'razorpay_payment_id': razorpay_payment_id,
+        }).eq('razorpay_order_id', razorpay_order_id).execute()
+
+        payment_id = result.data[0]['id'] if result.data else None
+
+        supabase.table('chat_sessions').insert({
+            'user_id': firebase_uid,
+            'payment_id': payment_id,
+            'messages_used': 0,
+            'is_active': True,
+        }).execute()
+
+        return jsonify({'success': True})
+
+    except Exception as e:
+        logger.exception("Mobile payment verify DB error: %s", e)
+        return jsonify({'error': 'Session creation failed'}), 500
+
+
+@app.route('/api/payment/status', methods=['POST'])
+def api_payment_status():
+    data = request.get_json()
+    firebase_uid = data.get('firebase_uid', '')
+
+    if not firebase_uid:
+        return jsonify({'has_access': False}), 200
+
+    try:
+        result = supabase.table('chat_sessions').select('*').eq(
+            'user_id', firebase_uid
+        ).eq('is_active', True).order(
+            'created_at', desc=True
+        ).limit(1).execute()
+
+        if result.data:
+            session_data = result.data[0]
+            messages_used = session_data.get('messages_used', 0)
+            if messages_used < 25:
+                return jsonify({
+                    'has_access': True,
+                    'messages_left': 25 - messages_used,
+                    'session_id': str(session_data['id']),
+                })
+
+        return jsonify({'has_access': False})
+
+    except Exception as e:
+        return jsonify({'has_access': False}), 200
+
+
+# ═══════════════════════════════════════════════════════════
 #  MOBILE CHAT API
 # ═══════════════════════════════════════════════════════════
 
