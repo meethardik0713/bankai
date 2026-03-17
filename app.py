@@ -738,7 +738,7 @@ def api_create_order():
         })
 
         supabase.table('payments').insert({
-            'user_id': firebase_uid,
+            'firebase_uid': firebase_uid,
             'amount': 10,
             'status': 'pending',
             'razorpay_order_id': order['id'],
@@ -794,7 +794,7 @@ def api_verify_payment():
         payment_id = result.data[0]['id'] if result.data else None
 
         supabase.table('chat_sessions').insert({
-            'user_id': firebase_uid,
+            'firebase_uid': firebase_uid,
             'payment_id': payment_id,
             'messages_used': 0,
             'is_active': True,
@@ -817,7 +817,7 @@ def api_payment_status():
 
     try:
         result = supabase.table('chat_sessions').select('*').eq(
-            'user_id', firebase_uid
+            'firebase_uid', firebase_uid
         ).eq('is_active', True).order(
             'created_at', desc=True
         ).limit(1).execute()
