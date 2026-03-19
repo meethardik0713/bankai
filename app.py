@@ -738,7 +738,6 @@ def api_create_order():
         })
 
         supabase.table('payments').insert({
-            'firebase_uid': firebase_uid,
             'amount': 10,
             'status': 'pending',
             'razorpay_order_id': order['id'],
@@ -798,6 +797,7 @@ def api_verify_payment():
             'payment_id': payment_id,
             'messages_used': 0,
             'is_active': True,
+            'db_ready': False,
         }).execute()
 
         return jsonify({'success': True})
