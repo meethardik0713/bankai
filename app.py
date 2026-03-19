@@ -8,7 +8,7 @@ import hashlib
 import threading
 import hmac
 import razorpay
-from flask import Flask, request, render_template, send_file, abort, session, redirect, jsonify
+from flask import Flask, request, render_template, send_file, abort, session, redirect, jsonify, Response
 from flask_cors import CORS
 from flask_talisman import Talisman
 from io import BytesIO
