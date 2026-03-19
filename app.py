@@ -562,6 +562,24 @@ def clear_cache():
     return ('', 204)
 
 
+@app.route('/sitemap.xml')
+def sitemap():
+    from datetime import datetime
+    pages = [
+        ('https://www.aarogyamfin.com/', '1.0', 'weekly'),
+        ('https://www.aarogyamfin.com/about', '0.8', 'monthly'),
+        ('https://www.aarogyamfin.com/accuracy', '0.7', 'monthly'),
+        ('https://www.aarogyamfin.com/privacy', '0.5', 'yearly'),
+        ('https://www.aarogyamfin.com/terms', '0.5', 'yearly'),
+    ]
+    xml = ['<?xml version="1.0" encoding="UTF-8"?>',
+           '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
+    for url, priority, freq in pages:
+        xml.append(f'  <url><loc>{url}</loc><lastmod>{datetime.now().strftime("%Y-%m-%d")}</lastmod><changefreq>{freq}</changefreq><priority>{priority}</priority></url>')
+    xml.append('</urlset>')
+    return Response('\n'.join(xml), mimetype='application/xml')
+
+
 @app.route('/about')
 def about():
     return render_template('about.html')
