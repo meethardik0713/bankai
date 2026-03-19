@@ -566,11 +566,11 @@ def clear_cache():
 def sitemap():
     from datetime import datetime
     pages = [
-        ('https://www.aarogyamfin.com/', '1.0', 'weekly'),
-        ('https://www.aarogyamfin.com/about', '0.8', 'monthly'),
-        ('https://www.aarogyamfin.com/accuracy', '0.7', 'monthly'),
-        ('https://www.aarogyamfin.com/privacy', '0.5', 'yearly'),
-        ('https://www.aarogyamfin.com/terms', '0.5', 'yearly'),
+        ('https://aarogyamfin.com/', '1.0', 'weekly'),
+        ('https://aarogyamfin.com/about', '0.8', 'monthly'),
+        ('https://aarogyamfin.com/accuracy', '0.7', 'monthly'),
+        ('https://aarogyamfin.com/privacy', '0.5', 'yearly'),
+        ('https://aarogyamfin.com/terms', '0.5', 'yearly'),
     ]
     xml = ['<?xml version="1.0" encoding="UTF-8"?>',
            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
