@@ -994,6 +994,35 @@ def api_chat_message():
     if not get_db(session_id):
         return jsonify({'error': 'No statement loaded. Upload PDF first.'}), 400
 
+    # ── Token limit check ─────────────────────────────────
+    try:
+        session_data = supabase.table('chat_sessions').select(
+            'input_tokens_used, input_tokens_limit, output_tokens_used, output_tokens_limit, expires_at'
+        ).eq('id', session_id).limit(1).execute()
+
+        if session_data.data:
+            s            = session_data.data[0]
+            input_used   = s.get('input_tokens_used', 0)
+            input_limit  = s.get('input_tokens_limit', 25000)
+            output_used  = s.get('output_tokens_used', 0)
+            output_limit = s.get('output_tokens_limit', 5000)
+
+            # Check expiry
+            from datetime import datetime, timezone
+            expires_at = s.get('expires_at')
+            if expires_at:
+                exp = datetime.fromisoformat(expires_at.replace('Z', '+00:00'))
+                if exp < datetime.now(timezone.utc):
+                    return jsonify({'error': 'Session expired. Please purchase a new plan.'}), 403
+
+            # Check token limits
+            if input_used >= input_limit:
+                return jsonify({'error': 'Token limit reached. Please purchase a new plan.'}), 403
+            if output_used >= output_limit:
+                return jsonify({'error': 'Token limit reached. Please purchase a new plan.'}), 403
+    except Exception as e:
+        logger.exception("Token limit check failed: %s", e)
+
     result = ai_chat(session_id, user_message, history)
 
     # ── Update token usage + save messages in Supabase ───
