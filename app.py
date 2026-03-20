@@ -896,6 +896,7 @@ def api_payment_status():
                     'output_tokens_used':  output_used,
                     'input_tokens_limit':  input_limit,
                     'output_tokens_limit': output_limit,
+                    'messages':            s.get('messages') or [],
                 })
 
         return jsonify({'has_access': False, 'plan': 'Free'})
@@ -975,22 +976,27 @@ def api_chat_message():
 
     result = ai_chat(session_id, user_message, history)
 
-    # ── Update token usage in Supabase ───────────────────
+    # ── Update token usage + save messages in Supabase ───
     tokens_used = result.get('tokens_used', 0)
-    if tokens_used and session_id:
-        try:
-            existing = supabase.table('chat_sessions').select(
-                'input_tokens_used, output_tokens_used'
-            ).eq('id', session_id).limit(1).execute()
+    try:
+        existing = supabase.table('chat_sessions').select(
+            'input_tokens_used, output_tokens_used, messages'
+        ).eq('id', session_id).limit(1).execute()
 
-            if existing.data:
-                s = existing.data[0]
-                supabase.table('chat_sessions').update({
-                    'input_tokens_used':  s.get('input_tokens_used', 0) + tokens_used,
-                    'output_tokens_used': s.get('output_tokens_used', 0),
-                }).eq('id', session_id).execute()
-        except Exception as e:
-            logger.exception("Token update failed: %s", e)
+        if existing.data:
+            s                 = existing.data[0]
+            existing_messages = s.get('messages') or []
+            existing_messages.append({'role': 'user',      'content': user_message})
+            existing_messages.append({'role': 'assistant', 'content': result['reply']})
+            existing_messages = existing_messages[-100:]
+
+            supabase.table('chat_sessions').update({
+                'input_tokens_used':  s.get('input_tokens_used', 0) + tokens_used,
+                'output_tokens_used': s.get('output_tokens_used', 0),
+                'messages':           existing_messages,
+            }).eq('id', session_id).execute()
+    except Exception as e:
+        logger.exception("Token/message update failed: %s", e)
 
     return jsonify({
         'reply':       result['reply'],
