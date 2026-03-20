@@ -986,8 +986,8 @@ def api_chat_message():
             if existing.data:
                 s = existing.data[0]
                 supabase.table('chat_sessions').update({
-                    'input_tokens_used':  s.get('input_tokens_used', 0)  + tokens_used.get('input', 0),
-                    'output_tokens_used': s.get('output_tokens_used', 0) + tokens_used.get('output', 0),
+                    'input_tokens_used':  s.get('input_tokens_used', 0) + tokens_used,
+                    'output_tokens_used': s.get('output_tokens_used', 0),
                 }).eq('id', session_id).execute()
         except Exception as e:
             logger.exception("Token update failed: %s", e)
