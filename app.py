@@ -53,6 +53,14 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 CHAT_MESSAGE_LIMIT = 10
 CHAT_SESSION_HOURS = 48
 
+# ── Plan config ───────────────────────────────────────────
+PLAN_CONFIG = {
+    'Basic':    {'price': 10,  'input_tokens': 25000,   'output_tokens': 5000,  'validity_hours': 24},
+    'Standard': {'price': 49,  'input_tokens': 100000,  'output_tokens': 10000, 'validity_hours': 75},
+    'Pro':      {'price': 99,  'input_tokens': 300000,  'output_tokens': 15000, 'validity_hours': 125},
+    'Elite':    {'price': 499, 'input_tokens': 1500000, 'output_tokens': 20000, 'validity_hours': 200},
+}
+
 # ── Rate limiting ─────────────────────────────────────────
 request_counts = defaultdict(list)
 RATE_LIMIT  = 10
@@ -325,7 +333,6 @@ def chat_page():
     upload_error  = None
     verify_report = None
 
-    # ── PDF uploaded directly on /chat ────────────────────
     if request.method == 'POST' and 'pdf_file' in request.files:
         file = request.files.get('pdf_file')
         if file and file.filename:
@@ -352,7 +359,6 @@ def chat_page():
                     if os.path.exists(filepath):
                         os.remove(filepath)
 
-    # ── Auto-load from main page cache ───────────────────
     elif not db_ready:
         cached_hash = session.get('file_hash')
         if cached_hash:
@@ -741,32 +747,41 @@ def api_create_order():
     if is_rate_limited(ip):
         return jsonify({'error': 'Too many requests'}), 429
 
-    data = request.get_json()
+    data         = request.get_json()
     firebase_uid = data.get('firebase_uid', '')
-    email = data.get('email', '')
+    email        = data.get('email', '')
+    plan_name    = data.get('plan', 'Basic')
+
+    if plan_name not in PLAN_CONFIG:
+        plan_name = 'Basic'
 
     if not firebase_uid:
         return jsonify({'error': 'No user ID'}), 400
 
+    plan   = PLAN_CONFIG[plan_name]
+    amount = plan['price'] * 100  # paise
+
     try:
         order = rzp_client.order.create({
-            'amount': 1000,
-            'currency': 'INR',
+            'amount':          amount,
+            'currency':        'INR',
             'payment_capture': 1,
         })
 
         supabase.table('payments').insert({
-            'amount': 10,
-            'status': 'pending',
+            'amount':            plan['price'],
+            'status':            'pending',
             'razorpay_order_id': order['id'],
+            'plan':              plan_name,
         }).execute()
 
+        logger.info("Mobile order created: %s plan=%s for %s", order['id'], plan_name, email)
         return jsonify({
             'order_id': order['id'],
-            'amount': 1000,
+            'amount':   amount,
             'currency': 'INR',
-            'key_id': RAZORPAY_KEY_ID,
-            'email': email,
+            'key_id':   RAZORPAY_KEY_ID,
+            'email':    email,
         })
     except Exception as e:
         logger.exception("Mobile order creation failed: %s", e)
@@ -779,17 +794,17 @@ def api_verify_payment():
     if is_rate_limited(ip):
         return jsonify({'error': 'Too many requests'}), 429
 
-    data = request.get_json()
-    firebase_uid = data.get('firebase_uid', '')
-    razorpay_order_id = data.get('razorpay_order_id', '')
+    data                = request.get_json()
+    firebase_uid        = data.get('firebase_uid', '')
+    razorpay_order_id   = data.get('razorpay_order_id', '')
     razorpay_payment_id = data.get('razorpay_payment_id', '')
-    razorpay_signature = data.get('razorpay_signature', '')
+    razorpay_signature  = data.get('razorpay_signature', '')
 
     if not firebase_uid:
         return jsonify({'error': 'No user ID'}), 400
 
     try:
-        msg = f"{razorpay_order_id}|{razorpay_payment_id}"
+        msg      = f"{razorpay_order_id}|{razorpay_payment_id}"
         expected = hmac.new(
             RAZORPAY_KEY_SECRET.encode(),
             msg.encode(),
@@ -803,21 +818,36 @@ def api_verify_payment():
         return jsonify({'error': 'Verification error'}), 500
 
     try:
+        plan_name = data.get('plan', 'Basic')
+        if plan_name not in PLAN_CONFIG:
+            plan_name = 'Basic'
+        plan = PLAN_CONFIG[plan_name]
+
+        from datetime import datetime, timezone, timedelta
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=plan['validity_hours'])
+
         result = supabase.table('payments').update({
-            'status': 'paid',
+            'status':              'paid',
             'razorpay_payment_id': razorpay_payment_id,
+            'plan':                plan_name,
         }).eq('razorpay_order_id', razorpay_order_id).execute()
 
         payment_id = result.data[0]['id'] if result.data else None
 
         supabase.table('chat_sessions').insert({
-            'firebase_uid': firebase_uid,
-            'payment_id': payment_id,
-            'messages_used': 0,
-            'is_active': True,
-            'db_ready': False,
+            'firebase_uid':        firebase_uid,
+            'payment_id':          payment_id,
+            'is_active':           True,
+            'db_ready':            False,
+            'plan':                plan_name,
+            'input_tokens_limit':  plan['input_tokens'],
+            'output_tokens_limit': plan['output_tokens'],
+            'input_tokens_used':   0,
+            'output_tokens_used':  0,
+            'expires_at':          expires_at.isoformat(),
         }).execute()
 
+        logger.info("Mobile payment verified: plan=%s for %s", plan_name, firebase_uid)
         return jsonify({'success': True})
 
     except Exception as e:
@@ -827,13 +857,14 @@ def api_verify_payment():
 
 @app.route('/api/payment/status', methods=['POST'])
 def api_payment_status():
-    data = request.get_json()
+    data         = request.get_json()
     firebase_uid = data.get('firebase_uid', '')
 
     if not firebase_uid:
         return jsonify({'has_access': False}), 200
 
     try:
+        from datetime import datetime, timezone
         result = supabase.table('chat_sessions').select('*').eq(
             'firebase_uid', firebase_uid
         ).eq('is_active', True).order(
@@ -841,18 +872,36 @@ def api_payment_status():
         ).limit(1).execute()
 
         if result.data:
-            session_data = result.data[0]
-            messages_used = session_data.get('messages_used', 0)
-            if messages_used < 25:
+            s            = result.data[0]
+            input_used   = s.get('input_tokens_used', 0)
+            output_used  = s.get('output_tokens_used', 0)
+            input_limit  = s.get('input_tokens_limit', 25000)
+            output_limit = s.get('output_tokens_limit', 5000)
+            plan_name    = s.get('plan', 'Basic')
+            expires_at   = s.get('expires_at')
+
+            # Check expiry
+            if expires_at:
+                exp = datetime.fromisoformat(expires_at.replace('Z', '+00:00'))
+                if exp < datetime.now(timezone.utc):
+                    return jsonify({'has_access': False, 'plan': 'Free'})
+
+            # Check token limits
+            if input_used < input_limit and output_used < output_limit:
                 return jsonify({
-                    'has_access': True,
-                    'messages_left': 25 - messages_used,
-                    'session_id': str(session_data['id']),
+                    'has_access':          True,
+                    'plan':                plan_name,
+                    'session_id':          str(s['id']),
+                    'input_tokens_used':   input_used,
+                    'output_tokens_used':  output_used,
+                    'input_tokens_limit':  input_limit,
+                    'output_tokens_limit': output_limit,
                 })
 
-        return jsonify({'has_access': False})
+        return jsonify({'has_access': False, 'plan': 'Free'})
 
     except Exception as e:
+        logger.exception("Payment status error: %s", e)
         return jsonify({'has_access': False}), 200
 
 
@@ -866,7 +915,7 @@ def api_chat_upload():
     if is_rate_limited(ip):
         return jsonify({'error': 'Too many requests'}), 429
 
-    file = request.files.get('pdf_file')
+    file       = request.files.get('pdf_file')
     session_id = request.form.get('session_id', '')
 
     if not file or not file.filename:
@@ -898,8 +947,8 @@ def api_chat_upload():
     row_count = build_index(session_id, transactions)
 
     return jsonify({
-        'success': True,
-        'session_id': session_id,
+        'success':           True,
+        'session_id':        session_id,
         'transaction_count': row_count,
     }), 200
 
@@ -910,10 +959,10 @@ def api_chat_message():
     if is_rate_limited(ip):
         return jsonify({'error': 'Too many requests'}), 429
 
-    data = request.get_json()
-    session_id = data.get('session_id', '')
+    data         = request.get_json()
+    session_id   = data.get('session_id', '')
     user_message = (data.get('message') or '').strip()[:500]
-    history = data.get('history') or []
+    history      = data.get('history') or []
 
     if not session_id:
         return jsonify({'error': 'No session_id'}), 400
@@ -926,9 +975,26 @@ def api_chat_message():
 
     result = ai_chat(session_id, user_message, history)
 
+    # ── Update token usage in Supabase ───────────────────
+    tokens_used = result.get('tokens_used', 0)
+    if tokens_used and session_id:
+        try:
+            existing = supabase.table('chat_sessions').select(
+                'input_tokens_used, output_tokens_used'
+            ).eq('id', session_id).limit(1).execute()
+
+            if existing.data:
+                s = existing.data[0]
+                supabase.table('chat_sessions').update({
+                    'input_tokens_used':  s.get('input_tokens_used', 0)  + tokens_used.get('input', 0),
+                    'output_tokens_used': s.get('output_tokens_used', 0) + tokens_used.get('output', 0),
+                }).eq('id', session_id).execute()
+        except Exception as e:
+            logger.exception("Token update failed: %s", e)
+
     return jsonify({
-        'reply': result['reply'],
-        'tokens_used': result.get('tokens_used', 0),
+        'reply':       result['reply'],
+        'tokens_used': tokens_used,
     }), 200
 
 
@@ -949,3 +1015,4 @@ def file_too_large(e):
 if __name__ == '__main__':
     debug_mode = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
     app.run(debug=debug_mode)
+    
