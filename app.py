@@ -888,15 +888,26 @@ def api_payment_status():
 
             # Check token limits
             if input_used < input_limit and output_used < output_limit:
+                # Rebuild SQLite index if transactions exist
+                saved_txns = s.get('transactions') or []
+                actual_session_id = str(s['id'])
+                if saved_txns and not get_db(actual_session_id):
+                    try:
+                        build_index(actual_session_id, saved_txns)
+                        logger.info("SQLite rebuilt for session %s", actual_session_id)
+                    except Exception as e:
+                        logger.exception("SQLite rebuild failed: %s", e)
+
                 return jsonify({
                     'has_access':          True,
                     'plan':                plan_name,
-                    'session_id':          str(s['id']),
+                    'session_id':          actual_session_id,
                     'input_tokens_used':   input_used,
                     'output_tokens_used':  output_used,
                     'input_tokens_limit':  input_limit,
                     'output_tokens_limit': output_limit,
                     'messages':            s.get('messages') or [],
+                    'pdf_loaded':          len(saved_txns) > 0,
                 })
 
         return jsonify({'has_access': False, 'plan': 'Free'})
@@ -946,6 +957,15 @@ def api_chat_upload():
 
     from core.sqlite_indexer import build_index
     row_count = build_index(session_id, transactions)
+
+    # Save transactions to Supabase for 48hr persistence
+    try:
+        supabase.table('chat_sessions').update({
+            'transactions': transactions,
+            'db_ready':     True,
+        }).eq('id', session_id).execute()
+    except Exception as e:
+        logger.exception("Failed to save transactions: %s", e)
 
     return jsonify({
         'success':           True,
