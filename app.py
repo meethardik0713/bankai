@@ -297,11 +297,14 @@ def verify_payment():
 
         payment_id = result.data[0]['id'] if result.data else None
 
+        from datetime import datetime, timezone, timedelta
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=CHAT_SESSION_HOURS)
         supabase.table('chat_sessions').insert({
             'user_id':       user_id,
             'payment_id':    payment_id,
             'messages_used': 0,
             'is_active':     True,
+            'expires_at':    expires_at.isoformat(),
         }).execute()
 
         logger.info("Payment verified + session created for %s", user_email)

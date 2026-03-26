@@ -46,6 +46,12 @@
   .nav-cta { font-size: 0.75rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold); border: 1px solid var(--border); padding: 10px 24px; text-decoration: none; transition: all 0.3s; background: rgba(201,168,76,0.04); }
   .nav-cta:hover { background: rgba(201,168,76,0.1); border-color: rgba(201,168,76,0.4); }
 
+  /* Mobile AI Chat button in nav — hidden everywhere */
+  .nav-ai-chat-mobile { display: none !important; }
+
+  /* Floating AI Chat button — hidden on desktop */
+  .fab-chat { display: none; }
+
   #hero { position: relative; width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; }
   #three-canvas { position: absolute; inset: 0; z-index: 0; }
 
@@ -179,6 +185,45 @@
     nav { padding: 20px 24px; }
     .nav-links { display: none; }
     .nav-cta { display: none; }
+
+    /* AI Chat button visible in navbar on mobile */
+    .nav-ai-chat-mobile {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.72rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--gold);
+      border: 1px solid rgba(201,168,76,0.4);
+      padding: 8px 14px;
+      text-decoration: none;
+      background: rgba(201,168,76,0.08);
+      transition: all 0.3s;
+    }
+
+    /* Floating AI Chat button bottom-right */
+    .fab-chat {
+      display: flex;
+      position: fixed;
+      bottom: 28px;
+      right: 20px;
+      z-index: 999;
+      background: var(--gold);
+      color: #060810;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.75rem;
+      font-weight: 500;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      padding: 15px 22px;
+      text-decoration: none;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 0 0 1px rgba(201,168,76,0.5), 0 8px 32px rgba(0,0,0,0.6);
+      border-radius: 2px;
+    }
+
     .hero-headline { font-size: 2.6rem; }
     .hero-content { padding: 0 20px; }
     .hero-sub { font-size: 0.85rem; }
@@ -207,6 +252,11 @@
 <div class="cursor" id="cursor"></div>
 <div class="cursor-ring" id="cursorRing"></div>
 
+<!-- Floating AI Chat Button (mobile only) -->
+<a href="/pay" class="fab-chat">
+  ✦ AI Chat
+</a>
+
 <nav>
   <a href="#" class="nav-logo">Aarogyam<span>Fin</span></a>
   <ul class="nav-links">
@@ -214,8 +264,10 @@
     <li><a href="#how">How It Works</a></li>
     <li><a href="#trust">Security</a></li>
     <li><a href="/accuracy">Accuracy Test</a></li>
-<li><a href="/pay">AI Chat ✨</a></li>
+    <li><a href="/pay">AI Chat ✨</a></li>
   </ul>
+  <!-- AI Chat button visible on mobile in navbar -->
+  <a href="/pay" class="nav-ai-chat-mobile">✨ AI Chat</a>
   {% if is_logged_in %}
 <span style="font-size:0.75rem; color:var(--muted); margin-right:16px;">{{ user_email }}</span>
 <a href="/logout" class="nav-cta">Logout</a>
