@@ -519,6 +519,7 @@ def home():
                 ]
             else:
                 filtered = all_transactions
+            dashboard_data = run_dashboard(all_transactions)
 
             for t in filtered:
                 if t.get('amount'):
@@ -559,6 +560,7 @@ def home():
         page_num          = page_num,
         total_pages       = total_pages,
         total_count       = total_count,
+        dashboard_data    = dashboard_data if 'dashboard_data' in locals() else None,
     )
 
 

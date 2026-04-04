@@ -231,19 +231,192 @@ tr:hover td { background: rgba(201,168,76,0.02); }
 .empty svg { width: 40px; height: 40px; margin: 0 auto 16px; opacity: 0.3; display: block; }
 .empty p { font-family: 'Cormorant Garamond', serif; font-size: 1.3rem; font-weight: 300; }
 
-/* ── RESPONSIVE ── */
+/* ═══════════════════════════════════════════════════════
+   MOBILE RESPONSIVE — Replace existing @media block
+   Paste this INSIDE <style> tag, at the very bottom
+   ═══════════════════════════════════════════════════════ */
+
+/* ── TABLET (max 900px) ── */
 @media (max-width: 900px) {
-  .dashboard { grid-template-columns: 1fr; }
-  .sidebar { position: static; height: auto; border-right: none; border-bottom: 1px solid var(--border); padding: 16px; }
-  .nav-items { display: flex; flex-wrap: wrap; gap: 4px; padding: 0; }
-  .nav-item { border-left: none; border-bottom: 2px solid transparent; border-radius: 4px; }
-  .nav-item.active { border-bottom-color: var(--gold); border-left-color: transparent; }
-  .sidebar-section { display: none; }
-  .main { padding: 24px 16px; }
-  .grid-2, .grid-3 { grid-template-columns: 1fr; }
-  nav { padding: 16px 20px; }
   body { cursor: auto; }
   .cursor, .cursor-ring { display: none; }
+
+  /* NAV */
+  nav { padding: 12px 16px; gap: 8px; flex-wrap: wrap; }
+  .nav-logo { font-size: 1.1rem; }
+  .nav-right { gap: 8px; flex-wrap: wrap; }
+  .nav-tag { display: none; } /* hide "Financial Dashboard" tag — saves space */
+  .nav-right form button,
+  .nav-back {
+    font-size: 0.65rem;
+    padding: 6px 10px;
+    letter-spacing: 0.1em;
+  }
+
+  /* UPLOAD GATE */
+  .upload-gate { margin: 40px auto; padding: 0 20px; }
+  .upload-gate h2 { font-size: 2rem; }
+  .upload-area { padding: 32px 20px; }
+
+  /* DASHBOARD LAYOUT — sidebar on top */
+  .dashboard { grid-template-columns: 1fr; }
+
+  /* SIDEBAR — horizontal scrollable tab bar */
+  .sidebar {
+    position: sticky;
+    top: 57px; /* nav height */
+    z-index: 50;
+    height: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding: 0;
+    background: rgba(6,8,16,0.95);
+    backdrop-filter: blur(12px);
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  /* Hide stats section in sidebar on mobile */
+  .sidebar-section { display: none; }
+
+  /* Nav items — horizontal pill tabs */
+  .nav-items {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 0;
+    padding: 0;
+    width: max-content;
+    min-width: 100%;
+  }
+
+  .nav-item {
+    border-left: none;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    padding: 12px 14px;
+    flex-shrink: 0;
+    font-size: 0.72rem;
+    white-space: nowrap;
+    gap: 6px;
+  }
+  .nav-item svg { width: 13px; height: 13px; }
+  .nav-item:hover { background: var(--surface); border-left-color: transparent; }
+  .nav-item.active {
+    color: var(--gold);
+    background: rgba(201,168,76,0.06);
+    border-bottom-color: var(--gold);
+    border-left-color: transparent;
+  }
+  .nav-badge { font-size: 0.55rem; padding: 1px 5px; }
+
+  /* MAIN CONTENT */
+  .main { padding: 20px 16px; }
+
+  /* PANEL HEADER */
+  .panel-tag { font-size: 0.58rem; }
+  .panel-title { font-size: 1.6rem; }
+  .panel-sub { font-size: 0.8rem; }
+
+  /* METRICS — 2 columns on tablet */
+  .metrics { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .metric { padding: 16px 14px; }
+  .metric-value { font-size: 1.5rem; }
+  .metric-label { font-size: 0.6rem; }
+
+  /* GRIDS — single column */
+  .grid-2 { grid-template-columns: 1fr; gap: 16px; }
+  .grid-3 { grid-template-columns: 1fr; gap: 12px; }
+
+  /* CARDS */
+  .card { padding: 18px 14px; }
+  .card-title { font-size: 1rem; }
+
+  /* TABLES — horizontal scroll */
+  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table { min-width: 480px; }
+  th, td { padding: 8px 10px; font-size: 0.75rem; }
+
+  /* RISK METER — stacked */
+  .risk-meter {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 16px;
+  }
+  .risk-circle { width: 64px; height: 64px; }
+  .risk-score-num { font-size: 1.3rem; }
+  .risk-details h4 { font-size: 1rem; }
+  .risk-details p { font-size: 0.75rem; }
+
+  /* SCORE CARD — stacked */
+  .score-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 16px;
+  }
+  .score-bar-wrap { width: 100%; margin: 0; }
+  .score-val { font-size: 1.1rem; }
+
+  /* PROGRESS BARS */
+  .progress-label { width: 80px; font-size: 0.68rem; }
+  .progress-val { width: 50px; font-size: 0.68rem; }
+
+  /* SPLIT BAR */
+  .split-bar { height: 24px; }
+
+  /* ALERTS */
+  .alert { font-size: 0.78rem; padding: 12px 14px; }
+  .alert-title { font-size: 0.8rem; }
+
+  /* CHARTS */
+  canvas.chart { max-height: 200px; }
+}
+
+/* ── MOBILE (max 480px) ── */
+@media (max-width: 480px) {
+  /* NAV — stack on very small screens */
+  nav { padding: 10px 12px; }
+  .nav-logo { font-size: 1rem; }
+  .nav-right form button { padding: 5px 8px; font-size: 0.6rem; }
+  .nav-back { font-size: 0.6rem; padding: 5px 8px; }
+
+  /* SIDEBAR TABS — smaller */
+  .nav-item { padding: 10px 10px; font-size: 0.65rem; }
+
+  /* METRICS — still 2 col but smaller */
+  .metrics { grid-template-columns: repeat(2, 1fr); gap: 6px; }
+  .metric { padding: 12px 10px; }
+  .metric-value { font-size: 1.2rem; }
+  .metric-sub { font-size: 0.65rem; }
+
+  /* MAIN */
+  .main { padding: 14px 10px; }
+
+  /* PANEL */
+  .panel-header { margin-bottom: 20px; }
+  .panel-title { font-size: 1.4rem; }
+
+  /* CARDS */
+  .card { padding: 14px 10px; margin-bottom: 14px; }
+
+  /* UPLOAD GATE */
+  .upload-gate { padding: 0 12px; margin: 24px auto; }
+  .upload-gate h2 { font-size: 1.6rem; }
+  .upload-gate p { font-size: 0.82rem; }
+  .upload-area { padding: 24px 14px; }
+
+  /* PROGRESS */
+  .progress-row { gap: 6px; }
+  .progress-label { width: 70px; font-size: 0.62rem; }
+  .progress-val { width: 44px; font-size: 0.62rem; }
+
+  /* RISK METER */
+  .risk-details p { font-size: 0.7rem; line-height: 1.5; }
+
+  /* TABLES */
+  table { min-width: 380px; }
+  th, td { padding: 6px 8px; font-size: 0.7rem; }
 }
 </style>
 </head>

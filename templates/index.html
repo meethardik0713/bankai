@@ -46,12 +46,14 @@
   .nav-cta { font-size: 0.75rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold); border: 1px solid var(--border); padding: 10px 24px; text-decoration: none; transition: all 0.3s; background: rgba(201,168,76,0.04); }
   .nav-cta:hover { background: rgba(201,168,76,0.1); border-color: rgba(201,168,76,0.4); }
 
-  /* Mobile AI Chat button in nav — hidden everywhere */
-  .nav-ai-chat-mobile { display: none !important; }
+  /* Mobile buttons — hidden on desktop */
+  .nav-ai-chat-mobile { display: none; }
+  .nav-dashboard-mobile { display: none; }
 
   /* Floating AI Chat button — hidden on desktop */
   .fab-chat { display: none; }
 
+  /* ── HERO ── */
   #hero { position: relative; width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; overflow: hidden; }
   #three-canvas { position: absolute; inset: 0; z-index: 0; }
 
@@ -75,7 +77,8 @@
   .scroll-line { width: 1px; height: 48px; background: linear-gradient(to bottom, var(--gold), transparent); animation: scrollPulse 2s infinite; }
   .scroll-text { font-size: 0.6rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); }
 
-  #analyzer { padding: 120px 60px; max-width: 1000px; margin: 0 auto; }
+  /* ── ANALYZER SECTION ── */
+  #analyzer { padding: 120px 60px; max-width: 1400px; margin: 0 auto; }
   .section-tag { font-size: 0.68rem; letter-spacing: 0.28em; text-transform: uppercase; color: var(--gold); margin-bottom: 20px; display: block; }
   .section-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(2rem, 4vw, 3.5rem); font-weight: 300; line-height: 1.15; margin-bottom: 48px; max-width: 600px; }
 
@@ -105,6 +108,7 @@
   .clear-btn { padding: 18px 24px; background: transparent; border: 1px solid rgba(248,113,113,0.3); color: #f87171; font-family: 'DM Sans', sans-serif; font-size: 0.75rem; font-weight: 500; letter-spacing: 0.15em; text-transform: uppercase; cursor: pointer; transition: all 0.3s; white-space: nowrap; }
   .clear-btn:hover { background: rgba(248,113,113,0.08); border-color: rgba(248,113,113,0.5); }
 
+  /* ── STATS ROW ── */
   .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; margin-bottom: 32px; }
   .stat-box { background: rgba(255,255,255,0.02); border: 1px solid var(--border); padding: 28px 20px; text-align: center; }
   .stat-number { font-family: 'Cormorant Garamond', serif; font-size: 2.4rem; font-weight: 300; color: var(--gold); line-height: 1; margin-bottom: 8px; }
@@ -113,10 +117,15 @@
   .stat-debit   { font-family: 'DM Sans', sans-serif; font-size: 0.85rem; font-weight: 500; color: #f87171; line-height: 1.4; }
   .stat-label { font-size: 0.68rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); margin-top: 8px; }
 
+  /* ── CHART ── */
   .chart-box { background: rgba(255,255,255,0.02); border: 1px solid var(--border); padding: 32px; margin-bottom: 32px; }
   .chart-box h3 { font-family: 'Cormorant Garamond', serif; font-size: 1.2rem; font-weight: 400; margin-bottom: 24px; color: var(--text); }
   canvas.chart { max-height: 280px; }
 
+  /* ── SPLIT LAYOUT ── */
+  .results-split { display: grid; grid-template-columns: 1fr 340px; gap: 20px; align-items: start; }
+
+  /* ── TRANSACTION TABLE ── */
   .results-box { background: rgba(255,255,255,0.02); border: 1px solid var(--border); overflow: hidden; margin-bottom: 40px; }
   .results-header { display: flex; justify-content: space-between; align-items: center; padding: 24px 32px; border-bottom: 1px solid var(--border); background: rgba(255,255,255,0.02); }
   .results-header h3 { font-family: 'Cormorant Garamond', serif; font-size: 1.2rem; font-weight: 400; }
@@ -125,15 +134,16 @@
   .export-btn:hover { background: rgba(201,168,76,0.08); border-color: rgba(201,168,76,0.4); }
 
   table { width: 100%; border-collapse: collapse; }
-  th { font-size: 0.65rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); padding: 14px 24px; text-align: left; border-bottom: 1px solid var(--border); font-weight: 400; }
-  td { font-size: 0.85rem; color: var(--text); padding: 14px 24px; border-bottom: 1px solid rgba(255,255,255,0.03); }
+  th { font-size: 0.65rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); padding: 14px 20px; text-align: left; border-bottom: 1px solid var(--border); font-weight: 400; }
+  td { font-size: 0.82rem; color: var(--text); padding: 12px 20px; border-bottom: 1px solid rgba(255,255,255,0.03); }
   tr:hover td { background: rgba(201,168,76,0.03); }
 
-  .date-col { color: var(--muted); white-space: nowrap; font-size: 0.8rem; }
-  .balance-col { color: rgba(232,228,217,0.6); font-size: 0.85rem; }
+  .date-col { color: var(--muted); white-space: nowrap; font-size: 0.78rem; }
+  .balance-col { color: rgba(232,228,217,0.6); font-size: 0.82rem; }
+  .desc-col { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-  .badge-credit { display: inline-flex; align-items: center; gap: 4px; background: rgba(74,222,128,0.1); border: 1px solid rgba(74,222,128,0.25); color: #4ade80; font-size: 0.62rem; letter-spacing: 0.12em; text-transform: uppercase; padding: 3px 8px; border-radius: 2px; font-weight: 500; white-space: nowrap; }
-  .badge-debit { display: inline-flex; align-items: center; gap: 4px; background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.25); color: #f87171; font-size: 0.62rem; letter-spacing: 0.12em; text-transform: uppercase; padding: 3px 8px; border-radius: 2px; font-weight: 500; white-space: nowrap; }
+  .badge-credit { display: inline-flex; align-items: center; gap: 4px; background: rgba(74,222,128,0.1); border: 1px solid rgba(74,222,128,0.25); color: #4ade80; font-size: 0.6rem; letter-spacing: 0.12em; text-transform: uppercase; padding: 3px 7px; border-radius: 2px; font-weight: 500; white-space: nowrap; }
+  .badge-debit { display: inline-flex; align-items: center; gap: 4px; background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.25); color: #f87171; font-size: 0.6rem; letter-spacing: 0.12em; text-transform: uppercase; padding: 3px 7px; border-radius: 2px; font-weight: 500; white-space: nowrap; }
   .badge-unknown { color: var(--muted); font-size: 0.8rem; }
   .amount-credit { color: #4ade80; font-weight: 500; }
   .amount-debit { color: #f87171; font-weight: 500; }
@@ -141,6 +151,74 @@
 
   .no-results { padding: 60px; text-align: center; color: var(--muted); font-family: 'Cormorant Garamond', serif; font-size: 1.4rem; font-weight: 300; }
 
+  /* ── DASHBOARD SIDEBAR ── */
+  .split-dashboard { position: sticky; top: 100px; }
+
+  .dash-section-title {
+    font-size: 0.58rem;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 12px;
+    display: block;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .dash-card {
+    background: rgba(255,255,255,0.02);
+    border: 1px solid var(--border);
+    padding: 18px 20px;
+    margin-bottom: 10px;
+    transition: border-color 0.3s;
+  }
+  .dash-card:hover { border-color: rgba(201,168,76,0.3); }
+
+  .dash-metric {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 7px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .dash-metric:last-child { border-bottom: none; padding-bottom: 0; }
+  .dash-metric-label { font-size: 0.72rem; color: var(--muted); }
+  .dash-metric-value { font-size: 0.82rem; font-weight: 500; color: var(--text); }
+  .dash-metric-value.green { color: #4ade80; }
+  .dash-metric-value.red { color: #f87171; }
+  .dash-metric-value.gold { color: var(--gold); }
+  .dash-metric-value.small { font-size: 0.72rem; }
+
+  .dash-badge {
+    display: inline-block;
+    font-size: 0.58rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 2px;
+    font-weight: 500;
+  }
+  .dash-badge.low  { background: rgba(74,222,128,0.1);  border: 1px solid rgba(74,222,128,0.2);  color: #4ade80; }
+  .dash-badge.medium { background: rgba(251,191,36,0.1); border: 1px solid rgba(251,191,36,0.2); color: #fbbf24; }
+  .dash-badge.high { background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.2); color: #f87171; }
+
+  .dash-view-full {
+    display: block;
+    text-align: center;
+    font-size: 0.65rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--gold);
+    border: 1px solid var(--border);
+    padding: 12px;
+    text-decoration: none;
+    transition: all 0.3s;
+    margin-top: 4px;
+    background: rgba(201,168,76,0.02);
+  }
+  .dash-view-full:hover { background: rgba(201,168,76,0.08); border-color: rgba(201,168,76,0.4); }
+
+  /* ── OTHER SECTIONS ── */
   #how { padding: 120px 60px; max-width: 1200px; margin: 0 auto; }
   .steps-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; }
   .step { padding: 48px 40px; background: var(--surface); border: 1px solid var(--border); position: relative; overflow: hidden; transition: border-color 0.4s; }
@@ -181,28 +259,37 @@
   .reveal { opacity: 0; transform: translateY(32px); transition: opacity 0.8s ease, transform 0.8s ease; }
   .reveal.visible { opacity: 1; transform: translateY(0); }
 
+  /* ── RESPONSIVE ── */
+  @media (max-width: 1200px) {
+    .results-split { grid-template-columns: 1fr 300px; }
+  }
+
+  @media (max-width: 1024px) {
+    .results-split { grid-template-columns: 1fr; }
+    .split-dashboard { position: static; }
+    .split-dashboard { order: -1; }
+  }
+
   @media (max-width: 768px) {
-    nav { padding: 20px 24px; }
+    nav { padding: 14px 16px; gap: 8px; }
+    .nav-logo { font-size: 1.1rem; }
     .nav-links { display: none; }
     .nav-cta { display: none; }
-
-    /* AI Chat button visible in navbar on mobile */
-    .nav-ai-chat-mobile {
-      display: inline-flex;
+    .nav-dashboard-mobile {
+      display: inline-flex !important;
       align-items: center;
       gap: 6px;
-      font-size: 0.72rem;
-      letter-spacing: 0.14em;
+      font-size: 0.65rem;
+      letter-spacing: 0.12em;
       text-transform: uppercase;
       color: var(--gold);
       border: 1px solid rgba(201,168,76,0.4);
-      padding: 8px 14px;
+      padding: 7px 12px;
       text-decoration: none;
       background: rgba(201,168,76,0.08);
       transition: all 0.3s;
     }
 
-    /* Floating AI Chat button bottom-right */
     .fab-chat {
       display: flex;
       position: fixed;
@@ -228,22 +315,25 @@
     .hero-content { padding: 0 20px; }
     .hero-sub { font-size: 0.85rem; }
     .hero-actions { flex-direction: column; gap: 8px; }
-    #analyzer, #how, #features, #trust { padding: 80px 24px; }
+    #analyzer { padding: 80px 16px; }
+    #how, #features, #trust { padding: 80px 24px; }
     .steps-grid, .features-grid { grid-template-columns: 1fr; }
     .trust-inner { grid-template-columns: 1fr; gap: 40px; }
     .trust-badges { grid-template-columns: 1fr; }
     .stats-row { grid-template-columns: repeat(2, 1fr); }
     .stat-number { font-size: 2rem; }
     .stat-total { font-size: 1.2rem; }
-    .upload-form { padding: 28px 20px; }
+    .upload-form { padding: 24px 16px; }
     .form-actions { flex-direction: column; }
     .results-box { overflow-x: auto; }
-    table { min-width: 600px; }
-    th, td { padding: 10px 10px; font-size: 0.75rem; }
+    table { min-width: 540px; }
+    th, td { padding: 10px 12px; font-size: 0.72rem; }
+    .desc-col { max-width: 160px; }
     footer { flex-direction: column; gap: 24px; text-align: center; }
     .footer-links { flex-wrap: wrap; justify-content: center; }
     body { cursor: auto; }
     .cursor, .cursor-ring { display: none; }
+    .dash-card { padding: 14px 16px; }
   }
 </style>
 </head>
@@ -253,9 +343,7 @@
 <div class="cursor-ring" id="cursorRing"></div>
 
 <!-- Floating AI Chat Button (mobile only) -->
-<a href="/pay" class="fab-chat">
-  ✦ AI Chat
-</a>
+<a href="/pay" class="fab-chat">✦ AI Chat</a>
 
 <nav>
   <a href="#" class="nav-logo">Aarogyam<span>Fin</span></a>
@@ -264,20 +352,19 @@
     <li><a href="#how">How It Works</a></li>
     <li><a href="#trust">Security</a></li>
     <li><a href="/accuracy">Accuracy Test</a></li>
-    <li><a href="/dashboard">Dashboard </a></li>
-    <li><a href="/pay">AI Chat </a></li>
+    <li><a href="/dashboard">Dashboard</a></li>
+    <li><a href="/pay">AI Chat</a></li>
   </ul>
-  <!-- AI Chat button visible on mobile in navbar -->
-  <a href="/pay" class="nav-ai-chat-mobile">✨ AI Chat</a>
   {% if is_logged_in %}
-<span style="font-size:0.75rem; color:var(--muted); margin-right:16px;">{{ user_email }}</span>
-<a href="/logout" class="nav-cta">Logout</a>
-{% else %}
-<a href="/login" class="nav-cta" style="margin-right:8px;">Sign In</a>
-<a href="/login" class="nav-cta">Sign Up</a>
-{% endif %}
+  <span style="font-size:0.75rem; color:var(--muted); margin-right:8px;">{{ user_email }}</span>
+  <a href="/logout" class="nav-cta">Logout</a>
+  {% else %}
+  <a href="/login" class="nav-cta" style="margin-right:8px;">Sign In</a>
+  <a href="/login" class="nav-cta">Sign Up</a>
+  {% endif %}
 </nav>
 
+<!-- ═══ HERO ═══ -->
 <section id="hero">
   <canvas id="three-canvas"></canvas>
   <div class="hero-content">
@@ -305,13 +392,13 @@
   </div>
 </section>
 
+<!-- ═══ ANALYZER ═══ -->
 <section id="analyzer">
   <span class="section-tag reveal">Live Analysis</span>
   <h2 class="section-title reveal">Upload your statement, get instant insights</h2>
 
   <div class="upload-form reveal">
     <form method="POST" action="/" enctype="multipart/form-data" id="analyzeForm">
-
       <div class="form-group">
         <label class="form-label">Bank Statement PDF</label>
         <div class="file-upload-wrapper">
@@ -338,10 +425,10 @@
 
       <div class="form-actions">
         {% if is_logged_in %}
-<button type="submit" class="submit-btn">⚡ Analyze Statement</button>
-{% else %}
-<a href="/login" class="submit-btn" style="text-align:center; text-decoration:none;">🔐 Login to Analyze</a>
-{% endif %}
+        <button type="submit" class="submit-btn">⚡ Analyze Statement</button>
+        {% else %}
+        <a href="/login" class="submit-btn" style="text-align:center; text-decoration:none;">🔐 Login to Analyze</a>
+        {% endif %}
         <button type="button" class="clear-btn" id="clearAllBtn">✕ Clear All / Change PDF</button>
       </div>
     </form>
@@ -349,6 +436,7 @@
 
   {% if transaction_data %}
 
+  <!-- Stats Row -->
   <div class="stats-row reveal">
     <div class="stat-box">
       <div class="stat-number">{{ count }}</div>
@@ -368,6 +456,7 @@
     </div>
   </div>
 
+  <!-- Chart -->
   {% if amounts_count > 0 %}
   <div class="chart-box reveal">
     <h3>Transaction Amounts Chart</h3>
@@ -375,82 +464,163 @@
   </div>
   {% endif %}
 
-  <div class="results-box reveal">
-    <div class="results-header">
-      <h3>Results {% if keyword %}for "{{ keyword }}"{% endif %}</h3>
-      <form method="POST" action="/export">
-        {% for t in transaction_data %}
-        <input type="hidden" name="dates"      value="{{ t.date }}">
-        <input type="hidden" name="descs"      value="{{ t.desc }}">
-        <input type="hidden" name="amounts"    value="{{ t.amount if t.amount else '' }}">
-        <input type="hidden" name="balances"   value="{{ t.balance if t.balance else '' }}">
-        <input type="hidden" name="types"      value="{{ t.type if t.type else '' }}">
-        <input type="hidden" name="categories" value="{{ t.category if t.category else '' }}">
-        {% endfor %}
-        <input type="hidden" name="keyword" value="{{ keyword }}">
-        <button type="submit" class="export-btn">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Export Excel
-        </button>
-      </form>
+  <!-- Split Layout: Table + Dashboard Sidebar -->
+  <div class="results-split">
+
+    <!-- LEFT: Transaction Table -->
+    <div class="results-box reveal">
+      <div class="results-header">
+        <h3>Results {% if keyword %}for "{{ keyword }}"{% endif %}</h3>
+        <form method="POST" action="/export">
+          {% for t in transaction_data %}
+          <input type="hidden" name="dates"      value="{{ t.date }}">
+          <input type="hidden" name="descs"      value="{{ t.desc }}">
+          <input type="hidden" name="amounts"    value="{{ t.amount if t.amount else '' }}">
+          <input type="hidden" name="balances"   value="{{ t.balance if t.balance else '' }}">
+          <input type="hidden" name="types"      value="{{ t.type if t.type else '' }}">
+          <input type="hidden" name="categories" value="{{ t.category if t.category else '' }}">
+          {% endfor %}
+          <input type="hidden" name="keyword" value="{{ keyword }}">
+          <button type="submit" class="export-btn">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export Excel
+          </button>
+        </form>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Description</th>
+            <th>Type</th>
+            <th>Amount (₹)</th>
+            <th>Balance (₹)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in transaction_data %}
+          <tr>
+            <td class="date-col">{{ t.date }}</td>
+            <td class="desc-col" title="{{ t.desc }}">{{ t.desc }}</td>
+            <td>
+              {% if t.type == 'CR' %}
+                <span class="badge-credit">↑ CR</span>
+              {% elif t.type == 'DR' %}
+                <span class="badge-debit">↓ DR</span>
+              {% else %}
+                <span class="badge-unknown">—</span>
+              {% endif %}
+            </td>
+            <td class="{% if t.type == 'CR' %}amount-credit{% elif t.type == 'DR' %}amount-debit{% else %}amount-neutral{% endif %}">
+              {% if t.amount %}₹{{ "%.2f"|format(t.amount) }}{% else %}—{% endif %}
+            </td>
+            <td class="balance-col">{% if t.balance %}₹{{ "%.2f"|format(t.balance) }}{% else %}—{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      {% if total_pages is defined and total_pages > 1 %}
+      <div style="display:flex; gap:12px; align-items:center; justify-content:center; padding:20px;">
+        <form method="POST" action="/">
+          <input type="hidden" name="keyword" value="{{ keyword }}">
+          <input type="hidden" name="page" value="{{ page_num - 1 }}">
+          {% if page_num > 1 %}
+          <button type="submit" class="export-btn">← Prev</button>
+          {% endif %}
+        </form>
+        <span style="font-size:0.72rem; letter-spacing:0.12em; color:var(--muted); text-transform:uppercase;">
+          Page {{ page_num }} / {{ total_pages }} · {{ total_count }} txns
+        </span>
+        <form method="POST" action="/">
+          <input type="hidden" name="keyword" value="{{ keyword }}">
+          <input type="hidden" name="page" value="{{ page_num + 1 }}">
+          {% if page_num < total_pages %}
+          <button type="submit" class="export-btn">Next →</button>
+          {% endif %}
+        </form>
+      </div>
+      {% endif %}
     </div>
-    <table>
-      <thead>
-        <tr>
-          <th>Date</th>
-          <th>Description</th>
-          <th>Type</th>
-          <th>Amount (₹)</th>
-          <th>Balance (₹)</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for t in transaction_data %}
-        <tr>
-          <td class="date-col">{{ t.date }}</td>
-          <td>{{ t.desc }}</td>
-          <td>
-            {% if t.type == 'CR' %}
-              <span class="badge-credit">↑ Credit</span>
-            {% elif t.type == 'DR' %}
-              <span class="badge-debit">↓ Debit</span>
-            {% else %}
-              <span class="badge-unknown">—</span>
-            {% endif %}
-          </td>
-          <td class="{% if t.type == 'CR' %}amount-credit{% elif t.type == 'DR' %}amount-debit{% else %}amount-neutral{% endif %}">
-            {% if t.amount %}₹{{ "%.2f"|format(t.amount) }}{% else %}—{% endif %}
-          </td>
-          <td class="balance-col">{% if t.balance %}₹{{ "%.2f"|format(t.balance) }}{% else %}—{% endif %}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
 
-  {% if total_pages is defined and total_pages > 1 %}
-  <div style="display:flex; gap:12px; align-items:center; justify-content:center; margin-bottom:40px;">
-    <form method="POST" action="/">
-      <input type="hidden" name="keyword" value="{{ keyword }}">
-      <input type="hidden" name="page" value="{{ page_num - 1 }}">
-      {% if page_num > 1 %}
-      <button type="submit" class="export-btn">← Prev</button>
-      {% endif %}
-    </form>
+    <!-- RIGHT: Dashboard Summary Sidebar -->
+    {% if dashboard_data %}
+    <aside class="split-dashboard reveal">
 
-    <span style="font-size:0.78rem; letter-spacing:0.15em; color:var(--muted); text-transform:uppercase;">
-      Page {{ page_num }} of {{ total_pages }} &nbsp;·&nbsp; {{ total_count }} transactions
-    </span>
+      <div class="dash-card">
+        <span class="dash-section-title">💰 Income & Spending</span>
+        <div class="dash-metric">
+          <span class="dash-metric-label">Real Income</span>
+          <span class="dash-metric-value green">₹{{ "{:,.0f}".format(dashboard_data.itr.real_income_total) }}</span>
+        </div>
+        <div class="dash-metric">
+          <span class="dash-metric-label">Loan Received</span>
+          <span class="dash-metric-value red">₹{{ "{:,.0f}".format(dashboard_data.itr.loan_disbursal_total) }}</span>
+        </div>
+        <div class="dash-metric">
+          <span class="dash-metric-label">Avg Monthly Spend</span>
+          <span class="dash-metric-value">₹{{ "{:,.0f}".format(dashboard_data.loan.avg_monthly_debit) }}</span>
+        </div>
+        <div class="dash-metric">
+          <span class="dash-metric-label">Avg Balance</span>
+          <span class="dash-metric-value gold">₹{{ "{:,.0f}".format(dashboard_data.loan.avg_balance) }}</span>
+        </div>
+      </div>
 
-    <form method="POST" action="/">
-      <input type="hidden" name="keyword" value="{{ keyword }}">
-      <input type="hidden" name="page" value="{{ page_num + 1 }}">
-      {% if page_num < total_pages %}
-      <button type="submit" class="export-btn">Next →</button>
-      {% endif %}
-    </form>
-  </div>
-  {% endif %}
+      <div class="dash-card">
+        <span class="dash-section-title">📋 Tax & EMI</span>
+        <div class="dash-metric">
+          <span class="dash-metric-label">Salary</span>
+          <span class="dash-metric-value green">₹{{ "{:,.0f}".format(dashboard_data.itr.salary_total) }}</span>
+        </div>
+        <div class="dash-metric">
+          <span class="dash-metric-label">Freelance</span>
+          <span class="dash-metric-value green">₹{{ "{:,.0f}".format(dashboard_data.itr.freelance_total) }}</span>
+        </div>
+        <div class="dash-metric">
+          <span class="dash-metric-label">EMI Outflow</span>
+          <span class="dash-metric-value red">₹{{ "{:,.0f}".format(dashboard_data.audit.total_emi_outflow) }}</span>
+        </div>
+        <div class="dash-metric">
+          <span class="dash-metric-label">FOIR</span>
+          <span class="dash-metric-value {% if dashboard_data.loan.foir > 50 %}red{% elif dashboard_data.loan.foir > 35 %}gold{% else %}green{% endif %}">{{ dashboard_data.loan.foir }}%</span>
+        </div>
+        <div class="dash-metric">
+          <span class="dash-metric-label">ITR Form</span>
+          <span class="dash-metric-value gold small">{{ dashboard_data.itr.suggested_itr.split('(')[0].strip() }}</span>
+        </div>
+      </div>
+
+      <div class="dash-card">
+        <span class="dash-section-title">🛡️ Risk & Credit</span>
+        <div class="dash-metric">
+          <span class="dash-metric-label">Compliance Risk</span>
+          <span class="dash-badge {{ dashboard_data.compliance.risk_level | lower }}">{{ dashboard_data.compliance.risk_level }}</span>
+        </div>
+        <div class="dash-metric">
+          <span class="dash-metric-label">Credit Profile</span>
+          <span class="dash-badge {% if dashboard_data.loan.credit_color == 'green' %}low{% elif dashboard_data.loan.credit_color == 'red' %}high{% else %}medium{% endif %}">{{ dashboard_data.loan.credit_indicator }}</span>
+        </div>
+        <div class="dash-metric">
+          <span class="dash-metric-label">Loan Eligible</span>
+          <span class="dash-metric-value gold">₹{{ "{:,.0f}".format(dashboard_data.loan.loan_eligible) }}</span>
+        </div>
+        <div class="dash-metric">
+          <span class="dash-metric-label">Balance Mismatches</span>
+          <span class="dash-metric-value {% if dashboard_data.audit.mismatch_count > 0 %}red{% else %}green{% endif %}">{{ dashboard_data.audit.mismatch_count }}</span>
+        </div>
+        <div class="dash-metric">
+          <span class="dash-metric-label">EMIs Detected</span>
+          <span class="dash-metric-value">{{ dashboard_data.audit.emi_count }}</span>
+        </div>
+      </div>
+
+      <a href="/dashboard" class="dash-view-full">View Full Dashboard →</a>
+
+    </aside>
+    {% endif %}
+
+  </div><!-- end results-split -->
 
   {% elif keyword %}
   <div class="results-box reveal">
@@ -459,6 +629,7 @@
   {% endif %}
 </section>
 
+<!-- ═══ HOW IT WORKS ═══ -->
 <section id="how">
   <span class="section-tag reveal">Process</span>
   <h2 class="section-title reveal">Three steps to complete financial clarity</h2>
@@ -484,6 +655,7 @@
   </div>
 </section>
 
+<!-- ═══ TRUST ═══ -->
 <section id="trust">
   <div class="trust-inner">
     <div>
@@ -500,6 +672,7 @@
   </div>
 </section>
 
+<!-- ═══ FEATURES ═══ -->
 <section id="features">
   <span class="section-tag reveal">Capabilities</span>
   <h2 class="section-title reveal">Everything you need to understand your money</h2>
