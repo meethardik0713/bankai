@@ -18,6 +18,7 @@ from universal_parser import parse_transactions
 from core.verifier import run_accuracy_check
 from core.sqlite_indexer import build_index, drop_index, get_db
 from core.chat_engine import verify_data, chat as ai_chat
+from core.dashboard import run_dashboard
 from supabase import create_client, Client
 
 SUPABASE_URL = os.environ.get('SUPABASE_URL')
@@ -568,6 +569,9 @@ def clear_cache():
     if fhash:
         with _CACHE_LOCK:
             _CACHE.pop(fhash, None)
+    referrer = request.referrer or '/'
+    if 'dashboard' in referrer:
+        return redirect('/dashboard')
     return ('', 204)
 
 
@@ -575,16 +579,18 @@ def clear_cache():
 def sitemap():
     from datetime import datetime
     pages = [
-        ('https://aarogyamfin.com/', '1.0', 'weekly'),
-        ('https://aarogyamfin.com/about', '0.8', 'monthly'),
-        ('https://aarogyamfin.com/accuracy', '0.7', 'monthly'),
-        ('https://aarogyamfin.com/privacy', '0.5', 'yearly'),
-        ('https://aarogyamfin.com/terms', '0.5', 'yearly'),
+        ('https://aarogyamfin.com/',           '1.0', 'weekly'),
+        ('https://aarogyamfin.com/about',       '0.8', 'monthly'),
+        ('https://aarogyamfin.com/accuracy',    '0.7', 'monthly'),
+        ('https://aarogyamfin.com/dashboard',   '0.8', 'weekly'),
+        ('https://aarogyamfin.com/privacy',     '0.5', 'yearly'),
+        ('https://aarogyamfin.com/terms',       '0.5', 'yearly'),
     ]
     xml = ['<?xml version="1.0" encoding="UTF-8"?>',
            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
     for url, priority, freq in pages:
-        xml.append(f'  <url><loc>{url}</loc><lastmod>{datetime.now().strftime("%Y-%m-%d")}</lastmod><changefreq>{freq}</changefreq><priority>{priority}</priority></url>')
+        xml.append(f'  <url><loc>{url}</loc><lastmod>{datetime.now().strftime("%Y-%m-%d")}</lastmod>'
+                   f'<changefreq>{freq}</changefreq><priority>{priority}</priority></url>')
     xml.append('</urlset>')
     return Response('\n'.join(xml), mimetype='application/xml')
 
@@ -692,6 +698,117 @@ def export():
 
     safe_kw = secure_filename(keyword) if keyword else 'transactions'
     return send_file(output, download_name=f'transactions_{safe_kw}.xlsx', as_attachment=True)
+
+
+# ═══════════════════════════════════════════════════════════
+#  DASHBOARD ROUTES
+# ═══════════════════════════════════════════════════════════
+
+@app.route('/dashboard', methods=['GET'])
+def dashboard_page():
+    is_logged_in, user_email, user_id = _get_current_user()
+    if not is_logged_in:
+        return redirect('/login')
+
+    data        = None
+    cached_hash = session.get('file_hash')
+
+    if cached_hash:
+        cached = _cache_get(cached_hash)
+        if cached:
+            data = run_dashboard(cached['transactions'])
+
+    return render_template(
+        'dashboard.html',
+        data         = data,
+        is_logged_in = is_logged_in,
+        user_email   = user_email,
+    )
+
+
+@app.route('/dashboard', methods=['POST'])
+def dashboard_analyze():
+    ip = request.remote_addr
+    if is_rate_limited(ip):
+        abort(429)
+
+    is_logged_in, user_email, user_id = _get_current_user()
+    if not is_logged_in:
+        return redirect('/login')
+
+    data          = None
+    error_message = ''
+
+    # ── Use already-cached file ────────────────────────────
+    if request.form.get('use_cached'):
+        cached_hash = session.get('file_hash')
+        if cached_hash:
+            cached = _cache_get(cached_hash)
+            if cached:
+                data = run_dashboard(cached['transactions'])
+            else:
+                error_message = 'Session expired. Please re-upload.'
+        return render_template('dashboard.html',
+            data          = data,
+            error_message = error_message,
+            is_logged_in  = is_logged_in,
+            user_email    = user_email,
+        )
+
+    # ── New PDF upload ─────────────────────────────────────
+    file = request.files.get('pdf_file')
+    if not file or not file.filename:
+        return render_template('dashboard.html',
+            data          = None,
+            error_message = 'No file uploaded.',
+            is_logged_in  = is_logged_in,
+            user_email    = user_email,
+        )
+
+    safe_name = secure_filename(file.filename)
+    if not safe_name.lower().endswith('.pdf'):
+        error_message = 'Only PDF files accepted.'
+    elif len(safe_name) >= 200:
+        error_message = 'Filename too long.'
+    elif not _is_valid_pdf(file):
+        error_message = 'Invalid PDF file.'
+    else:
+        fhash  = _file_hash(file)
+        cached = _cache_get(fhash)
+
+        if cached:
+            transactions = cached['transactions']
+            logger.info("Dashboard cache hit for %s", safe_name)
+        else:
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], safe_name)
+            file.save(filepath)
+            try:
+                t0           = time.time()
+                transactions = parse_transactions(filepath)
+                parse_time   = round(time.time() - t0, 1)
+                _cache_set(fhash, transactions, safe_name)
+                session['file_hash'] = fhash
+                session['file_name'] = safe_name
+                logger.info("Dashboard parsed %s → %d txns in %.1fs",
+                            safe_name, len(transactions), parse_time)
+            except Exception as e:
+                logger.exception("Dashboard parse error: %s", safe_name)
+                error_message = f'Could not parse: {e}'
+                transactions  = []
+            finally:
+                if os.path.exists(filepath):
+                    os.remove(filepath)
+
+        if transactions and not error_message:
+            data = run_dashboard(transactions)
+
+    return render_template(
+        'dashboard.html',
+        data          = data,
+        error_message = error_message,
+        is_logged_in  = is_logged_in,
+        user_email    = user_email,
+    )
 
 
 # ═══════════════════════════════════════════════════════════
@@ -883,16 +1000,13 @@ def api_payment_status():
             plan_name    = s.get('plan', 'Basic')
             expires_at   = s.get('expires_at')
 
-            # Check expiry
             if expires_at:
                 exp = datetime.fromisoformat(expires_at.replace('Z', '+00:00'))
                 if exp < datetime.now(timezone.utc):
                     return jsonify({'has_access': False, 'plan': 'Free'})
 
-            # Check token limits
             if input_used < input_limit and output_used < output_limit:
-                # Rebuild SQLite index if transactions exist
-                saved_txns = s.get('transactions') or []
+                saved_txns        = s.get('transactions') or []
                 actual_session_id = str(s['id'])
                 if saved_txns and not get_db(actual_session_id):
                     try:
@@ -958,10 +1072,8 @@ def api_chat_upload():
     if not transactions:
         return jsonify({'error': 'No transactions found'}), 400
 
-    from core.sqlite_indexer import build_index
     row_count = build_index(session_id, transactions)
 
-    # Save transactions to Supabase for 48hr persistence
     try:
         supabase.table('chat_sessions').update({
             'transactions': transactions,
@@ -993,11 +1105,9 @@ def api_chat_message():
     if not user_message:
         return jsonify({'error': 'Empty message'}), 400
 
-    from core.sqlite_indexer import get_db
     if not get_db(session_id):
         return jsonify({'error': 'No statement loaded. Upload PDF first.'}), 400
 
-    # ── Token limit check ─────────────────────────────────
     try:
         session_data = supabase.table('chat_sessions').select(
             'input_tokens_used, input_tokens_limit, output_tokens_used, output_tokens_limit, expires_at'
@@ -1010,7 +1120,6 @@ def api_chat_message():
             output_used  = s.get('output_tokens_used', 0)
             output_limit = s.get('output_tokens_limit', 5000)
 
-            # Check expiry
             from datetime import datetime, timezone
             expires_at = s.get('expires_at')
             if expires_at:
@@ -1018,7 +1127,6 @@ def api_chat_message():
                 if exp < datetime.now(timezone.utc):
                     return jsonify({'error': 'Session expired. Please purchase a new plan.'}), 403
 
-            # Check token limits
             if input_used >= input_limit:
                 return jsonify({'error': 'Token limit reached. Please purchase a new plan.'}), 403
             if output_used >= output_limit:
@@ -1026,10 +1134,9 @@ def api_chat_message():
     except Exception as e:
         logger.exception("Token limit check failed: %s", e)
 
-    result = ai_chat(session_id, user_message, history)
-
-    # ── Update token usage + save messages in Supabase ───
+    result      = ai_chat(session_id, user_message, history)
     tokens_used = result.get('tokens_used', 0)
+
     try:
         existing = supabase.table('chat_sessions').select(
             'input_tokens_used, output_tokens_used, messages'
@@ -1073,4 +1180,3 @@ def file_too_large(e):
 if __name__ == '__main__':
     debug_mode = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
     app.run(debug=debug_mode)
-    

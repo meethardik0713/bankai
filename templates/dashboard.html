@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AarogyamFin — Financial Intelligence Dashboard</title>
+<link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+:root {
+  --gold: #c9a84c;
+  --gold-light: #e8cc7a;
+  --gold-dim: rgba(201,168,76,0.15);
+  --bg: #060810;
+  --surface: rgba(255,255,255,0.03);
+  --surface2: rgba(255,255,255,0.05);
+  --border: rgba(201,168,76,0.15);
+  --border-hover: rgba(201,168,76,0.35);
+  --text: #e8e4d9;
+  --muted: rgba(232,228,217,0.45);
+  --green: #4ade80;
+  --red: #f87171;
+  --yellow: #fbbf24;
+  --green-bg: rgba(74,222,128,0.08);
+  --red-bg: rgba(248,113,113,0.08);
+  --yellow-bg: rgba(251,191,36,0.08);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 300;
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+
+/* ── CURSOR ── */
+.cursor { position: fixed; width: 8px; height: 8px; background: var(--gold); border-radius: 50%; pointer-events: none; z-index: 9999; mix-blend-mode: difference; transition: transform 0.1s; }
+.cursor-ring { position: fixed; width: 36px; height: 36px; border: 1px solid rgba(201,168,76,0.4); border-radius: 50%; pointer-events: none; z-index: 9998; }
+
+/* ── NAV ── */
+nav {
+  position: sticky; top: 0; z-index: 100;
+  padding: 20px 48px;
+  display: flex; justify-content: space-between; align-items: center;
+  background: rgba(6,8,16,0.92);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(12px);
+}
+.nav-logo { font-family: 'Cormorant Garamond', serif; font-size: 1.3rem; font-weight: 500; letter-spacing: 0.12em; color: var(--text); text-decoration: none; }
+.nav-logo span { color: var(--gold); }
+.nav-right { display: flex; align-items: center; gap: 24px; }
+.nav-tag { font-size: 0.68rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold); border: 1px solid var(--border); padding: 6px 14px; background: rgba(201,168,76,0.04); }
+.nav-back { font-size: 0.72rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); text-decoration: none; transition: color 0.3s; }
+.nav-back:hover { color: var(--gold); }
+
+/* ── UPLOAD GATE ── */
+.upload-gate {
+  max-width: 640px; margin: 80px auto; padding: 0 32px;
+  text-align: center;
+}
+.upload-gate h2 { font-family: 'Cormorant Garamond', serif; font-size: 2.8rem; font-weight: 300; line-height: 1.1; margin-bottom: 20px; }
+.upload-gate h2 em { color: var(--gold-light); font-style: italic; }
+.upload-gate p { font-size: 0.9rem; color: var(--muted); line-height: 1.8; margin-bottom: 48px; }
+.upload-area {
+  border: 1px dashed rgba(201,168,76,0.35);
+  padding: 48px;
+  background: rgba(255,255,255,0.02);
+  cursor: pointer;
+  transition: all 0.3s;
+}
+.upload-area:hover { border-color: rgba(201,168,76,0.6); background: rgba(201,168,76,0.04); }
+.upload-icon { width: 48px; height: 48px; margin: 0 auto 20px; color: var(--gold); opacity: 0.7; }
+.upload-area p { font-size: 0.85rem; color: var(--muted); margin: 0; }
+.upload-area p strong { color: var(--gold); font-weight: 500; }
+
+/* ── LAYOUT ── */
+.dashboard {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  min-height: calc(100vh - 65px);
+}
+
+/* ── SIDEBAR ── */
+.sidebar {
+  border-right: 1px solid var(--border);
+  padding: 32px 0;
+  position: sticky; top: 65px; height: calc(100vh - 65px);
+  overflow-y: auto;
+  background: rgba(255,255,255,0.01);
+}
+
+.sidebar-section { padding: 0 20px 24px; border-bottom: 1px solid var(--border); margin-bottom: 8px; }
+.sidebar-label { font-size: 0.58rem; letter-spacing: 0.28em; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; display: block; padding: 0 4px; }
+
+.stat-mini { padding: 10px 12px; margin-bottom: 4px; background: var(--surface); border: 1px solid transparent; transition: all 0.3s; }
+.stat-mini:hover { border-color: var(--border); }
+.stat-mini-num { font-family: 'Cormorant Garamond', serif; font-size: 1.4rem; font-weight: 300; color: var(--gold); line-height: 1; }
+.stat-mini-label { font-size: 0.62rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin-top: 3px; }
+
+.nav-items { padding: 12px 8px 0; }
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 16px;
+  font-size: 0.8rem; letter-spacing: 0.06em;
+  color: var(--muted);
+  cursor: pointer;
+  border-left: 2px solid transparent;
+  transition: all 0.25s;
+  border-radius: 0 4px 4px 0;
+}
+.nav-item:hover { color: var(--text); background: var(--surface); border-left-color: var(--gold-dim); }
+.nav-item.active { color: var(--gold); background: rgba(201,168,76,0.06); border-left-color: var(--gold); }
+.nav-item svg { width: 15px; height: 15px; flex-shrink: 0; opacity: 0.7; }
+.nav-item.active svg { opacity: 1; }
+.nav-badge { margin-left: auto; font-size: 0.6rem; padding: 2px 6px; border-radius: 10px; background: rgba(201,168,76,0.15); color: var(--gold); }
+.nav-badge.red { background: rgba(248,113,113,0.15); color: var(--red); }
+.nav-badge.yellow { background: rgba(251,191,36,0.15); color: var(--yellow); }
+
+/* ── MAIN CONTENT ── */
+.main { padding: 40px 48px; overflow-y: auto; }
+
+/* ── PANELS ── */
+.panel { display: none; }
+.panel.active { display: block; animation: fadeIn 0.4s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+.panel-header { margin-bottom: 36px; }
+.panel-tag { font-size: 0.62rem; letter-spacing: 0.28em; text-transform: uppercase; color: var(--gold); margin-bottom: 10px; display: block; }
+.panel-title { font-family: 'Cormorant Garamond', serif; font-size: 2.2rem; font-weight: 300; line-height: 1.1; }
+.panel-sub { font-size: 0.85rem; color: var(--muted); margin-top: 8px; line-height: 1.7; }
+
+/* ── METRIC CARDS ── */
+.metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 32px; }
+.metric {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 24px 20px;
+  transition: border-color 0.3s;
+}
+.metric:hover { border-color: var(--border-hover); }
+.metric-value { font-family: 'Cormorant Garamond', serif; font-size: 2rem; font-weight: 300; color: var(--gold); line-height: 1; margin-bottom: 6px; }
+.metric-value.green { color: var(--green); }
+.metric-value.red { color: var(--red); }
+.metric-value.yellow { color: var(--yellow); }
+.metric-label { font-size: 0.65rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); }
+.metric-sub { font-size: 0.75rem; color: var(--muted); margin-top: 4px; }
+
+/* ── GRID LAYOUTS ── */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+
+/* ── CARDS ── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 28px;
+  margin-bottom: 20px;
+}
+.card-title { font-family: 'Cormorant Garamond', serif; font-size: 1.2rem; font-weight: 400; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+.card-title svg { width: 18px; height: 18px; color: var(--gold); }
+
+/* ── CHART ── */
+.chart-wrap { position: relative; }
+canvas.chart { max-height: 240px; }
+
+/* ── TABLES ── */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+th { font-size: 0.6rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); padding: 10px 16px; text-align: left; border-bottom: 1px solid var(--border); font-weight: 400; }
+td { padding: 10px 16px; border-bottom: 1px solid rgba(255,255,255,0.03); color: var(--text); }
+tr:hover td { background: rgba(201,168,76,0.02); }
+.td-muted { color: var(--muted); font-size: 0.78rem; }
+.td-mono { font-family: 'DM Mono', monospace; font-size: 0.78rem; }
+
+/* ── BADGES ── */
+.badge { display: inline-flex; align-items: center; gap: 3px; font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase; padding: 2px 8px; border-radius: 2px; font-weight: 500; white-space: nowrap; }
+.badge-cr { background: rgba(74,222,128,0.1); border: 1px solid rgba(74,222,128,0.2); color: var(--green); }
+.badge-dr { background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.2); color: var(--red); }
+.badge-warn { background: rgba(251,191,36,0.1); border: 1px solid rgba(251,191,36,0.2); color: var(--yellow); }
+.badge-gold { background: rgba(201,168,76,0.1); border: 1px solid rgba(201,168,76,0.2); color: var(--gold); }
+.badge-biz { background: rgba(96,165,250,0.1); border: 1px solid rgba(96,165,250,0.2); color: #60a5fa; }
+
+/* ── PROGRESS BAR ── */
+.progress-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.progress-label { font-size: 0.75rem; color: var(--muted); width: 120px; flex-shrink: 0; }
+.progress-track { flex: 1; height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; }
+.progress-fill { height: 100%; border-radius: 2px; background: var(--gold); transition: width 1s ease; }
+.progress-fill.green { background: var(--green); }
+.progress-fill.red { background: var(--red); }
+.progress-fill.blue { background: #60a5fa; }
+.progress-val { font-size: 0.75rem; color: var(--text); width: 60px; text-align: right; flex-shrink: 0; }
+
+/* ── RISK METER ── */
+.risk-meter { display: flex; align-items: center; gap: 24px; padding: 24px; background: var(--surface); border: 1px solid var(--border); margin-bottom: 20px; }
+.risk-circle { width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-direction: column; border: 2px solid; flex-shrink: 0; }
+.risk-circle.green { border-color: var(--green); background: var(--green-bg); }
+.risk-circle.yellow { border-color: var(--yellow); background: var(--yellow-bg); }
+.risk-circle.red { border-color: var(--red); background: var(--red-bg); }
+.risk-score-num { font-family: 'Cormorant Garamond', serif; font-size: 1.6rem; font-weight: 300; line-height: 1; }
+.risk-score-label { font-size: 0.55rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); }
+.risk-details h4 { font-family: 'Cormorant Garamond', serif; font-size: 1.2rem; font-weight: 400; margin-bottom: 6px; }
+.risk-details p { font-size: 0.82rem; color: var(--muted); line-height: 1.6; }
+
+/* ── ALERT BOXES ── */
+.alert { padding: 16px 20px; border-left: 3px solid; margin-bottom: 12px; font-size: 0.84rem; line-height: 1.6; }
+.alert-warn { border-color: var(--yellow); background: rgba(251,191,36,0.05); color: rgba(232,228,217,0.85); }
+.alert-danger { border-color: var(--red); background: rgba(248,113,113,0.05); color: rgba(232,228,217,0.85); }
+.alert-ok { border-color: var(--green); background: rgba(74,222,128,0.05); color: rgba(232,228,217,0.85); }
+.alert-title { font-weight: 500; color: var(--text); display: block; margin-bottom: 3px; }
+
+/* ── SCORE CARD ── */
+.score-card { display: flex; align-items: center; justify-content: space-between; padding: 20px 28px; border: 1px solid var(--border); background: var(--surface); margin-bottom: 12px; }
+.score-label { font-size: 0.82rem; color: var(--text); }
+.score-bar-wrap { flex: 1; margin: 0 24px; height: 6px; background: rgba(255,255,255,0.06); border-radius: 3px; }
+.score-bar-fill { height: 100%; border-radius: 3px; transition: width 1.2s ease; }
+.score-val { font-family: 'Cormorant Garamond', serif; font-size: 1.4rem; font-weight: 300; min-width: 60px; text-align: right; }
+
+/* ── SPLIT BAR ── */
+.split-bar { height: 32px; display: flex; border-radius: 2px; overflow: hidden; margin-bottom: 10px; }
+.split-seg { display: flex; align-items: center; justify-content: center; font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase; font-weight: 500; transition: all 0.8s ease; }
+
+/* ── EMPTY STATE ── */
+.empty { padding: 48px; text-align: center; color: var(--muted); }
+.empty svg { width: 40px; height: 40px; margin: 0 auto 16px; opacity: 0.3; display: block; }
+.empty p { font-family: 'Cormorant Garamond', serif; font-size: 1.3rem; font-weight: 300; }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 900px) {
+  .dashboard { grid-template-columns: 1fr; }
+  .sidebar { position: static; height: auto; border-right: none; border-bottom: 1px solid var(--border); padding: 16px; }
+  .nav-items { display: flex; flex-wrap: wrap; gap: 4px; padding: 0; }
+  .nav-item { border-left: none; border-bottom: 2px solid transparent; border-radius: 4px; }
+  .nav-item.active { border-bottom-color: var(--gold); border-left-color: transparent; }
+  .sidebar-section { display: none; }
+  .main { padding: 24px 16px; }
+  .grid-2, .grid-3 { grid-template-columns: 1fr; }
+  nav { padding: 16px 20px; }
+  body { cursor: auto; }
+  .cursor, .cursor-ring { display: none; }
+}
+</style>
+</head>
+<body>
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<nav>
+  <a href="/" class="nav-logo">Aarogyam<span>Fin</span></a>
+  <div class="nav-right">
+    <form method="POST" action="/clear" style="display:inline;">
+      <button type="submit" style="background:transparent; border:1px solid rgba(248,113,113,0.3); color:#f87171; font-family:'DM Sans',sans-serif; font-size:0.72rem; letter-spacing:0.16em; text-transform:uppercase; padding:8px 16px; cursor:pointer;">✕ Change PDF</button>
+    </form>
+    <span class="nav-tag">Financial Dashboard</span>
+    <a href="/" class="nav-back">← Back to Analyzer</a>
+  </div>
+</nav>
+
+<!-- ═══════════════════════════════ UPLOAD GATE ═══════════════════════════ -->
+{% if not data %}
+<div class="upload-gate">
+  <h2>Financial <em>Intelligence</em><br>Dashboard</h2>
+  <p>Upload a bank statement PDF to unlock deep financial analysis — expense categorization, ITR preparation, audit reconciliation, loan eligibility, and compliance reporting.</p>
+  <form method="POST" action="/dashboard" enctype="multipart/form-data">
+    <div class="upload-area" onclick="document.getElementById('dashPdf').click()">
+      <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="12" y1="18" x2="12" y2="12"/>
+        <line x1="9" y1="15" x2="15" y2="15"/>
+      </svg>
+      <p><strong>Click to upload</strong> or drag & drop</p>
+      <p style="margin-top:8px; font-size:0.75rem;">PDF only · Max 10MB · All Indian banks supported</p>
+    </div>
+    <input type="file" id="dashPdf" name="pdf_file" accept=".pdf" style="display:none" onchange="this.form.submit()">
+  </form>
+  {% if session.get('file_hash') %}
+  <form method="POST" action="/dashboard" style="margin-top:20px;">
+    <input type="hidden" name="use_cached" value="1">
+    <button type="submit" style="width:100%; padding:16px; background:var(--gold); color:#060810; border:none; font-family:'DM Sans',sans-serif; font-size:0.82rem; font-weight:500; letter-spacing:0.2em; text-transform:uppercase; cursor:pointer;">
+      ⚡ Use Already Uploaded: {{ session.get('file_name','') }}
+    </button>
+  </form>
+  {% endif %}
+</div>
+{% else %}
+
+<!-- ═══════════════════════════════ DASHBOARD ═══════════════════════════ -->
+<div class="dashboard">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <span class="sidebar-label">Overview</span>
+      <div class="stat-mini">
+        <div class="stat-mini-num">{{ data.total_txns }}</div>
+        <div class="stat-mini-label">Transactions</div>
+      </div>
+      <div class="stat-mini">
+        <div class="stat-mini-num" style="color:var(--green); font-size:1rem;">₹{{ "{:,.0f}".format(data.total_cr) }}</div>
+        <div class="stat-mini-label">Total Credits</div>
+      </div>
+      <div class="stat-mini">
+        <div class="stat-mini-num" style="color:var(--red); font-size:1rem;">₹{{ "{:,.0f}".format(data.total_dr) }}</div>
+        <div class="stat-mini-label">Total Debits</div>
+      </div>
+    </div>
+    <div class="nav-items">
+      <div class="nav-item active" onclick="showPanel('expense', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M8 12h8M12 8v8"/></svg>
+        Expenses
+        <span class="nav-badge">{{ data.expense.business|length + data.expense.personal|length }}</span>
+      </div>
+      <div class="nav-item" onclick="showPanel('itr', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        ITR / Tax
+        <span class="nav-badge {% if data.itr.high_value_count > 0 %}yellow{% endif %}">{{ data.itr.suggested_itr.split('(')[0].strip() }}</span>
+      </div>
+      <div class="nav-item" onclick="showPanel('audit', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+        Audit
+        <span class="nav-badge {% if data.audit.mismatch_count > 0 or data.audit.bounce_count > 0 %}red{% endif %}">{{ data.audit.reconciliation_score }}%</span>
+      </div>
+      <div class="nav-item" onclick="showPanel('loan', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+        Loan
+        <span class="nav-badge {% if data.loan.credit_color == 'green' %}{% elif data.loan.credit_color == 'red' %}red{% else %}yellow{% endif %}">{{ data.loan.credit_indicator }}</span>
+      </div>
+      <div class="nav-item" onclick="showPanel('compliance', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Compliance
+        <span class="nav-badge {% if data.compliance.risk_level == 'High' %}red{% elif data.compliance.risk_level == 'Medium' %}yellow{% endif %}">{{ data.compliance.risk_level }}</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <!-- ═══ EXPENSE CATEGORIZATION ═══ -->
+    <div class="panel active" id="panel-expense">
+      <div class="panel-header">
+        <span class="panel-tag">Module 01</span>
+        <h2 class="panel-title">Expense Categorization</h2>
+        <p class="panel-sub">Business vs personal spends — GST-eligible transactions identified for input credit claims.</p>
+      </div>
+
+      <div class="metrics">
+        <div class="metric">
+          <div class="metric-value">₹{{ "{:,.0f}".format(data.expense.business_total) }}</div>
+          <div class="metric-label">Business Expenses</div>
+          <div class="metric-sub">{{ data.expense.business_pct }}% of total debits</div>
+        </div>
+        <div class="metric">
+          <div class="metric-value red">₹{{ "{:,.0f}".format(data.expense.personal_total) }}</div>
+          <div class="metric-label">Personal Expenses</div>
+          <div class="metric-sub">{{ data.expense.personal_pct }}% of total debits</div>
+        </div>
+        <div class="metric">
+          <div class="metric-value green">₹{{ "{:,.0f}".format(data.expense.gst_eligible_total) }}</div>
+          <div class="metric-label">GST Input Eligible</div>
+          <div class="metric-sub">{{ data.expense.gst_eligible|length }} transactions</div>
+        </div>
+        <div class="metric">
+          <div class="metric-value yellow">₹{{ "{:,.0f}".format(data.expense.mixed_total) }}</div>
+          <div class="metric-label">Mixed / Unclassified</div>
+          <div class="metric-sub">{{ data.expense.mixed|length }} transactions</div>
+        </div>
+      </div>
+
+      <!-- Split Bar -->
+      <div class="card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          Spend Distribution
+        </div>
+        <div class="split-bar" style="margin-bottom:16px;">
+          <div class="split-seg" style="width:{{ data.expense.business_pct }}%; background:rgba(96,165,250,0.3); color:#60a5fa;">
+            {% if data.expense.business_pct > 8 %}Biz {{ data.expense.business_pct }}%{% endif %}
+          </div>
+          <div class="split-seg" style="width:{{ data.expense.personal_pct }}%; background:rgba(248,113,113,0.3); color:var(--red);">
+            {% if data.expense.personal_pct > 8 %}Personal {{ data.expense.personal_pct }}%{% endif %}
+          </div>
+          <div class="split-seg" style="flex:1; background:rgba(251,191,36,0.15); color:var(--yellow);">
+            Mixed
+          </div>
+        </div>
+
+        <!-- Category breakdown -->
+        <div style="margin-top:8px;">
+          {% for cat, amt in data.expense.category_totals.items() %}
+          {% set pct = (amt / data.expense.total_debits * 100) | round(1) if data.expense.total_debits else 0 %}
+          <div class="progress-row">
+            <span class="progress-label">{{ cat }}</span>
+            <div class="progress-track"><div class="progress-fill" style="width:{{ pct }}%"></div></div>
+            <span class="progress-val">₹{{ "{:,.0f}".format(amt) }}</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- GST Eligible Transactions -->
+      {% if data.expense.gst_eligible %}
+      <div class="card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+          GST Input Credit Eligible ({{ data.expense.gst_eligible|length }} txns)
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Date</th><th>Description</th><th>Type</th><th>Amount (₹)</th></tr></thead>
+            <tbody>
+              {% for t in data.expense.gst_eligible[:15] %}
+              <tr>
+                <td class="td-muted">{{ t.date }}</td>
+                <td>{{ t.desc[:60] }}{% if t.desc|length > 60 %}…{% endif %}</td>
+                <td><span class="badge badge-biz">Biz</span></td>
+                <td style="color:var(--red)">₹{{ "%.2f"|format(t.amount) }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% if data.expense.gst_eligible|length > 15 %}
+        <p style="font-size:0.75rem; color:var(--muted); padding:12px 0 0; text-align:center;">Showing 15 of {{ data.expense.gst_eligible|length }} eligible transactions</p>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- ═══ ITR / TAX FILING ═══ -->
+    <div class="panel" id="panel-itr">
+      <div class="panel-header">
+        <span class="panel-tag">Module 02</span>
+        <h2 class="panel-title">ITR / Tax Filing</h2>
+        <p class="panel-sub">Income source identification, deduction capture (80C/80D), and ITR form suggestion.</p>
+      </div>
+
+      <!-- Suggested ITR -->
+      <div class="alert alert-ok" style="margin-bottom:28px;">
+        <span class="alert-title">📋 Suggested ITR Form</span>
+        {{ data.itr.suggested_itr }}
+      </div>
+
+      <div class="metrics">
+        <div class="metric">
+          <div class="metric-value green">₹{{ "{:,.0f}".format(data.itr.salary_total) }}</div>
+          <div class="metric-label">Salary Income</div>
+          <div class="metric-sub">{{ data.itr.income_sources.salary|length }} credits</div>
+        </div>
+        <div class="metric">
+          <div class="metric-value">₹{{ "{:,.0f}".format(data.itr.interest_total) }}</div>
+          <div class="metric-label">Interest Income</div>
+          <div class="metric-sub">Form 26AS verify karo</div>
+        </div>
+        <div class="metric">
+          <div class="metric-value yellow">₹{{ "{:,.0f}".format(data.itr.section_80c_total) }}</div>
+          <div class="metric-label">80C Deductions</div>
+          <div class="metric-sub">Max ₹1.5L eligible</div>
+        </div>
+        <div class="metric">
+          <div class="metric-value">₹{{ "{:,.0f}".format(data.itr.section_80d_total) }}</div>
+          <div class="metric-label">80D Health</div>
+          <div class="metric-sub">Max ₹25K eligible</div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <!-- Income Breakdown Chart -->
+        <div class="card">
+          <div class="card-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+            Income Sources
+          </div>
+          <div class="chart-wrap">
+            <canvas class="chart" id="incomeChart"></canvas>
+          </div>
+        </div>
+
+        <!-- High Value Credits -->
+        <div class="card">
+          <div class="card-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            High Value Credits ≥ ₹1L ({{ data.itr.high_value_count }})
+          </div>
+          {% if data.itr.high_value_credits %}
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Date</th><th>Description</th><th>₹ Amount</th></tr></thead>
+              <tbody>
+                {% for t in data.itr.high_value_credits[:8] %}
+                <tr>
+                  <td class="td-muted">{{ t.date }}</td>
+                  <td>{{ t.desc[:45] }}{% if t.desc|length > 45 %}…{% endif %}</td>
+                  <td style="color:var(--green)">₹{{ "{:,.0f}".format(t.amount) }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <div class="empty"><p>No high-value credits found</p></div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- 80C/80D Deductions -->
+      {% if data.itr.deductions['80C'] or data.itr.deductions['80D'] %}
+      <div class="card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+          Tax Deductions Found
+        </div>
+        <div class="grid-2">
+          <div>
+            <p style="font-size:0.7rem; letter-spacing:0.18em; text-transform:uppercase; color:var(--muted); margin-bottom:12px;">Section 80C (₹{{ "{:,.0f}".format(data.itr.section_80c_total) }})</p>
+            {% for t in data.itr.deductions['80C'][:5] %}
+            <div style="padding:8px 0; border-bottom:1px solid var(--border); font-size:0.82rem;">
+              <span class="td-muted">{{ t.date }}</span> · {{ t.desc[:40] }} · <span style="color:var(--yellow)">₹{{ "{:,.0f}".format(t.amount) }}</span>
+            </div>
+            {% endfor %}
+          </div>
+          <div>
+            <p style="font-size:0.7rem; letter-spacing:0.18em; text-transform:uppercase; color:var(--muted); margin-bottom:12px;">Section 80D (₹{{ "{:,.0f}".format(data.itr.section_80d_total) }})</p>
+            {% for t in data.itr.deductions['80D'][:5] %}
+            <div style="padding:8px 0; border-bottom:1px solid var(--border); font-size:0.82rem;">
+              <span class="td-muted">{{ t.date }}</span> · {{ t.desc[:40] }} · <span style="color:var(--yellow)">₹{{ "{:,.0f}".format(t.amount) }}</span>
+            </div>
+            {% endfor %}
+            {% if not data.itr.deductions['80D'] %}
+            <p style="font-size:0.8rem; color:var(--muted);">No 80D deductions detected</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- ═══ AUDIT & RECONCILIATION ═══ -->
+    <div class="panel" id="panel-audit">
+      <div class="panel-header">
+        <span class="panel-tag">Module 03</span>
+        <h2 class="panel-title">Audit & Reconciliation</h2>
+        <p class="panel-sub">Balance continuity verification, cheque tracking, EMI schedule, bounce detection, and duplicate flagging.</p>
+      </div>
+
+      <!-- Reconciliation Score -->
+      <div class="score-card" style="margin-bottom:24px;">
+        <span class="score-label" style="font-family:'Cormorant Garamond',serif; font-size:1.1rem;">Reconciliation Score</span>
+        <div class="score-bar-wrap">
+          <div class="score-bar-fill" id="reconBar" style="width:0%; background:{% if data.audit.reconciliation_score >= 80 %}var(--green){% elif data.audit.reconciliation_score >= 50 %}var(--yellow){% else %}var(--red){% endif %}"></div>
+        </div>
+        <span class="score-val" style="color:{% if data.audit.reconciliation_score >= 80 %}var(--green){% elif data.audit.reconciliation_score >= 50 %}var(--yellow){% else %}var(--red){% endif %}">{{ data.audit.reconciliation_score }}/100</span>
+      </div>
+
+      <div class="metrics">
+        <div class="metric">
+          <div class="metric-value {% if data.audit.mismatch_count > 0 %}red{% else %}green{% endif %}">{{ data.audit.mismatch_count }}</div>
+          <div class="metric-label">Balance Mismatches</div>
+          <div class="metric-sub">{% if data.audit.mismatch_count == 0 %}All balances verified ✓{% else %}Requires investigation{% endif %}</div>
+        </div>
+        <div class="metric">
+          <div class="metric-value {% if data.audit.bounce_count > 0 %}red{% else %}green{% endif %}">{{ data.audit.bounce_count }}</div>
+          <div class="metric-label">Bounced Txns</div>
+          <div class="metric-sub">{% if data.audit.bounce_count == 0 %}Clean record{% else %}Check cheque/NACH{% endif %}</div>
+        </div>
+        <div class="metric">
+          <div class="metric-value yellow">{{ data.audit.emi_count }}</div>
+          <div class="metric-label">EMIs Detected</div>
+          <div class="metric-sub">₹{{ "{:,.0f}".format(data.audit.total_emi_outflow) }} total</div>
+        </div>
+        <div class="metric">
+          <div class="metric-value {% if data.audit.duplicate_count > 0 %}yellow{% else %}green{% endif %}">{{ data.audit.duplicate_count }}</div>
+          <div class="metric-label">Duplicate Suspects</div>
+          <div class="metric-sub">Same amt + date</div>
+        </div>
+      </div>
+
+      {% if data.audit.balance_mismatches %}
+      <div class="alert alert-danger">
+        <span class="alert-title">⚠ Balance Continuity Issues Found</span>
+        {{ data.audit.mismatch_count }} transaction(s) have balance discrepancies — potential data gaps or parsing issues. Verify with original statement.
+      </div>
+      <div class="card">
+        <div class="card-title">Balance Mismatches</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Row</th><th>Date</th><th>Description</th><th>Expected</th><th>Actual</th><th>Diff</th></tr></thead>
+            <tbody>
+              {% for m in data.audit.balance_mismatches[:10] %}
+              <tr>
+                <td class="td-muted">{{ loop.index }}</td>
+                <td class="td-muted">{{ m.date }}</td>
+                <td>{{ m.desc[:40] }}…</td>
+                <td>₹{{ "%.2f"|format(m.expected_balance) }}</td>
+                <td>₹{{ "%.2f"|format(m.balance) }}</td>
+                <td style="color:var(--red)">₹{{ "%.2f"|format(m.diff) }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% else %}
+      <div class="alert alert-ok"><span class="alert-title">✓ Balance Continuity Verified</span>All transaction balances match expected values within tolerance.</div>
+      {% endif %}
+
+      <!-- EMI Schedule -->
+      {% if data.audit.emis %}
+      <div class="card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+          EMI / Loan Outflows ({{ data.audit.emi_count }}) — EMI-to-Income: {{ data.audit.emi_to_income_ratio }}%
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Date</th><th>Description</th><th>Amount (₹)</th></tr></thead>
+            <tbody>
+              {% for t in data.audit.emis[:12] %}
+              <tr>
+                <td class="td-muted">{{ t.date }}</td>
+                <td>{{ t.desc[:55] }}{% if t.desc|length > 55 %}…{% endif %}</td>
+                <td style="color:var(--red)">₹{{ "%.2f"|format(t.amount) }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+
+      {% if data.audit.bounced %}
+      <div class="card">
+        <div class="card-title" style="color:var(--red);">Bounced / Returned Transactions ({{ data.audit.bounce_count }})</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Date</th><th>Description</th><th>Amount</th></tr></thead>
+            <tbody>
+              {% for t in data.audit.bounced %}
+              <tr>
+                <td class="td-muted">{{ t.date }}</td>
+                <td>{{ t.desc[:55] }}</td>
+                <td style="color:var(--red)">₹{{ "%.2f"|format(t.amount) }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- ═══ LOAN & CREDIT ASSESSMENT ═══ -->
+    <div class="panel" id="panel-loan">
+      <div class="panel-header">
+        <span class="panel-tag">Module 04</span>
+        <h2 class="panel-title">Loan & Credit Assessment</h2>
+        <p class="panel-sub">Cash flow analysis, FOIR calculation, debt-service ratio, and loan eligibility estimate.</p>
+      </div>
+
+      <!-- Credit Indicator -->
+      <div class="risk-meter" style="margin-bottom:28px;">
+        <div class="risk-circle {{ data.loan.credit_color }}">
+          <span class="risk-score-num" style="color:{% if data.loan.credit_color == 'green' %}var(--green){% elif data.loan.credit_color == 'red' %}var(--red){% else %}var(--yellow){% endif %}">
+            {% if data.loan.credit_color == 'green' %}✓{% elif data.loan.credit_color == 'red' %}!{% else %}~{% endif %}
+          </span>
+          <span class="risk-score-label">Profile</span>
+        </div>
+        <div class="risk-details">
+          <h4 style="color:{% if data.loan.credit_color == 'green' %}var(--green){% elif data.loan.credit_color == 'red' %}var(--red){% else %}var(--yellow){% endif %}">{{ data.loan.credit_indicator }} Credit Profile</h4>
+          <p>FOIR: {{ data.loan.foir }}% &nbsp;·&nbsp; {{ data.loan.months_analyzed }} months analyzed &nbsp;·&nbsp; {{ data.loan.negative_months }} negative balance months</p>
+          {% if data.loan.dscr %}<p style="margin-top:4px;">DSCR: {{ data.loan.dscr }}x &nbsp;·&nbsp; Remaining EMI capacity: ₹{{ "{:,.0f}".format(data.loan.remaining_emi_capacity) }}/month</p>{% endif %}
+        </div>
+      </div>
+
+      <div class="metrics">
+        <div class="metric">
+          <div class="metric-value green">₹{{ "{:,.0f}".format(data.loan.avg_monthly_credit) }}</div>
+          <div class="metric-label">Avg Monthly Income</div>
+          <div class="metric-sub">Based on credits</div>
+        </div>
+        <div class="metric">
+          <div class="metric-value red">₹{{ "{:,.0f}".format(data.loan.avg_monthly_debit) }}</div>
+          <div class="metric-label">Avg Monthly Spend</div>
+          <div class="metric-sub">Based on debits</div>
+        </div>
+        <div class="metric">
+          <div class="metric-value">₹{{ "{:,.0f}".format(data.loan.avg_balance) }}</div>
+          <div class="metric-label">Avg Balance</div>
+          <div class="metric-sub">Min: ₹{{ "{:,.0f}".format(data.loan.min_balance) }}</div>
+        </div>
+        <div class="metric">
+          <div class="metric-value {% if data.loan.loan_eligible > 0 %}green{% else %}red{% endif %}">
+            ₹{{ "{:,.0f}".format(data.loan.loan_eligible) }}
+          </div>
+          <div class="metric-label">Est. Loan Eligible</div>
+          <div class="metric-sub">60-month @ 10% pa (indicative)</div>
+        </div>
+      </div>
+
+      {% if data.loan.foir > 50 %}
+      <div class="alert alert-warn">
+        <span class="alert-title">⚠ High FOIR Detected ({{ data.loan.foir }}%)</span>
+        FOIR above 50% may reduce loan approval chances. Most banks prefer FOIR ≤ 40-50%. Consider reducing existing EMI obligations before applying.
+      </div>
+      {% endif %}
+      {% if data.loan.negative_months > 0 %}
+      <div class="alert alert-danger">
+        <span class="alert-title">⚠ Negative Balance Detected</span>
+        {{ data.loan.negative_months }} month(s) showed negative/overdraft balance. This negatively impacts creditworthiness assessment.
+      </div>
+      {% endif %}
+
+      <div class="card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          Monthly Cash Flow
+        </div>
+        <div class="chart-wrap">
+          <canvas class="chart" id="cashflowChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ COMPLIANCE REPORTING ═══ -->
+    <div class="panel" id="panel-compliance">
+      <div class="panel-header">
+        <span class="panel-tag">Module 05</span>
+        <h2 class="panel-title">Compliance Reporting</h2>
+        <p class="panel-sub">PMLA / RBI flagging — high-value transactions, cash deposit limits, STR candidates, Form 61A requirements.</p>
+      </div>
+
+      <!-- Risk Meter -->
+      <div class="risk-meter" style="margin-bottom:28px;">
+        <div class="risk-circle {{ data.compliance.risk_color }}">
+          <span class="risk-score-num" style="color:{% if data.compliance.risk_color == 'green' %}var(--green){% elif data.compliance.risk_color == 'red' %}var(--red){% else %}var(--yellow){% endif %}">{{ data.compliance.risk_score }}</span>
+          <span class="risk-score-label">Risk Score</span>
+        </div>
+        <div class="risk-details">
+          <h4 style="color:{% if data.compliance.risk_color == 'green' %}var(--green){% elif data.compliance.risk_color == 'red' %}var(--red){% else %}var(--yellow){% endif %}">{{ data.compliance.risk_level }} Compliance Risk</h4>
+          <p>{{ data.compliance.high_value_count }} high-value txns &nbsp;·&nbsp; {{ data.compliance.cash_count }} cash txns &nbsp;·&nbsp; {{ data.compliance.str_count }} STR candidates &nbsp;·&nbsp; {{ data.compliance.structured_count }} structuring suspects</p>
+        </div>
+      </div>
+
+      {% if data.compliance.form_61a_required %}
+      <div class="alert alert-danger">
+        <span class="alert-title">🚨 Form 61A / SFT Filing Required</span>
+        Annual cash transactions total ₹{{ "{:,.0f}".format(data.compliance.annual_cash_total) }} — exceeds ₹10L threshold. Reportable under PMLA / SFT (Statement of Financial Transactions) to Income Tax.
+      </div>
+      {% endif %}
+
+      {% if data.compliance.str_candidates %}
+      <div class="alert alert-warn">
+        <span class="alert-title">⚠ Suspicious Transaction Report (STR) Candidates</span>
+        {{ data.compliance.str_count }} day(s) with credits ≥ ₹5L. May require STR filing under PMLA if there's no clear legitimate source.
+      </div>
+      {% endif %}
+
+      {% if data.compliance.structured_suspects %}
+      <div class="alert alert-warn">
+        <span class="alert-title">⚠ Potential Structuring Detected</span>
+        {{ data.compliance.structured_count }} transaction(s) between ₹1.8L–₹2L — just below the ₹2L reporting threshold. Could indicate structured transactions to avoid CTR reporting.
+      </div>
+      {% endif %}
+
+      <div class="metrics">
+        <div class="metric">
+          <div class="metric-value {% if data.compliance.high_value_count > 5 %}yellow{% else %}green{% endif %}">{{ data.compliance.high_value_count }}</div>
+          <div class="metric-label">High Value (≥₹2L)</div>
+          <div class="metric-sub">Individual transactions</div>
+        </div>
+        <div class="metric">
+          <div class="metric-value">{{ data.compliance.cash_count }}</div>
+          <div class="metric-label">Cash Transactions</div>
+          <div class="metric-sub">ATM + cash deposits</div>
+        </div>
+        <div class="metric">
+          <div class="metric-value {% if data.compliance.daily_breaches %}red{% else %}green{% endif %}">{{ data.compliance.daily_breaches|length }}</div>
+          <div class="metric-label">Daily Limit Breaches</div>
+          <div class="metric-sub">Cash > ₹50K/day</div>
+        </div>
+        <div class="metric">
+          <div class="metric-value {% if data.compliance.form_61a_required %}red{% else %}green{% endif %}">{{ "Required" if data.compliance.form_61a_required else "Not Req." }}</div>
+          <div class="metric-label">Form 61A / SFT</div>
+          <div class="metric-sub">₹{{ "{:,.0f}".format(data.compliance.annual_cash_total) }} cash total</div>
+        </div>
+      </div>
+
+      {% if data.compliance.high_value_txns %}
+      <div class="card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+          High Value Transactions ≥ ₹2L ({{ data.compliance.high_value_count }})
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Date</th><th>Description</th><th>Type</th><th>Amount (₹)</th></tr></thead>
+            <tbody>
+              {% for t in data.compliance.high_value_txns %}
+              <tr>
+                <td class="td-muted">{{ t.date }}</td>
+                <td>{{ t.desc[:55] }}{% if t.desc|length > 55 %}…{% endif %}</td>
+                <td><span class="badge {% if t.type == 'CR' %}badge-cr{% else %}badge-dr{% endif %}">{{ t.type }}</span></td>
+                <td style="color:{% if t.type == 'CR' %}var(--green){% else %}var(--red){% endif %}; font-weight:500;">₹{{ "{:,.0f}".format(t.amount) }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+
+      {% if data.compliance.str_candidates %}
+      <div class="card">
+        <div class="card-title" style="color:var(--yellow);">STR Candidates — Single Day ≥ ₹5L Credits</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Date</th><th>Daily Credit Total</th><th>Transactions</th></tr></thead>
+            <tbody>
+              {% for s in data.compliance.str_candidates %}
+              <tr>
+                <td class="td-muted">{{ s.date }}</td>
+                <td style="color:var(--yellow)">₹{{ "{:,.0f}".format(s.total) }}</td>
+                <td>{{ s.count }} txns</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+  </main>
+</div>
+{% endif %}
+
+<script>
+// CURSOR
+const cursor = document.getElementById('cursor');
+const ring = document.getElementById('cursorRing');
+let mx = 0, my = 0, rx = 0, ry = 0;
+document.addEventListener('mousemove', e => {
+  mx = e.clientX; my = e.clientY;
+  cursor.style.left = mx - 4 + 'px';
+  cursor.style.top = my - 4 + 'px';
+});
+function animateRing() {
+  rx += (mx - rx) * 0.12; ry += (my - ry) * 0.12;
+  ring.style.left = rx - 18 + 'px'; ring.style.top = ry - 18 + 'px';
+  requestAnimationFrame(animateRing);
+}
+animateRing();
+
+// PANEL SWITCHING
+function showPanel(name, el) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  el.classList.add('active');
+  initCharts();
+}
+
+// CHARTS
+let chartsInit = false;
+function initCharts() {
+  if (chartsInit) return;
+  chartsInit = true;
+
+  const gold = '#c9a84c';
+  const chartDefaults = {
+    responsive: true,
+    plugins: { legend: { labels: { color: '#e8e4d9', font: { family: 'DM Sans', size: 11 }, boxWidth: 12 } } },
+    scales: {
+      x: { ticks: { color: 'rgba(232,228,217,0.45)', font: { size: 10 } }, grid: { color: 'rgba(201,168,76,0.04)' } },
+      y: { ticks: { color: 'rgba(232,228,217,0.45)', font: { size: 10 } }, grid: { color: 'rgba(201,168,76,0.04)' } }
+    }
+  };
+
+  {% if data %}
+  // Income Chart (Doughnut)
+  const incomeCtx = document.getElementById('incomeChart');
+  if (incomeCtx) {
+    const incomeData = {{ data.itr.income_breakdown | tojson }};
+    const labels = Object.keys(incomeData).filter(k => incomeData[k] > 0);
+    const values = labels.map(k => incomeData[k]);
+    new Chart(incomeCtx, {
+      type: 'doughnut',
+      data: {
+        labels,
+        datasets: [{ data: values, backgroundColor: ['rgba(201,168,76,0.7)','rgba(74,222,128,0.7)','rgba(96,165,250,0.7)','rgba(251,191,36,0.7)','rgba(232,228,217,0.3)'], borderColor: 'rgba(255,255,255,0.05)', borderWidth: 1 }]
+      },
+      options: { responsive: true, plugins: { legend: { labels: { color: '#e8e4d9', font: { family: 'DM Sans', size: 11 }, boxWidth: 12 } } } }
+    });
+  }
+
+  // Cashflow Chart
+  const cfCtx = document.getElementById('cashflowChart');
+  if (cfCtx) {
+    const monthlyData = {{ data.loan.monthly_data | tojson }};
+    const months = Object.keys(monthlyData).sort();
+    const credits = months.map(m => monthlyData[m].credits);
+    const debits = months.map(m => monthlyData[m].debits);
+    new Chart(cfCtx, {
+      type: 'bar',
+      data: {
+        labels: months,
+        datasets: [
+          { label: 'Credits', data: credits, backgroundColor: 'rgba(74,222,128,0.35)', borderColor: 'rgba(74,222,128,0.8)', borderWidth: 1, borderRadius: 2 },
+          { label: 'Debits', data: debits, backgroundColor: 'rgba(248,113,113,0.35)', borderColor: 'rgba(248,113,113,0.8)', borderWidth: 1, borderRadius: 2 }
+        ]
+      },
+      options: chartDefaults
+    });
+  }
+  {% endif %}
+
+  // Animate recon bar
+  const reconBar = document.getElementById('reconBar');
+  if (reconBar) {
+    setTimeout(() => { reconBar.style.width = '{{ data.audit.reconciliation_score if data else 0 }}%'; }, 300);
+  }
+}
+
+// Init on load
+window.addEventListener('load', () => {
+  initCharts();
+  // Animate progress bars
+  document.querySelectorAll('.progress-fill').forEach(el => {
+    const w = el.style.width;
+    el.style.width = '0';
+    setTimeout(() => { el.style.width = w; }, 200);
+  });
+});
+</script>
+</body>
+</html>

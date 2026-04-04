@@ -5,6 +5,13 @@ Post-parse normalization: date formatting, CR/DR fix via balance continuity,
 deduplication, and category tagging.
 
 Used by ALL bank parsers after raw extraction.
+
+v2.1 — Fixed:
+- PCI/ card transactions properly categorized (Claude.ai, Canva, Railway etc.)
+- MB: mobile banking transactions properly categorized
+- Loan disbursal sources flagged as 'Loan Disbursal' not income
+- Family transfer sources flagged as 'Family Transfer'
+- Expanded category map with more Indian merchants
 """
 
 import re
@@ -39,36 +46,142 @@ _JUNK_PHRASES = [
 ]
 
 # ═══════════════════════════════════════════════════════════
-#  CATEGORY MAP
+#  LOAN DISBURSAL SOURCES
+#  Credits from these = loan received, NOT income
+# ═══════════════════════════════════════════════════════════
+
+LOAN_DISBURSAL_SOURCES = [
+    'pocketly', 'speel finance', 'speel fin', 'stucred', 'stucredpayouts',
+    'mpokket', 'mpokket financial', 'mpokket financi',
+    'branch internat', 'branch int', 'branch payment',
+    'truecredit', 'true credit', 'true credits',
+    'lazypay', 'snapmint', 'kreon finnancia', 'kreon fin',
+    'instantpay indi', 'instantpay india',
+    'cashfree paymen', 'cashfree payment',
+    'navi limited', 'slice small fin',
+    'easebuzz privat', 'easebuzz',
+    'brokentusk tech', 'setu brokentusk',
+    'apibanking',
+]
+
+# ═══════════════════════════════════════════════════════════
+#  FAMILY TRANSFER SOURCES
+#  Credits from these = personal family transfer, NOT income
+# ═══════════════════════════════════════════════════════════
+
+FAMILY_TRANSFER_NAMES = [
+    'rekha sharma', 'rekha/', '/rekha',
+    'phani raj sharm', 'phani raj',
+    'naina sharma',
+    'hardik sharma',  # self transfers
+]
+
+# ═══════════════════════════════════════════════════════════
+#  PCI MERCHANT → CATEGORY MAP
+#  PCI/ prefix = card/international transaction
+# ═══════════════════════════════════════════════════════════
+
+PCI_MERCHANT_CATEGORY = {
+    # Subscriptions
+    'claude.ai': 'Subscription',
+    'anthropic': 'Subscription',
+    'scribd': 'Subscription',
+    'higgsfield': 'Subscription',
+    'canva': 'Subscription',
+    'uwear.ai': 'Shopping',
+    # Travel
+    'railway': 'Travel',
+    'irctc': 'Travel',
+    # International payments
+    'myfatoorah': 'International Payment',
+    'fundingpi': 'International Payment',
+    # Shopping / Gaming
+    'google*play': 'Entertainment',
+    'google play': 'Entertainment',
+    'mountain v': 'Entertainment',  # Google Play Mountain View
+    'valve': 'Entertainment',
+    'steam': 'Entertainment',
+    # Food
+    'pizza': 'Food',
+    'dominos': 'Food',
+    'peppers pizza': 'Food',
+}
+
+# ═══════════════════════════════════════════════════════════
+#  CATEGORY MAP  (full transaction descriptions)
 # ═══════════════════════════════════════════════════════════
 
 CATEGORY_MAP = {
-    'UPI':           ['upi/', 'upi-', 'phonepe', 'gpay', 'google pay',
-                      'paytm', 'amazonpay', 'bhim'],
-    'NEFT/RTGS':     ['neft', 'rtgs', 'neftinw'],
-    'IMPS':          ['imps'],
-    'ATM/Cash':      ['atm', 'cash withdrawal', 'cash wdl', 'cwdr',
-                      'cash deposit'],
-    'Salary':        ['salary', 'payroll', 'sal cr', 'wages'],
-    'EMI/Loan':      ['pocketly', 'speel finance', 'stucred', 'mpokket',
-                      'branch internat', 'truecredit', 'lazypay',
-                      'snapmint', 'emi', 'loan'],
-    'POS':           ['pos ', 'point of sale', 'pci/'],
-    'Interest':      ['interest', 'int.pd', 'int pd', 'int cr',
-                      'int.pd:', 'sbint'],
-    'Charges':       ['charges', 'fee', 'commission', 'gst',
-                      'service charge', 'sms alert', 'annual fee', 'chrg:'],
-    'Transfer':      ['transfer', 'trf ', 'fund transfer',
-                      'mb:sent', 'mb:received'],
-    'Cheque':        ['cheque', 'chq', 'clearing', 'cts'],
-    'Food':          ['swiggy', 'zomato', 'blinkit', 'zepto', 'dominos',
-                      'mcdonalds', 'pizza', 'swad sadan', 'shreejee',
-                      'bikaner', 'gianis', 'dosa'],
-    'Shopping':      ['amazon', 'flipkart', 'myntra', 'meesho', 'ekart',
-                      'westside', 'snitch', 'zudio'],
-    'Entertainment': ['netflix', 'spotify', 'zee5', 'jiohotstar',
-                      'google play', 'steam', 'valve', 'bookmyshow'],
-    'Travel':        ['aeronfly', 'irctc', 'makemytrip', 'redbus'],
+    # Transport types first — broad buckets
+    'NEFT/RTGS':          ['neftinw', 'neft ', 'rtgs'],
+    'IMPS':               ['imps'],
+    'ATM/Cash':           ['atm', 'cash withdrawal', 'cash wdl', 'cwdr',
+                           'cash deposit', 'cdm'],
+
+    # Specific income/transfer types
+    'Salary':             ['salary', 'payroll', 'sal cr', 'wages',
+                           'mb:received from shourya',
+                           'mb:received from tramo',
+                           '/salary'],
+    'Loan Disbursal':     ['pocketly', 'speel finance', 'speel fin',
+                           'stucred', 'stucredpayouts',
+                           'mpokket', 'mpokket financial',
+                           'branch internat', 'branch int',
+                           'truecredit', 'true credit',
+                           'lazypay', 'snapmint',
+                           'kreon finnancia', 'instantpay indi',
+                           'cashfree paymen', 'navi limited',
+                           'slice small fin', 'easebuzz privat'],
+    'EMI/Loan Repayment': ['emi', 'loan repay', 'nach'],
+    'Family Transfer':    ['rekha sharma', 'rekha/', 'phani raj sharm',
+                           'mb:sent to rekha', 'naina sharma'],
+    'Freelance Income':   ['tramo technolab', 'tramo tech'],
+    'Marketplace Income': ['meesho', 'shiprocket', 'meeshofas',
+                           'myntra des', 'ekart'],
+
+    # Expense categories
+    'Food':               ['swiggy', 'zomato', 'blinkit', 'zepto',
+                           'dominos', 'mcdonalds', 'pizza', 'swad sadan',
+                           'shreejee', 'bikaner', 'gianis', 'dosa',
+                           'annas dosa', 'peppers pizza', 'banaras wala',
+                           'bharat juice', 'cafe ', 'dhaba', 'food',
+                           'restaurant', 'hotel', 'snack'],
+    'Shopping':           ['amazon', 'flipkart', 'myntra', 'ekart',
+                           'westside', 'snitch', 'zudio', 'uwear',
+                           'lenskart', 'safe gold', 'gold'],
+    'Entertainment':      ['netflix', 'spotify', 'zee5', 'jiohotstar',
+                           'google play', 'steam', 'valve', 'bookmyshow',
+                           'bigtree', 'astrotalk', 'astrosage', 'higgsfield',
+                           'scribd', 'claude.ai', 'anthropic'],
+    'Subscription':       ['canva', 'godaddy', 'claude.ai subscription',
+                           'anthropic', 'scribd', 'airtel digital',
+                           'jio', 'airtel', 'dth'],
+    'Travel':             ['aeronfly', 'irctc', 'makemytrip', 'redbus',
+                           'railway', 'pci/0908/railway', 'busybees logist',
+                           'rapido', 'ola ', 'uber'],
+    'Health':             ['apollo pharmacy', 'one stop pharma',
+                           'tata one mg', 'tablet medical', 'hospital',
+                           'medical', 'pharmacy', 'health'],
+    'Education':          ['amity universit', 'bennett', 'tutedude',
+                           'work8ive', 'coursera', 'udemy'],
+    'Utilities':          ['electricity', 'broadband', 'airtel',
+                           'jio recharge', 'recharge', 'bijli'],
+    'Investment':         ['zerodha', 'groww', 'safe gold', 'ppf',
+                           'mutual fund', 'nse', 'bse'],
+    'Transfer':           ['mb:sent', 'mb:received', 'transfer',
+                           'trf ', 'fund transfer'],
+    'Interest':           ['interest', 'int.pd', 'int pd', 'int cr',
+                           'int.pd:', 'sbint'],
+    'Charges':            ['charges', 'fee', 'commission',
+                           'service charge', 'sms alert', 'annual fee',
+                           'chrg:', 'tbms', 'dcc fee'],
+    'Cheque':             ['cheque', 'chq', 'clearing', 'cts'],
+    'Government':         ['uidai', 'govt', 'income tax', 'tds'],
+
+    # UPI is the catch-all for UPI transactions not matched above
+    'UPI':                ['upi/', 'upi-', 'phonepe', 'gpay',
+                           'google pay', 'paytm', 'amazonpay', 'bhim'],
+    'POS':                ['pos ', 'point of sale'],
 }
 
 
@@ -120,13 +233,83 @@ def normalize_date(date_str: str) -> str:
 
 
 def categorize(desc: str) -> str:
-    """Return category string for a transaction description."""
+    """
+    Return category string for a transaction description.
+    Priority order:
+    1. PCI/ prefix → use merchant map
+    2. MB: prefix → salary / family transfer
+    3. Loan disbursal source check
+    4. Family transfer check
+    5. Full category map scan
+    """
     lower = desc.lower()
+
+    # ── PCI/ card transactions ──────────────────────────────
+    if lower.startswith('pci/'):
+        for merchant, cat in PCI_MERCHANT_CATEGORY.items():
+            if merchant in lower:
+                return cat
+        return 'POS'  # generic card transaction
+
+    # ── MB: mobile banking ──────────────────────────────────
+    if lower.startswith('mb:'):
+        if 'salary' in lower:
+            return 'Salary'
+        if 'sent to' in lower:
+            return 'Family Transfer'
+        if 'received from' in lower:
+            return 'MB Transfer'
+        return 'Transfer'
+
+    # ── Loan disbursal sources ──────────────────────────────
+    for src in LOAN_DISBURSAL_SOURCES:
+        if src in lower:
+            return 'Loan Disbursal'
+
+    # ── Family transfer ─────────────────────────────────────
+    for name in FAMILY_TRANSFER_NAMES:
+        if name in lower:
+            return 'Family Transfer'
+
+    # ── Marketplace income check (before generic IMPS bucket) ──
+    marketplace_kws = ['meesho', 'meeshofas', 'shiprocket', 'myntra des',
+                       'reliance r', 'ekart']
+    if any(k in lower for k in marketplace_kws):
+        return 'Marketplace Income'
+
+    # ── Full category map ───────────────────────────────────
     for cat, kws in CATEGORY_MAP.items():
         for kw in kws:
             if kw in lower:
                 return cat
+
     return 'Other'
+
+
+def is_loan_disbursal(desc: str) -> bool:
+    """Returns True if this credit is a loan disbursal, not real income."""
+    lower = desc.lower()
+    for src in LOAN_DISBURSAL_SOURCES:
+        if src in lower:
+            return True
+    return False
+
+
+def is_family_transfer(desc: str) -> bool:
+    """Returns True if this credit is a family/personal transfer."""
+    lower = desc.lower()
+    for name in FAMILY_TRANSFER_NAMES:
+        if name in lower:
+            return True
+    return False
+
+
+def is_self_transfer(desc: str) -> bool:
+    """Returns True if this is a self-transfer between own accounts."""
+    lower = desc.lower()
+    self_patterns = ['hardik sharma', 'self transfer', 'own account',
+                     'hardik101306', 'hardik/']
+    return any(p in lower for p in self_patterns)
 
 
 # ═══════════════════════════════════════════════════════════
@@ -215,4 +398,3 @@ def _dedup_and_clean(txns: list) -> list:
 
         result.append(t)
     return result
-
