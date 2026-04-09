@@ -246,18 +246,13 @@
   .feature h3 { font-family: 'Cormorant Garamond', serif; font-size: 1.25rem; font-weight: 400; margin-bottom: 12px; }
   .feature p { font-size: 0.85rem; line-height: 1.8; color: var(--muted); }
 
-  footer { border-top: 1px solid var(--border); }
-  .footer-inner { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 60px; padding: 60px 60px 40px; max-width: 1400px; margin: 0 auto; }
-  .footer-logo { font-family: 'Cormorant Garamond', serif; font-size: 1.3rem; font-weight: 500; letter-spacing: 0.1em; margin-bottom: 16px; }
+  footer { padding: 48px 60px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  .footer-logo { font-family: 'Cormorant Garamond', serif; font-size: 1.2rem; font-weight: 500; letter-spacing: 0.1em; }
   .footer-logo span { color: var(--gold); }
-  .footer-desc { font-size: 0.82rem; color: var(--muted); line-height: 1.7; }
-  .footer-made { font-size: 0.72rem; color: var(--muted); margin-top: 16px; letter-spacing: 0.05em; }
-  .footer-col { display: flex; flex-direction: column; gap: 12px; }
-  .footer-col-title { font-size: 0.62rem; letter-spacing: 0.25em; text-transform: uppercase; color: var(--gold); margin-bottom: 4px; }
-  .footer-col a { font-size: 0.82rem; color: var(--muted); text-decoration: none; transition: color 0.3s; }
-  .footer-col a:hover { color: var(--text); }
-  .footer-bottom { border-top: 1px solid var(--border); padding: 20px 60px; display: flex; justify-content: space-between; align-items: center; }
-  .footer-bottom p { font-size: 0.72rem; color: var(--muted); letter-spacing: 0.05em; }
+  .footer-copy { font-size: 0.75rem; color: var(--muted); letter-spacing: 0.05em; }
+  .footer-links { display: flex; gap: 32px; list-style: none; }
+  .footer-links a { font-size: 0.72rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); text-decoration: none; transition: color 0.3s; }
+  .footer-links a:hover { color: var(--gold); }
 
   @keyframes fadeUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
   @keyframes scrollPulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
@@ -334,8 +329,8 @@
     table { min-width: 540px; }
     th, td { padding: 10px 12px; font-size: 0.72rem; }
     .desc-col { max-width: 160px; }
-    .footer-inner { grid-template-columns: 1fr; gap: 28px; padding: 36px 16px 24px; }
-    .footer-bottom { flex-direction: column; gap: 8px; padding: 16px 24px; text-align: center; }
+    footer { flex-direction: column; gap: 24px; text-align: center; }
+    .footer-links { flex-wrap: wrap; justify-content: center; }
     body { cursor: auto; }
     .cursor, .cursor-ring { display: none; }
     .dash-card { padding: 14px 16px; }
@@ -361,6 +356,7 @@
     <li><a href="/pay">AI Chat</a></li>
   </ul>
   {% if is_logged_in %}
+  <a href="/dashboard" class="nav-dashboard-mobile">📊 Dashboard</a>
   <span style="font-size:0.75rem; color:var(--muted); margin-right:8px;">{{ user_email }}</span>
   <a href="/logout" class="nav-cta">Logout</a>
   {% else %}
@@ -556,19 +552,19 @@
         <span class="dash-section-title">💰 Income & Spending</span>
         <div class="dash-metric">
           <span class="dash-metric-label">Real Income</span>
-          <span class="dash-metric-value green">₹{{ "{:,.0f}".format(dashboard_data.itr.real_income_total) }}</span>
+          <span class="dash-metric-value green">₹{{ "{:,.0f}".format(dashboard_data['itr']['real_income_total']) }}</span>
         </div>
         <div class="dash-metric">
           <span class="dash-metric-label">Loan Received</span>
-          <span class="dash-metric-value red">₹{{ "{:,.0f}".format(dashboard_data.itr.loan_disbursal_total) }}</span>
+          <span class="dash-metric-value red">₹{{ "{:,.0f}".format(dashboard_data['itr']['loan_disbursal_total']) }}</span>
         </div>
         <div class="dash-metric">
           <span class="dash-metric-label">Avg Monthly Spend</span>
-          <span class="dash-metric-value">₹{{ "{:,.0f}".format(dashboard_data.loan.avg_monthly_debit) }}</span>
+          <span class="dash-metric-value">₹{{ "{:,.0f}".format(dashboard_data['loan']['avg_monthly_debit']) }}</span>
         </div>
         <div class="dash-metric">
           <span class="dash-metric-label">Avg Balance</span>
-          <span class="dash-metric-value gold">₹{{ "{:,.0f}".format(dashboard_data.loan.avg_balance) }}</span>
+          <span class="dash-metric-value gold">₹{{ "{:,.0f}".format(dashboard_data['loan']['avg_balance']) }}</span>
         </div>
       </div>
 
@@ -576,23 +572,23 @@
         <span class="dash-section-title">📋 Tax & EMI</span>
         <div class="dash-metric">
           <span class="dash-metric-label">Salary</span>
-          <span class="dash-metric-value green">₹{{ "{:,.0f}".format(dashboard_data.itr.salary_total) }}</span>
+          <span class="dash-metric-value green">₹{{ "{:,.0f}".format(dashboard_data['itr']['salary_total']) }}</span>
         </div>
         <div class="dash-metric">
           <span class="dash-metric-label">Freelance</span>
-          <span class="dash-metric-value green">₹{{ "{:,.0f}".format(dashboard_data.itr.freelance_total) }}</span>
+          <span class="dash-metric-value green">₹{{ "{:,.0f}".format(dashboard_data['itr']['freelance_total']) }}</span>
         </div>
         <div class="dash-metric">
           <span class="dash-metric-label">EMI Outflow</span>
-          <span class="dash-metric-value red">₹{{ "{:,.0f}".format(dashboard_data.audit.total_emi_outflow) }}</span>
+          <span class="dash-metric-value red">₹{{ "{:,.0f}".format(dashboard_data['audit']['total_emi_outflow']) }}</span>
         </div>
         <div class="dash-metric">
           <span class="dash-metric-label">FOIR</span>
-          <span class="dash-metric-value {% if dashboard_data.loan.foir > 50 %}red{% elif dashboard_data.loan.foir > 35 %}gold{% else %}green{% endif %}">{{ dashboard_data.loan.foir }}%</span>
+          <span class="dash-metric-value {% if dashboard_data['loan']['foir'] > 50 %}red{% elif dashboard_data['loan']['foir'] > 35 %}gold{% else %}green{% endif %}">{{ dashboard_data['loan']['foir'] }}%</span>
         </div>
         <div class="dash-metric">
           <span class="dash-metric-label">ITR Form</span>
-          <span class="dash-metric-value gold small">{{ dashboard_data.itr.suggested_itr.split('(')[0].strip() }}</span>
+          <span class="dash-metric-value gold small">{{ dashboard_data['itr']['suggested_itr'].split('(')[0].strip() }}</span>
         </div>
       </div>
 
@@ -600,23 +596,23 @@
         <span class="dash-section-title">🛡️ Risk & Credit</span>
         <div class="dash-metric">
           <span class="dash-metric-label">Compliance Risk</span>
-          <span class="dash-badge {{ dashboard_data.compliance.risk_level | lower }}">{{ dashboard_data.compliance.risk_level }}</span>
+          <span class="dash-badge {{ dashboard_data['compliance']['risk_level'] | lower }}">{{ dashboard_data['compliance']['risk_level'] }}</span>
         </div>
         <div class="dash-metric">
           <span class="dash-metric-label">Credit Profile</span>
-          <span class="dash-badge {% if dashboard_data.loan.credit_color == 'green' %}low{% elif dashboard_data.loan.credit_color == 'red' %}high{% else %}medium{% endif %}">{{ dashboard_data.loan.credit_indicator }}</span>
+          <span class="dash-badge {% if dashboard_data['loan']['credit_color'] == 'green' %}low{% elif dashboard_data['loan']['credit_color'] == 'red' %}high{% else %}medium{% endif %}">{{ dashboard_data['loan']['credit_indicator'] }}</span>
         </div>
         <div class="dash-metric">
           <span class="dash-metric-label">Loan Eligible</span>
-          <span class="dash-metric-value gold">₹{{ "{:,.0f}".format(dashboard_data.loan.loan_eligible) }}</span>
+          <span class="dash-metric-value gold">₹{{ "{:,.0f}".format(dashboard_data['loan']['loan_eligible']) }}</span>
         </div>
         <div class="dash-metric">
           <span class="dash-metric-label">Balance Mismatches</span>
-          <span class="dash-metric-value {% if dashboard_data.audit.mismatch_count > 0 %}red{% else %}green{% endif %}">{{ dashboard_data.audit.mismatch_count }}</span>
+          <span class="dash-metric-value {% if dashboard_data['audit']['mismatch_count'] > 0 %}red{% else %}green{% endif %}">{{ dashboard_data['audit']['mismatch_count'] }}</span>
         </div>
         <div class="dash-metric">
           <span class="dash-metric-label">EMIs Detected</span>
-          <span class="dash-metric-value">{{ dashboard_data.audit.emi_count }}</span>
+          <span class="dash-metric-value">{{ dashboard_data['audit']['emi_count'] }}</span>
         </div>
       </div>
 
@@ -692,37 +688,15 @@
 </section>
 
 <footer>
-  <div class="footer-inner">
-    <div class="footer-brand">
-      <div class="footer-logo">Aarogyam<span>Fin</span></div>
-      <p class="footer-desc">AI-powered bank statement analyzer for Indians. Understand your money instantly.</p>
-      <p class="footer-desc" style="margin-top:8px;">GST · ITR · EMI · Compliance · Loan</p>
-      <p class="footer-made">Made with ♥ in India</p>
-    </div>
-    <div class="footer-col">
-      <div class="footer-col-title">Product</div>
-      <a href="#analyzer">Analyze Statement</a>
-      <a href="/dashboard">Financial Dashboard</a>
-      <a href="/accuracy">Accuracy Test</a>
-      <a href="/pay">AI Chat</a>
-    </div>
-    <div class="footer-col">
-      <div class="footer-col-title">Company</div>
-      <a href="/about">About Us</a>
-      <a href="/about#roadmap">Roadmap</a>
-      <a href="mailto:hardik101306@gmail.com">Contact</a>
-    </div>
-    <div class="footer-col">
-      <div class="footer-col-title">Legal</div>
-      <a href="/privacy">Privacy Policy</a>
-      <a href="/terms">Terms of Service</a>
-      <a href="#trust">Data Security</a>
-    </div>
-  </div>
-  <div class="footer-bottom">
-    <p>© 2026 AarogyamFin. All rights reserved. · New Delhi, India</p>
-    <p>aarogyamfin.com</p>
-  </div>
+  <div class="footer-logo">Aarogyam<span>Fin</span></div>
+  <p class="footer-copy">© 2026 AarogyamFin. All rights reserved.</p>
+  <ul class="footer-links">
+    <li><a href="/privacy">Privacy</a></li>
+    <li><a href="/terms">Terms</a></li>
+    <li><a href="#trust">Security</a></li>
+    <li><a href="/about">About</a></li>
+    <li><a href="#analyzer">Analyze</a></li>
+  </ul>
 </footer>
 
 <script>
