@@ -227,6 +227,10 @@ def analyze_expenses(transactions: list) -> dict:
         is_per = any(k in desc for k in PERSONAL_KEYWORDS)
         is_gst = any(k in desc for k in GST_ELIGIBLE_KEYWORDS)
 
+        if cat in ('UPI', 'Transfer', 'Charges', 'IMPS', 'NEFT/RTGS', 'ATM/Cash',
+                   'Subscription', 'Entertainment', 'Food', 'Shopping', 'Travel', 'Health'):
+            is_per = True
+
         # PCI/ transactions — card spends, mostly personal
         if desc.startswith('pci/'):
             is_per = True

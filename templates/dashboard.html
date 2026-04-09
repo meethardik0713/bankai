@@ -571,20 +571,69 @@ tr:hover td { background: rgba(201,168,76,0.02); }
           </div>
         </div>
 
-        <!-- Category breakdown -->
+        <!-- Category breakdown with accordion -->
         <div style="margin-top:8px;">
           {% for cat, amt in data.expense.category_totals.items() %}
           {% set pct = (amt / data.expense.total_debits * 100) | round(1) if data.expense.total_debits else 0 %}
-          <div class="progress-row">
-            <span class="progress-label">{{ cat }}</span>
-            <div class="progress-track"><div class="progress-fill" style="width:{{ pct }}%"></div></div>
-            <span class="progress-val">₹{{ "{:,.0f}".format(amt) }}</span>
+          {% set cat_txns = data.expense.business + data.expense.personal + data.expense.mixed %}
+          {% set filtered = cat_txns | selectattr('category', 'equalto', cat) | list %}
+          <div class="cat-accordion">
+            <div class="progress-row cat-header" onclick="toggleCat(this)" style="cursor:pointer;">
+              <span class="progress-label">{{ cat }}</span>
+              <div class="progress-track"><div class="progress-fill" style="width:{{ pct }}%"></div></div>
+              <span class="progress-val">₹{{ "{:,.0f}".format(amt) }}</span>
+              {% if filtered %}
+              <span class="cat-toggle" style="margin-left:10px; color:var(--gold); font-size:0.7rem; flex-shrink:0;">▶ {{ filtered|length }}</span>
+              {% endif %}
+            </div>
+            {% if filtered %}
+            <div class="cat-txns" style="display:none; margin-left:8px; margin-bottom:8px;">
+              <table style="min-width:unset;">
+                <thead><tr><th>Date</th><th>Description</th><th>Amount</th></tr></thead>
+                <tbody>
+                  {% for t in filtered[:20] %}
+                  <tr>
+                    <td class="td-muted">{{ t.date }}</td>
+                    <td style="font-size:0.75rem;">{{ t.desc[:50] }}{% if t.desc|length > 50 %}…{% endif %}</td>
+                    <td style="color:var(--red); font-size:0.75rem;">₹{{ "{:,.0f}".format(t.amount) }}</td>
+                  </tr>
+                  {% endfor %}
+                  {% if filtered|length > 20 %}
+                  <tr><td colspan="3" style="text-align:center; color:var(--muted); font-size:0.72rem;">+{{ filtered|length - 20 }} more</td></tr>
+                  {% endif %}
+                </tbody>
+              </table>
+            </div>
+            {% endif %}
           </div>
           {% endfor %}
         </div>
       </div>
 
       <!-- GST Eligible Transactions -->
+      {% if data.expense.mixed %}
+      <div class="card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          Mixed / Unclassified ({{ data.expense.mixed|length }} txns)
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Date</th><th>Description</th><th>Category</th><th>Amount (₹)</th></tr></thead>
+            <tbody>
+              {% for t in data.expense.mixed %}
+              <tr>
+                <td class="td-muted">{{ t.date }}</td>
+                <td>{{ t.desc[:60] }}{% if t.desc|length > 60 %}…{% endif %}</td>
+                <td><span class="badge badge-warn">{{ t.category }}</span></td>
+                <td style="color:var(--red)">₹{{ "%.2f"|format(t.amount) }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
       {% if data.expense.gst_eligible %}
       <div class="card">
         <div class="card-title">
@@ -1104,6 +1153,19 @@ function initCharts() {
   const reconBar = document.getElementById('reconBar');
   if (reconBar) {
     setTimeout(() => { reconBar.style.width = '{{ data.audit.reconciliation_score if data else 0 }}%'; }, 300);
+  }
+}
+
+function toggleCat(header) {
+  const txns = header.nextElementSibling;
+  const toggle = header.querySelector('.cat-toggle');
+  if (!txns) return;
+  if (txns.style.display === 'none') {
+    txns.style.display = 'block';
+    if (toggle) toggle.textContent = toggle.textContent.replace('▶', '▼');
+  } else {
+    txns.style.display = 'none';
+    if (toggle) toggle.textContent = toggle.textContent.replace('▼', '▶');
   }
 }
 

@@ -72,23 +72,44 @@ class HDFCParser(BaseParser):
             traceback.print_exc()
             return []
 
+        # Opening balance: pehli transaction ke balance se amount ghata ke nikalo
+        opening_bal = self._extract_opening_balance(pdf_path)
+        self._log(f"Opening balance extracted: {opening_bal}")
+        if opening_bal is None and all_balances:
+            # Statement summary se: 498.82 type pattern
+            opening_bal = None  # fallback neeche handle hoga
+        
         transactions = []
         for i, (date, bal) in enumerate(zip(all_dates, all_balances)):
-            prev_bal = all_balances[i - 1] if i > 0 else 0.0
+            if i == 0:
+                if opening_bal is not None:
+                    prev_bal = opening_bal
+                else:
+                    # Pehli balance se amount subtract/add karke nikalo
+                    prev_bal = all_balances[0]  # worst case same balance
+            else:
+                prev_bal = all_balances[i - 1]
             diff     = round(bal - prev_bal, 2)
-            txn_type = 'CR' if diff >= 0 else 'DR'
-            amount   = abs(diff)
+            txn_type = 'CR' if diff > 0 else 'DR'
+            amount   = round(abs(diff), 2)
+            if amount == 0:
+                amount = bal  # fallback
             narr     = all_narrations[i] if i < len(all_narrations) else ''
             transactions.append({
-                'date':    date,
-                'desc':    narr,
-                'amount':  amount,
-                'type':    txn_type,
-                'balance': bal,
+                'date':            date,
+                'desc':            narr,
+                'amount':          amount,
+                'type':            txn_type,
+                'balance':         bal,
+                'opening_balance': opening_bal if i == 0 else None,
             })
 
+        # normalizer ko override karne se rokna hai
+        for t in transactions:
+            t['_type_locked'] = True
+
         self._log(f"Transactions parsed: {len(transactions)}")
-        return normalize(transactions)
+        return normalize(transactions, opening_balance=opening_bal)
 
     @staticmethod
     def _clean_amt(s) -> float:
@@ -99,4 +120,27 @@ class HDFCParser(BaseParser):
             return float(s)
         except Exception:
             return 0.0
-        
+
+    def _extract_opening_balance(self, pdf_path: str) -> float:
+        """HDFC statement summary se opening balance nikalo."""
+        try:
+            with pdfplumber.open(pdf_path) as pdf:
+                for page in pdf.pages:
+                    text = page.extract_text() or ''
+                    if 'opening' in text.lower():
+                        print(f"[hdfc-debug] Found 'opening' on page, text snippet: {repr(text[text.lower().find('opening'):text.lower().find('opening')+200])}")
+                    # HDFC format: "Opening Balance Dr Count Cr Count Debits Credits Closing Bal"
+                    # Next line: "498.82 132 80 470,188.15 488,797.44 19,108.11"
+                    m = re.search(
+                        r'opening\s*balance.*?[\n\r]+([\d,]+\.\d{2})',
+                        text, re.IGNORECASE | re.DOTALL
+                    )
+                    if m:
+                        val = self._clean_amt(m.group(1))
+                        if val > 0:
+                            self._log(f"OB found: {val}")
+                            return val
+        except Exception as e:
+            self._log(f"OB extract error: {e}")
+        return None
+    
