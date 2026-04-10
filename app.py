@@ -594,7 +594,7 @@ def sitemap():
         ('https://aarogyamfin.com/',           '1.0', 'weekly'),
         ('https://aarogyamfin.com/about',       '0.8', 'monthly'),
         ('https://aarogyamfin.com/accuracy',    '0.7', 'monthly'),
-        ('https://aarogyamfin.com/dashboard',   '0.8', 'weekly'),
+        
         ('https://aarogyamfin.com/privacy',     '0.5', 'yearly'),
         ('https://aarogyamfin.com/terms',       '0.5', 'yearly'),
     ]
@@ -606,6 +606,39 @@ def sitemap():
     xml.append('</urlset>')
     return Response('\n'.join(xml), mimetype='application/xml')
 
+
+@app.route('/robots.txt')
+def robots():
+    content = """User-agent: *
+Allow: /
+
+User-agent: Googlebot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+User-agent: meta-externalagent
+Allow: /
+
+User-agent: CCBot
+Disallow: /
+
+User-agent: Bytespider
+Disallow: /
+
+Sitemap: https://aarogyamfin.com/sitemap.xml
+"""
+    return Response(content, mimetype='text/plain')
 
 @app.route('/about')
 def about():
