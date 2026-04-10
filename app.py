@@ -607,6 +607,40 @@ def sitemap():
     return Response('\n'.join(xml), mimetype='application/xml')
 
 
+@app.route('/llms.txt')
+def llms():
+    content = """# AarogyamFin — AI Bank Statement Analyzer
+# https://aarogyamfin.com
+
+## Product
+AarogyamFin is an AI-powered Indian bank statement analyzer.
+Users upload bank statement PDFs and instantly get transaction analysis, keyword search, Excel export, and AI chat insights.
+
+## Supported Banks
+SBI, HDFC, Kotak, Canara, Axis, Punjab National Bank, Bank of Baroda, ICICI, and all major Indian banks.
+
+## Features
+- PDF to Excel conversion
+- Transaction search by keyword
+- Credit/Debit categorization
+- AI chat for financial insights
+- Dashboard with ITR, loan eligibility, compliance analysis
+- Mobile app (Android)
+
+## Pricing
+Free basic analysis. AI Chat sessions from ₹10.
+
+## Contact
+aarogyamfin@gmail.com
+
+## URLs
+Homepage: https://aarogyamfin.com
+About: https://aarogyamfin.com/about
+Privacy: https://aarogyamfin.com/privacy
+Terms: https://aarogyamfin.com/terms
+"""
+    return Response(content, mimetype='text/plain')
+
 @app.route('/robots.txt')
 def robots():
     content = """User-agent: *
