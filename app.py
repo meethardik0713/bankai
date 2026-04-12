@@ -42,8 +42,18 @@ is_prod = os.environ.get('RAILWAY_ENVIRONMENT') is not None
 Talisman(app,
     force_https=is_prod,
     strict_transport_security=is_prod,
+    strict_transport_security_preload=is_prod,
     session_cookie_secure=is_prod,
-    content_security_policy=False
+    content_security_policy={
+        'default-src': "'self'",
+        'script-src': ["'self'", "'unsafe-inline'", 'https://cdnjs.cloudflare.com', 'https://challenges.cloudflare.com'],
+        'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+        'font-src': ["'self'", 'https://fonts.gstatic.com'],
+        'img-src': ["'self'", 'data:', 'https:'],
+        'connect-src': "'self'",
+        'frame-src': "'none'",
+        'object-src': "'none'",
+    }
 )
 
 UPLOAD_FOLDER = 'uploads'
@@ -589,20 +599,18 @@ def clear_cache():
 
 @app.route('/sitemap.xml')
 def sitemap():
-    from datetime import datetime
     pages = [
-        ('https://aarogyamfin.com/',           '1.0', 'weekly'),
-        ('https://aarogyamfin.com/about',       '0.8', 'monthly'),
-        ('https://aarogyamfin.com/accuracy',    '0.7', 'monthly'),
-        
-        ('https://aarogyamfin.com/privacy',     '0.5', 'yearly'),
-        ('https://aarogyamfin.com/terms',       '0.5', 'yearly'),
+        ('https://aarogyamfin.com/',        '2026-04-08'),
+        ('https://aarogyamfin.com/about',   '2026-04-08'),
+        ('https://aarogyamfin.com/accuracy','2026-04-07'),
+        ('https://aarogyamfin.com/privacy', '2026-04-08'),
+        ('https://aarogyamfin.com/terms',   '2026-04-08'),
+        ('https://aarogyamfin.com/contact', '2026-04-08'),
     ]
     xml = ['<?xml version="1.0" encoding="UTF-8"?>',
            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
-    for url, priority, freq in pages:
-        xml.append(f'  <url><loc>{url}</loc><lastmod>{datetime.now().strftime("%Y-%m-%d")}</lastmod>'
-                   f'<changefreq>{freq}</changefreq><priority>{priority}</priority></url>')
+    for url, lastmod in pages:
+        xml.append(f'  <url><loc>{url}</loc><lastmod>{lastmod}</lastmod></url>')
     xml.append('</urlset>')
     return Response('\n'.join(xml), mimetype='application/xml')
 
