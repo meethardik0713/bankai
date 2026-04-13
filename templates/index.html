@@ -518,15 +518,15 @@
       <div class="stat-label">Transactions Found</div>
     </div>
     <div class="stat-box">
-      <div class="stat-total">₹{{ "{:,.0f}".format(total) }}</div>
+      <div class="stat-total">₹{{ "{:,.2f}".format(total) }}</div>
       <div class="stat-label">Total Turnover</div>
     </div>
     <div class="stat-box">
-      <div class="stat-credit">↑ ₹{{ "{:,.0f}".format(total_credit) }}</div>
+      <div class="stat-credit">↑ ₹{{ "{:,.2f}".format(total_credit) }}</div>
       <div class="stat-label">Total Credit</div>
     </div>
     <div class="stat-box">
-      <div class="stat-debit">↓ ₹{{ "{:,.0f}".format(total_debit) }}</div>
+      <div class="stat-debit">↓ ₹{{ "{:,.2f}".format(total_debit) }}</div>
       <div class="stat-label">Total Debit</div>
     </div>
   </div>
