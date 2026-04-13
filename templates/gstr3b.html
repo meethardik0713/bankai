@@ -176,10 +176,26 @@ tr:hover td { background: rgba(201,168,76,0.02); }
   </div>
 </nav>
 
+<div style="display:grid; grid-template-columns:240px 1fr; min-height:calc(100vh - 65px);">
+<aside style="border-right:1px solid rgba(201,168,76,0.15); padding:32px 0; position:sticky; top:65px; height:calc(100vh - 65px); overflow-y:auto; background:rgba(255,255,255,0.01);">
+  <div style="padding:0 8px;">
+    <a href="/dashboard" style="text-decoration:none;"><div style="display:flex;align-items:center;gap:10px;padding:11px 16px;font-size:0.8rem;color:rgba(232,228,217,0.45);border-left:2px solid transparent;cursor:pointer;" onmouseover="this.style.color='#e8e4d9';this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.color='rgba(232,228,217,0.45)';this.style.background='transparent'"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M8 12h8M12 8v8"/></svg>Expenses</div></a>
+    <a href="/dashboard" style="text-decoration:none;"><div style="display:flex;align-items:center;gap:10px;padding:11px 16px;font-size:0.8rem;color:rgba(232,228,217,0.45);border-left:2px solid transparent;cursor:pointer;" onmouseover="this.style.color='#e8e4d9';this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.color='rgba(232,228,217,0.45)';this.style.background='transparent'"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>ITR / Tax</div></a>
+    <a href="/dashboard" style="text-decoration:none;"><div style="display:flex;align-items:center;gap:10px;padding:11px 16px;font-size:0.8rem;color:rgba(232,228,217,0.45);border-left:2px solid transparent;cursor:pointer;" onmouseover="this.style.color='#e8e4d9';this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.color='rgba(232,228,217,0.45)';this.style.background='transparent'"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>Audit</div></a>
+    <a href="/dashboard" style="text-decoration:none;"><div style="display:flex;align-items:center;gap:10px;padding:11px 16px;font-size:0.8rem;color:rgba(232,228,217,0.45);border-left:2px solid transparent;cursor:pointer;" onmouseover="this.style.color='#e8e4d9';this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.color='rgba(232,228,217,0.45)';this.style.background='transparent'"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>Loan</div></a>
+    <a href="/dashboard" style="text-decoration:none;"><div style="display:flex;align-items:center;gap:10px;padding:11px 16px;font-size:0.8rem;color:rgba(232,228,217,0.45);border-left:2px solid transparent;cursor:pointer;" onmouseover="this.style.color='#e8e4d9';this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.color='rgba(232,228,217,0.45)';this.style.background='transparent'"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Compliance</div></a>
+    <div style="height:1px;background:rgba(201,168,76,0.15);margin:8px 16px;"></div>
+    <a href="/gstr2b" style="text-decoration:none;"><div style="display:flex;align-items:center;gap:10px;padding:11px 16px;font-size:0.8rem;color:rgba(232,228,217,0.45);border-left:2px solid transparent;cursor:pointer;" onmouseover="this.style.color='#e8e4d9';this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.color='rgba(232,228,217,0.45)';this.style.background='transparent'"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>GSTR-2B Recon<span style="margin-left:auto;font-size:0.6rem;padding:2px 6px;border-radius:10px;background:rgba(201,168,76,0.15);color:#c9a84c;">ITC</span></div></a>
+    <a href="/gstr3b" style="text-decoration:none;"><div style="display:flex;align-items:center;gap:10px;padding:11px 16px;font-size:0.8rem;color:#c9a84c;background:rgba(201,168,76,0.06);border-left:2px solid #c9a84c;cursor:pointer;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>GSTR-3B<span style="margin-left:auto;font-size:0.6rem;padding:2px 6px;border-radius:10px;background:rgba(251,191,36,0.15);color:#fbbf24;">GST</span></div></a>
+    <a href="/gstr1" style="text-decoration:none;"><div style="display:flex;align-items:center;gap:10px;padding:11px 16px;font-size:0.8rem;color:rgba(232,228,217,0.45);border-left:2px solid transparent;cursor:pointer;" onmouseover="this.style.color='#e8e4d9';this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.color='rgba(232,228,217,0.45)';this.style.background='transparent'"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>GSTR-1<span style="margin-left:auto;font-size:0.6rem;padding:2px 6px;border-radius:10px;background:rgba(251,191,36,0.15);color:#fbbf24;">GST</span></div></a>
+    <a href="/gst-calendar" style="text-decoration:none;"><div style="display:flex;align-items:center;gap:10px;padding:11px 16px;font-size:0.8rem;color:rgba(232,228,217,0.45);border-left:2px solid transparent;cursor:pointer;" onmouseover="this.style.color='#e8e4d9';this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.color='rgba(232,228,217,0.45)';this.style.background='transparent'"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>GST Calendar<span style="margin-left:auto;font-size:0.6rem;padding:2px 6px;border-radius:10px;background:rgba(201,168,76,0.15);color:#c9a84c;">FY26</span></div></a>
+  </div>
+</aside>
+<div style="overflow-y:auto;">
 <div class="container">
 
   <div class="page-header">
-    <span class="page-tag">GST Module 03</span>
+    <span class="page-tag">GST Module 02</span>
     <h1 class="page-title">GSTR-3B <em>Auto-Fill</em></h1>
     <p class="page-sub">Upload bank statement + sales/purchase Excel — get Table 3.1, 3.2, 4, 5, 6.1 auto-populated with net tax liability calculation.</p>
   </div>
@@ -629,6 +645,8 @@ tr:hover td { background: rgba(201,168,76,0.02); }
   </div>
 
   {% endif %}
+</div>
+</div>
 </div>
 
 <script>
