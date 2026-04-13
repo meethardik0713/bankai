@@ -1,0 +1,71 @@
+[33mc72dce8[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m faaltu ki cheeze
+[33m5b744b2[m Major Step
+[33m1aac714[m seo: add llms.txt route for AI crawlers
+[33m200cd18[m seo: add contact email to privacy and terms
+[33m3c11695[m seo: add JSON-LD schema to homepage
+[33ma2572a1[m seo: add og-image.png
+[33m307c49b[m seo: add OG tags and canonical to all public pages
+[33m3df07fe[m Seo Fix robots.txt
+[33ma2e8410[m HDFC Errors Fix
+[33m29d685b[m Hdfc Errors Fix
+[33m7ec4b38[m Excel Report added
+[33mb6a43a5[m Below Correct
+[33m3a12c38[m Dashboard Added
+[33m1112e0f[m Logo Update
+[33mc3cfa18[m Add Dashboard Gst compliance
+[33mc1c176d[m Logo Update
+[33m32b3cd4[m Logo Make
+[33mb9d19b5[m Phone Ai Chat Button
+[33m5bbd8a4[m chat limit bug fixed
+[33mebcf072[m updated usage pdf store and chat store
+[33m5574c4a[m 48HRS Session Save
+[33me0b62a1[m Usage Bug fixed
+[33mab813a0[m Payment Options Added
+[33m2f131fd[m Website Indexing
+[33m7720852[m seo: canonical tag and meta description
+[33m5a19eac[m fix: add Response import for sitemap
+[33m9ca37bb[m feat: add sitemap.xml route for SEO
+[33m0c59734[m fix: razorpay mobile payment supabase column fix
+[33m564305d[m fix firebase_uid column for payments and chat_sessions
+[33m27b3cc6[m add mobile payment API routes
+[33m6c44d41[m add mobile chat API routes
+[33mfdca672[m add CORS for mobile API
+[33m49c1267[m App Route Added
+[33me74e651[m Chat Bot Fixes Added
+[33m99fcab9[m add anthropic requirement
+[33ma8d1ec6[m Chat Bot Addedd
+[33mddabe7e[m Razorpay Payment Gateway Added + Coming Soon Page
+[33mb842bbd[m All Banks 100% Accuracy Fixed
+[33m360e54f[m Detection Fix All Banks
+[33m20a0f44[m Add Brand Logo
+[33m33c0af4[m ICICI Bank Parser 100% Accuracy description Bug only
+[33m7540fa3[m Axis bank Added 100% ACcuracy
+[33m2c45fe7[m Add Bank of Baroda parser - 255/257 txns, 99.2% accuracy
+[33m01b7f36[m Add PNB parser
+[33m240994a[m added SBI parser
+[33mb5aaf14[m Parser fixes: resolved transaction extraction issues for Kotak, Canara, HDFC statements
+[33m4a4af38[m Added HDFC bank statement parser and improvements
+[33m4d79687[m fix deployment dotenv
+[33m590331e[m BankAI update
+[33m1d87946[m Add Sign In and Sign Up buttons to nav
+[33md65db47[m Fix logout route and debug auth
+[33m27e21c1[m Fix auth callback logging
+[33mfff20cb[m Add debug auth route
+[33m58976ce[m Fix auth session token
+[33m1996826[m Fix login check
+[33m9a2d5b8[m Add login check and protect analyze button
+[33mb2c7910[m Fix OAuth redirect URL
+[33m278e58e[m Add Supabase auth and Google login
+[33me14ca2d[m Add Talisman security headers, remove debug route
+[33mb2a1403[m Added accuracy testing tool for universal bank parser
+[33m59868dd[m Phase 2 completed - universal parser supports Kotak + Canara
+[33m6e58e39[m phase 2 update before universal parser testing
+[33m0c93b2a[m fix: HDFC SBI CANARA MY ONE
+[33maec08d0[m fix: HDFC SBI parsers working, keyword search improved
+[33mc0fa22c[m privacy terms links fixed
+[33m7894186[m security hardening added
+[33m9344d90[m about page added
+[33md345f60[m kotak cr dr fix
+[33m0fed435[m credit debit detection fixed
+[33m1dafab6[m remove sensitive files and add gitignore
+[33mbeddedb[m sync local project

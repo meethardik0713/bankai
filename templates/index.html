@@ -151,6 +151,30 @@
   .balance-col { color: rgba(232,228,217,0.6); font-size: 0.82rem; }
   .desc-col { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+  .cat-badge { display: inline-flex; align-items: center; font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase; padding: 4px 10px; border-radius: 2px; font-weight: 500; white-space: nowrap; }
+  .cat-Salary, .cat-Freelance-Income, .cat-Marketplace-Income { background: rgba(74,222,128,0.12); border: 1px solid rgba(74,222,128,0.3); color: #4ade80; }
+  .cat-UPI { background: rgba(96,165,250,0.12); border: 1px solid rgba(96,165,250,0.3); color: #60a5fa; }
+  .cat-IMPS { background: rgba(129,140,248,0.12); border: 1px solid rgba(129,140,248,0.3); color: #818cf8; }
+  .cat-NEFT-Received { background: rgba(167,139,250,0.12); border: 1px solid rgba(167,139,250,0.3); color: #a78bfa; }
+  .cat-NEFT-Sent { background: rgba(129,140,248,0.12); border: 1px solid rgba(129,140,248,0.3); color: #818cf8; }
+  .cat-EMI-Loan-Repayment, .cat-Loan-Disbursal { background: rgba(248,113,113,0.12); border: 1px solid rgba(248,113,113,0.3); color: #f87171; }
+  .cat-Food { background: rgba(251,146,60,0.12); border: 1px solid rgba(251,146,60,0.3); color: #fb923c; }
+  .cat-Shopping { background: rgba(232,121,249,0.12); border: 1px solid rgba(232,121,249,0.3); color: #e879f9; }
+  .cat-Entertainment, .cat-Subscription { background: rgba(167,139,250,0.10); border: 1px solid rgba(167,139,250,0.25); color: #c4b5fd; }
+  .cat-Travel { background: rgba(34,211,238,0.12); border: 1px solid rgba(34,211,238,0.3); color: #22d3ee; }
+  .cat-Health { background: rgba(52,211,153,0.12); border: 1px solid rgba(52,211,153,0.3); color: #34d399; }
+  .cat-Cash-Deposit { background: rgba(74,222,128,0.12); border: 1px solid rgba(74,222,128,0.3); color: #4ade80; }
+  .cat-ATM-Withdrawal { background: rgba(251,191,36,0.12); border: 1px solid rgba(251,191,36,0.3); color: #fbbf24; }
+  .cat-Charges { background: rgba(156,163,175,0.12); border: 1px solid rgba(156,163,175,0.3); color: #9ca3af; }
+  .cat-Interest { background: rgba(201,168,76,0.12); border: 1px solid rgba(201,168,76,0.3); color: #c9a84c; }
+  .cat-Investment { background: rgba(74,222,128,0.10); border: 1px solid rgba(74,222,128,0.25); color: #86efac; }
+  .cat-Transfer, .cat-Family-Transfer { background: rgba(148,163,184,0.12); border: 1px solid rgba(148,163,184,0.3); color: #94a3b8; }
+  .cat-Utilities { background: rgba(45,212,191,0.12); border: 1px solid rgba(45,212,191,0.3); color: #2dd4bf; }
+  .cat-Education { background: rgba(96,165,250,0.15); border: 1px solid rgba(96,165,250,0.4); color: #bfdbfe; }
+  .cat-Government { background: rgba(251,191,36,0.10); border: 1px solid rgba(251,191,36,0.25); color: #fde68a; }
+  .cat-POS, .cat-Cheque { background: rgba(156,163,175,0.10); border: 1px solid rgba(156,163,175,0.25); color: #d1d5db; }
+  .cat-Other, .cat-MB-Transfer { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); color: var(--muted); }
+
   .badge-credit { display: inline-flex; align-items: center; gap: 4px; background: rgba(74,222,128,0.1); border: 1px solid rgba(74,222,128,0.25); color: #4ade80; font-size: 0.6rem; letter-spacing: 0.12em; text-transform: uppercase; padding: 3px 7px; border-radius: 2px; font-weight: 500; white-space: nowrap; }
   .badge-debit { display: inline-flex; align-items: center; gap: 4px; background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.25); color: #f87171; font-size: 0.6rem; letter-spacing: 0.12em; text-transform: uppercase; padding: 3px 7px; border-radius: 2px; font-weight: 500; white-space: nowrap; }
   .badge-unknown { color: var(--muted); font-size: 0.8rem; }
@@ -542,7 +566,7 @@
         <thead>
           <tr>
             <th>Date</th>
-            <th>Description</th>
+            <th>Category</th>
             <th>Type</th>
             <th>Amount (₹)</th>
             <th>Balance (₹)</th>
@@ -552,7 +576,7 @@
           {% for t in transaction_data %}
           <tr>
             <td class="date-col">{{ t.date }}</td>
-            <td class="desc-col" title="{{ t.desc }}">{{ t.desc }}</td>
+            <td><span class="cat-badge cat-{{ t.category | default('Other') | replace('/', '-') | replace(' ', '-') }}" title="{{ t.desc }}">{{ t.category | default('Other') }}</span></td>
             <td>
               {% if t.type == 'CR' %}
                 <span class="badge-credit">↑ CR</span>

@@ -113,10 +113,10 @@ PCI_MERCHANT_CATEGORY = {
 
 CATEGORY_MAP = {
     # Transport types first — broad buckets
-    'NEFT/RTGS':          ['neftinw', 'neft ', 'rtgs'],
+    'NEFT/RTGS':          ['neftinw', 'neft ', 'neftcr', 'neftdr', 'neft-', 'rtgs'],
     'IMPS':               ['imps'],
     'ATM/Cash':           ['atm', 'cash withdrawal', 'cash wdl', 'cwdr',
-                           'cash deposit', 'cdm'],
+                           'cash deposit', 'cdm', 'cashdep', 'cash dep'],
 
     # Specific income/transfer types
     'Salary':             ['salary', 'payroll', 'sal cr', 'wages',
@@ -174,7 +174,8 @@ CATEGORY_MAP = {
                            'int.pd:', 'sbint'],
     'Charges':            ['charges', 'fee', 'commission',
                            'service charge', 'sms alert', 'annual fee',
-                           'chrg:', 'tbms', 'dcc fee'],
+                           'chrg:', 'tbms', 'dcc fee', 'ibbillpay', 'ib billpay',
+                           'fuel surchg', 'rev fuel', 'neft chgs'],
     'Cheque':             ['cheque', 'chq', 'clearing', 'cts'],
     'Government':         ['uidai', 'govt', 'income tax', 'tds'],
 
@@ -395,6 +396,12 @@ def _dedup_and_clean(txns: list) -> list:
                 raw_desc = raw_desc[:ji].strip()
         t['desc']     = raw_desc[:200].strip()
         t['category'] = categorize(t['desc'])
+
+        # Split combined categories by CR/DR
+        if t.get('category') == 'NEFT/RTGS':
+            t['category'] = 'NEFT Received' if t.get('type') == 'CR' else 'NEFT Sent'
+        elif t.get('category') == 'ATM/Cash':
+            t['category'] = 'Cash Deposit' if t.get('type') == 'CR' else 'ATM Withdrawal'
 
         result.append(t)
     return result
