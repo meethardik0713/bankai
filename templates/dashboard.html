@@ -522,6 +522,13 @@ tr:hover td { background: rgba(201,168,76,0.02); }
         Compliance
         <span class="nav-badge {% if data.compliance.risk_level == 'High' %}red{% elif data.compliance.risk_level == 'Medium' %}yellow{% endif %}">{{ data.compliance.risk_level }}</span>
       </div>
+      <a href="/gstr2b" style="text-decoration:none;">
+        <div class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+          GSTR-2B Recon
+          <span class="nav-badge">ITC</span>
+        </div>
+      </a>
       <a href="/gstr3b" style="text-decoration:none;">
         <div class="nav-item">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>

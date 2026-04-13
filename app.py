@@ -1272,6 +1272,82 @@ def dashboard_export():
 
 
 # ═══════════════════════════════════════════════════════════
+#  GSTR-2B RECONCILIATION ROUTE
+# ═══════════════════════════════════════════════════════════
+
+@app.route('/gstr2b', methods=['GET'])
+def gstr2b_page():
+    is_logged_in, user_email, user_id = _get_current_user()
+    if not is_logged_in:
+        return redirect('/login')
+    return render_template('gstr2b.html', data=None, is_logged_in=is_logged_in, user_email=user_email)
+
+
+@app.route('/gstr2b', methods=['POST'])
+def gstr2b_analyze():
+    ip = request.remote_addr
+    if is_rate_limited(ip):
+        abort(429)
+
+    is_logged_in, user_email, user_id = _get_current_user()
+    if not is_logged_in:
+        return redirect('/login')
+
+    from core.gstr2b_recon import run_gstr2b_recon
+    error_message = ''
+    data          = None
+    gstr2b_path   = None
+    pr_path       = None
+
+    gstr2b_file = request.files.get('gstr2b_excel')
+    if not gstr2b_file or not gstr2b_file.filename:
+        error_message = 'GSTR-2B Excel file is required.'
+        return render_template('gstr2b.html', data=None, error_message=error_message,
+                               is_logged_in=is_logged_in, user_email=user_email)
+
+    safe_g = secure_filename(gstr2b_file.filename)
+    if not safe_g.lower().endswith(('.xlsx', '.xls')):
+        error_message = 'GSTR-2B file must be .xlsx or .xls'
+        return render_template('gstr2b.html', data=None, error_message=error_message,
+                               is_logged_in=is_logged_in, user_email=user_email)
+
+    gstr2b_path = os.path.join(app.config['UPLOAD_FOLDER'], 'gstr2b_' + safe_g)
+    gstr2b_file.save(gstr2b_path)
+
+    pr_file = request.files.get('pr_excel')
+    if not pr_file or not pr_file.filename:
+        error_message = 'Purchase Register Excel file is required.'
+        if gstr2b_path and os.path.exists(gstr2b_path):
+            os.remove(gstr2b_path)
+        return render_template('gstr2b.html', data=None, error_message=error_message,
+                               is_logged_in=is_logged_in, user_email=user_email)
+
+    safe_p = secure_filename(pr_file.filename)
+    if not safe_p.lower().endswith(('.xlsx', '.xls')):
+        error_message = 'Purchase Register file must be .xlsx or .xls'
+        if gstr2b_path and os.path.exists(gstr2b_path):
+            os.remove(gstr2b_path)
+        return render_template('gstr2b.html', data=None, error_message=error_message,
+                               is_logged_in=is_logged_in, user_email=user_email)
+
+    pr_path = os.path.join(app.config['UPLOAD_FOLDER'], 'pr_' + safe_p)
+    pr_file.save(pr_path)
+
+    try:
+        data = run_gstr2b_recon(gstr2b_path, pr_path)
+    except Exception as e:
+        logger.exception("GSTR-2B recon error: %s", e)
+        error_message = f'Analysis error: {e}'
+    finally:
+        for fp in [gstr2b_path, pr_path]:
+            if fp and os.path.exists(fp):
+                os.remove(fp)
+
+    return render_template('gstr2b.html', data=data, error_message=error_message,
+                           is_logged_in=is_logged_in, user_email=user_email)
+
+
+# ═══════════════════════════════════════════════════════════
 #  GSTR-3B ROUTE
 # ═══════════════════════════════════════════════════════════
 
