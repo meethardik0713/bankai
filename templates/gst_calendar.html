@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AarogyamFin — GST Compliance Calendar</title>
+<link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --gold: #c9a84c;
+  --gold-light: #e8cc7a;
+  --gold-dim: rgba(201,168,76,0.15);
+  --bg: #060810;
+  --surface: rgba(255,255,255,0.03);
+  --border: rgba(201,168,76,0.15);
+  --border-hover: rgba(201,168,76,0.35);
+  --text: #e8e4d9;
+  --muted: rgba(232,228,217,0.45);
+  --green: #4ade80;
+  --red: #f87171;
+  --yellow: #fbbf24;
+  --blue: #60a5fa;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; font-weight: 300; min-height: 100vh; }
+
+nav {
+  position: sticky; top: 0; z-index: 100;
+  padding: 20px 48px;
+  display: flex; justify-content: space-between; align-items: center;
+  background: rgba(6,8,16,0.92);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(12px);
+}
+.nav-logo { font-family: 'Cormorant Garamond', serif; font-size: 1.3rem; font-weight: 500; letter-spacing: 0.12em; color: var(--text); text-decoration: none; }
+.nav-logo span { color: var(--gold); }
+.nav-right { display: flex; align-items: center; gap: 16px; }
+.nav-tag { font-size: 0.68rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold); border: 1px solid var(--border); padding: 6px 14px; }
+.nav-back { font-size: 0.72rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); text-decoration: none; transition: color 0.3s; }
+.nav-back:hover { color: var(--gold); }
+
+.container { max-width: 1200px; margin: 0 auto; padding: 48px 32px; }
+
+.page-header { margin-bottom: 40px; }
+.page-tag { font-size: 0.62rem; letter-spacing: 0.28em; text-transform: uppercase; color: var(--gold); margin-bottom: 10px; display: block; }
+.page-title { font-family: 'Cormorant Garamond', serif; font-size: 2.8rem; font-weight: 300; line-height: 1.1; }
+.page-title em { color: var(--gold-light); font-style: italic; }
+.page-sub { font-size: 0.88rem; color: var(--muted); margin-top: 10px; line-height: 1.7; }
+
+/* FILTERS */
+.filters {
+  display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+  margin-bottom: 32px; padding: 20px 24px;
+  background: var(--surface); border: 1px solid var(--border);
+}
+.filter-label { font-size: 0.65rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); margin-right: 4px; }
+.filter-btn {
+  padding: 7px 16px; font-size: 0.72rem; letter-spacing: 0.12em;
+  text-transform: uppercase; background: transparent;
+  border: 1px solid var(--border); color: var(--muted);
+  cursor: pointer; transition: all 0.25s; font-family: 'DM Sans', sans-serif;
+}
+.filter-btn:hover { border-color: var(--gold); color: var(--text); }
+.filter-btn.active { border-color: var(--gold); color: var(--gold); background: rgba(201,168,76,0.08); }
+.filter-sep { width: 1px; height: 28px; background: var(--border); margin: 0 4px; }
+
+/* MONTH NAV */
+.month-nav {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 24px;
+}
+.month-title { font-family: 'Cormorant Garamond', serif; font-size: 1.8rem; font-weight: 300; }
+.month-title span { color: var(--gold); }
+.month-btns { display: flex; gap: 8px; }
+.month-btn {
+  padding: 8px 16px; background: transparent; border: 1px solid var(--border);
+  color: var(--muted); cursor: pointer; font-family: 'DM Sans', sans-serif;
+  font-size: 0.75rem; transition: all 0.25s;
+}
+.month-btn:hover { border-color: var(--gold); color: var(--gold); }
+
+/* STATS ROW */
+.stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 28px; }
+.stat-box { background: var(--surface); border: 1px solid var(--border); padding: 18px 20px; }
+.stat-num { font-family: 'Cormorant Garamond', serif; font-size: 2rem; font-weight: 300; line-height: 1; margin-bottom: 4px; }
+.stat-lbl { font-size: 0.62rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
+
+/* CALENDAR GRID */
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); margin-bottom: 28px; }
+.cal-header { background: rgba(6,8,16,0.95); padding: 10px; text-align: center; font-size: 0.6rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); }
+.cal-day {
+  background: var(--bg); min-height: 90px; padding: 8px;
+  position: relative; cursor: default;
+  transition: background 0.2s;
+}
+.cal-day:hover { background: rgba(255,255,255,0.02); }
+.cal-day.empty { background: rgba(6,8,16,0.5); }
+.cal-day.today { background: rgba(201,168,76,0.04); outline: 1px solid rgba(201,168,76,0.3); }
+.cal-day.sunday { background: rgba(248,113,113,0.02); }
+.cal-day-num { font-size: 0.78rem; color: var(--muted); margin-bottom: 6px; font-weight: 400; }
+.cal-day.today .cal-day-num { color: var(--gold); font-weight: 500; }
+.cal-event {
+  font-size: 0.58rem; padding: 2px 5px; margin-bottom: 2px;
+  border-radius: 1px; cursor: pointer; line-height: 1.3;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  transition: opacity 0.2s;
+}
+.cal-event:hover { opacity: 0.8; }
+.ev-red { background: rgba(248,113,113,0.15); color: var(--red); border-left: 2px solid var(--red); }
+.ev-yellow { background: rgba(251,191,36,0.15); color: var(--yellow); border-left: 2px solid var(--yellow); }
+.ev-green { background: rgba(74,222,128,0.15); color: var(--green); border-left: 2px solid var(--green); }
+.ev-blue { background: rgba(96,165,250,0.15); color: var(--blue); border-left: 2px solid var(--blue); }
+.ev-gold { background: rgba(201,168,76,0.15); color: var(--gold); border-left: 2px solid var(--gold); }
+
+/* DEADLINE LIST */
+.deadline-list { margin-bottom: 28px; }
+.deadline-section-title {
+  font-size: 0.62rem; letter-spacing: 0.24em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 12px; padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.deadline-item {
+  display: flex; align-items: flex-start; gap: 16px;
+  padding: 16px 20px; background: var(--surface);
+  border: 1px solid var(--border); margin-bottom: 8px;
+  transition: border-color 0.25s; cursor: pointer;
+}
+.deadline-item:hover { border-color: var(--border-hover); }
+.deadline-item.overdue { border-left: 3px solid var(--red); }
+.deadline-item.due-today { border-left: 3px solid var(--yellow); }
+.deadline-item.upcoming { border-left: 3px solid var(--green); }
+.deadline-item.completed { border-left: 3px solid rgba(74,222,128,0.3); opacity: 0.6; }
+.dl-date { min-width: 48px; text-align: center; }
+.dl-day { font-family: 'Cormorant Garamond', serif; font-size: 1.8rem; font-weight: 300; line-height: 1; }
+.dl-mon { font-size: 0.6rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
+.dl-info { flex: 1; }
+.dl-title { font-size: 0.88rem; font-weight: 500; margin-bottom: 3px; }
+.dl-desc { font-size: 0.75rem; color: var(--muted); line-height: 1.5; }
+.dl-tags { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+.dl-right { text-align: right; min-width: 100px; }
+.dl-status { font-size: 0.6rem; letter-spacing: 0.14em; text-transform: uppercase; padding: 3px 8px; border-radius: 2px; display: inline-block; margin-bottom: 6px; }
+.st-overdue { background: rgba(248,113,113,0.15); color: var(--red); }
+.st-today { background: rgba(251,191,36,0.15); color: var(--yellow); }
+.st-upcoming { background: rgba(74,222,128,0.15); color: var(--green); }
+.st-done { background: rgba(74,222,128,0.08); color: rgba(74,222,128,0.5); }
+.dl-days-left { font-size: 0.72rem; color: var(--muted); }
+
+/* BADGE */
+.badge { display: inline-flex; align-items: center; font-size: 0.58rem; letter-spacing: 0.1em; text-transform: uppercase; padding: 2px 7px; border-radius: 2px; }
+.badge-reg { background: rgba(96,165,250,0.1); border: 1px solid rgba(96,165,250,0.2); color: var(--blue); }
+.badge-comp { background: rgba(201,168,76,0.1); border: 1px solid rgba(201,168,76,0.2); color: var(--gold); }
+.badge-qrmp { background: rgba(74,222,128,0.1); border: 1px solid rgba(74,222,128,0.2); color: var(--green); }
+.badge-all { background: rgba(232,228,217,0.08); border: 1px solid rgba(232,228,217,0.12); color: var(--muted); }
+
+/* PENALTY CALCULATOR */
+.penalty-calc { background: var(--surface); border: 1px solid var(--border); padding: 28px; margin-bottom: 28px; }
+.penalty-title { font-family: 'Cormorant Garamond', serif; font-size: 1.3rem; font-weight: 400; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+.penalty-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px; }
+.penalty-input-wrap { display: flex; flex-direction: column; gap: 6px; }
+.penalty-input-label { font-size: 0.62rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
+.penalty-input {
+  background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+  color: var(--text); padding: 10px 14px; font-family: 'DM Sans', sans-serif;
+  font-size: 0.85rem; width: 100%; transition: border-color 0.25s;
+}
+.penalty-input:focus { outline: none; border-color: var(--gold); }
+.penalty-input select { appearance: none; }
+.penalty-result { background: rgba(201,168,76,0.04); border: 1px solid rgba(201,168,76,0.2); padding: 20px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.penalty-res-item { text-align: center; }
+.penalty-res-num { font-family: 'Cormorant Garamond', serif; font-size: 1.6rem; font-weight: 300; color: var(--red); line-height: 1; margin-bottom: 4px; }
+.penalty-res-num.green { color: var(--green); }
+.penalty-res-lbl { font-size: 0.6rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.calc-btn {
+  padding: 10px 24px; background: var(--gold); color: #060810;
+  border: none; font-family: 'DM Sans', sans-serif; font-size: 0.78rem;
+  font-weight: 500; letter-spacing: 0.16em; text-transform: uppercase;
+  cursor: pointer; margin-bottom: 16px; transition: opacity 0.25s;
+}
+.calc-btn:hover { opacity: 0.85; }
+
+/* LEGEND */
+.legend { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 20px; }
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.72rem; color: var(--muted); }
+.legend-dot { width: 10px; height: 10px; border-radius: 1px; flex-shrink: 0; }
+
+/* TOOLTIP */
+.tooltip-overlay {
+  display: none; position: fixed; inset: 0; z-index: 200;
+  background: rgba(6,8,16,0.7); backdrop-filter: blur(4px);
+  align-items: center; justify-content: center;
+}
+.tooltip-overlay.show { display: flex; }
+.tooltip-box {
+  background: #0d1020; border: 1px solid var(--border);
+  padding: 32px; max-width: 480px; width: 90%; position: relative;
+}
+.tooltip-close { position: absolute; top: 16px; right: 16px; background: none; border: none; color: var(--muted); font-size: 1.2rem; cursor: pointer; }
+.tooltip-tag { font-size: 0.6rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold); margin-bottom: 10px; display: block; }
+.tooltip-title { font-family: 'Cormorant Garamond', serif; font-size: 1.6rem; font-weight: 300; margin-bottom: 12px; }
+.tooltip-body { font-size: 0.82rem; color: var(--muted); line-height: 1.7; }
+.tooltip-body strong { color: var(--text); }
+
+@media (max-width: 900px) {
+  nav { padding: 12px 16px; }
+  .container { padding: 24px 16px; }
+  .stats-row { grid-template-columns: repeat(2, 1fr); }
+  .penalty-grid { grid-template-columns: 1fr; }
+  .penalty-result { grid-template-columns: 1fr; }
+  .cal-grid { display: none; }
+  .page-title { font-size: 2rem; }
+  .filters { gap: 8px; }
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="nav-logo">Aarogyam<span>Fin</span></a>
+  <div class="nav-right">
+    <span class="nav-tag">GST Calendar</span>
+    <a href="/gstr1" class="nav-back">GSTR-1 →</a>
+    <a href="/dashboard" class="nav-back">← Dashboard</a>
+  </div>
+</nav>
+
+<div class="container">
+
+  <div class="page-header">
+    <span class="page-tag">GST Module 02</span>
+    <h1 class="page-title">GST Compliance <em>Calendar</em></h1>
+    <p class="page-sub">FY 2025-26 filing deadlines · Penalty calculator · Taxpayer type filter · Never miss a due date</p>
+  </div>
+
+  <!-- FILTERS -->
+  <div class="filters">
+    <span class="filter-label">Taxpayer Type:</span>
+    <button class="filter-btn active" onclick="setFilter('all', this)">All</button>
+    <button class="filter-btn" onclick="setFilter('regular', this)">Regular</button>
+    <button class="filter-btn" onclick="setFilter('composition', this)">Composition</button>
+    <button class="filter-btn" onclick="setFilter('qrmp', this)">QRMP</button>
+    <div class="filter-sep"></div>
+    <span class="filter-label">Show:</span>
+    <button class="filter-btn active" onclick="setView('list', this)" id="viewList">List View</button>
+    <button class="filter-btn" onclick="setView('calendar', this)" id="viewCal">Calendar View</button>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats-row" id="statsRow">
+    <div class="stat-box">
+      <div class="stat-num" style="color:var(--red);" id="statOverdue">0</div>
+      <div class="stat-lbl">Overdue</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-num" style="color:var(--yellow);" id="statToday">0</div>
+      <div class="stat-lbl">Due Today</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-num" style="color:var(--green);" id="statUpcoming">0</div>
+      <div class="stat-lbl">Upcoming (30 days)</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-num" style="color:var(--gold);" id="statTotal">0</div>
+      <div class="stat-lbl">Total FY 2025-26</div>
+    </div>
+  </div>
+
+  <!-- MONTH NAV (Calendar View) -->
+  <div class="month-nav" id="monthNav" style="display:none;">
+    <div class="month-title" id="monthTitle"><span>April</span> 2025</div>
+    <div class="month-btns">
+      <button class="month-btn" onclick="prevMonth()">← Prev</button>
+      <button class="month-btn" onclick="goToday()">Today</button>
+      <button class="month-btn" onclick="nextMonth()">Next →</button>
+    </div>
+  </div>
+
+  <!-- CALENDAR GRID -->
+  <div id="calendarWrap" style="display:none;">
+    <div class="legend" style="margin-bottom:12px;">
+      <div class="legend-item"><div class="legend-dot" style="background:var(--red);"></div>GSTR-3B / Tax Payment</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--yellow);"></div>GSTR-1</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--green);"></div>GSTR-2B / ITC</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--blue);"></div>TDS/TCS</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--gold);"></div>Annual Return</div>
+    </div>
+    <div class="cal-grid" id="calGrid">
+      <div class="cal-header">Sun</div>
+      <div class="cal-header">Mon</div>
+      <div class="cal-header">Tue</div>
+      <div class="cal-header">Wed</div>
+      <div class="cal-header">Thu</div>
+      <div class="cal-header">Fri</div>
+      <div class="cal-header">Sat</div>
+    </div>
+  </div>
+
+  <!-- LIST VIEW -->
+  <div id="listWrap">
+    <div id="overdueSection"></div>
+    <div id="todaySection"></div>
+    <div id="upcomingSection"></div>
+    <div id="futureSection"></div>
+  </div>
+
+  <!-- PENALTY CALCULATOR -->
+  <div class="penalty-calc">
+    <div class="penalty-title">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="1.5"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+      Late Filing Penalty Calculator
+    </div>
+    <div class="penalty-grid">
+      <div class="penalty-input-wrap">
+        <label class="penalty-input-label">Return Type</label>
+        <select class="penalty-input" id="penReturnType">
+          <option value="gstr1">GSTR-1</option>
+          <option value="gstr3b">GSTR-3B</option>
+          <option value="gstr9">GSTR-9 (Annual)</option>
+          <option value="cmp08">CMP-08</option>
+        </select>
+      </div>
+      <div class="penalty-input-wrap">
+        <label class="penalty-input-label">Due Date</label>
+        <input type="date" class="penalty-input" id="penDueDate">
+      </div>
+      <div class="penalty-input-wrap">
+        <label class="penalty-input-label">Filing Date</label>
+        <input type="date" class="penalty-input" id="penFilingDate">
+      </div>
+      <div class="penalty-input-wrap">
+        <label class="penalty-input-label">Tax Liability (₹)</label>
+        <input type="number" class="penalty-input" id="penTaxAmt" placeholder="0" min="0">
+      </div>
+      <div class="penalty-input-wrap">
+        <label class="penalty-input-label">Taxpayer Type</label>
+        <select class="penalty-input" id="penTaxpayerType">
+          <option value="regular">Regular</option>
+          <option value="nil">Nil Return</option>
+          <option value="small">Small (Turnover < ₹5Cr)</option>
+        </select>
+      </div>
+      <div class="penalty-input-wrap" style="align-items:flex-end;">
+        <button class="calc-btn" onclick="calculatePenalty()">Calculate Penalty</button>
+      </div>
+    </div>
+    <div class="penalty-result" id="penaltyResult" style="display:none;">
+      <div class="penalty-res-item">
+        <div class="penalty-res-num" id="penDays">0</div>
+        <div class="penalty-res-lbl">Days Late</div>
+      </div>
+      <div class="penalty-res-item">
+        <div class="penalty-res-num" id="penLateFeе">₹0</div>
+        <div class="penalty-res-lbl">Late Fee (CGST+SGST)</div>
+      </div>
+      <div class="penalty-res-item">
+        <div class="penalty-res-num" id="penInterest">₹0</div>
+        <div class="penalty-res-lbl">Interest @ 18% p.a.</div>
+      </div>
+      <div class="penalty-res-item" style="grid-column: 1/-1; border-top: 1px solid var(--border); padding-top: 12px; margin-top: 4px;">
+        <div class="penalty-res-num green" id="penTotal">₹0</div>
+        <div class="penalty-res-lbl">Total Payable</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- TOOLTIP MODAL -->
+<div class="tooltip-overlay" id="tooltipOverlay" onclick="closeTooltip(event)">
+  <div class="tooltip-box">
+    <button class="tooltip-close" onclick="closeTooltipBtn()">✕</button>
+    <span class="tooltip-tag" id="ttTag"></span>
+    <div class="tooltip-title" id="ttTitle"></div>
+    <div class="tooltip-body" id="ttBody"></div>
+  </div>
+</div>
+
+<script>
+const TODAY_STR = '{{ today }}';
+const TODAY = new Date(TODAY_STR + 'T00:00:00');
+let currentFilter = 'all';
+let currentView   = 'list';
+let calMonth      = TODAY.getMonth();
+let calYear       = TODAY.getFullYear();
+
+// ── DEADLINES DATA ────────────────────────────────────────
+const DEADLINES = [
+  // ── GSTR-1 (Monthly — Regular/QRMP) ──
+  { id:'g1-apr', date:'2025-05-11', title:'GSTR-1', form:'GSTR-1', month:'April 2025', type:['regular','qrmp'], color:'yellow', desc:'Monthly outward supplies return for April 2025. Report all B2B invoices, B2C sales, credit/debit notes, and export invoices.', penalty:'Late fee: ₹50/day (₹25 CGST + ₹25 SGST). Nil returns: ₹20/day max ₹500.' },
+  { id:'g1-may', date:'2025-06-11', title:'GSTR-1', form:'GSTR-1', month:'May 2025',   type:['regular','qrmp'], color:'yellow', desc:'Monthly outward supplies return for May 2025.', penalty:'Late fee: ₹50/day (₹25 CGST + ₹25 SGST). Nil returns: ₹20/day max ₹500.' },
+  { id:'g1-jun', date:'2025-07-11', title:'GSTR-1', form:'GSTR-1', month:'June 2025',  type:['regular','qrmp'], color:'yellow', desc:'Monthly outward supplies return for June 2025.', penalty:'Late fee: ₹50/day. Max ₹5,000 per return.' },
+  { id:'g1-jul', date:'2025-08-11', title:'GSTR-1', form:'GSTR-1', month:'July 2025',  type:['regular','qrmp'], color:'yellow', desc:'Monthly outward supplies return for July 2025.', penalty:'Late fee: ₹50/day. Max ₹5,000 per return.' },
+  { id:'g1-aug', date:'2025-09-11', title:'GSTR-1', form:'GSTR-1', month:'August 2025',type:['regular','qrmp'], color:'yellow', desc:'Monthly outward supplies return for August 2025.', penalty:'Late fee: ₹50/day. Max ₹5,000 per return.' },
+  { id:'g1-sep', date:'2025-10-11', title:'GSTR-1', form:'GSTR-1', month:'Sep 2025',   type:['regular','qrmp'], color:'yellow', desc:'Monthly outward supplies return for September 2025.', penalty:'Late fee: ₹50/day. Max ₹5,000 per return.' },
+  { id:'g1-oct', date:'2025-11-11', title:'GSTR-1', form:'GSTR-1', month:'Oct 2025',   type:['regular','qrmp'], color:'yellow', desc:'Monthly outward supplies return for October 2025.', penalty:'Late fee: ₹50/day. Max ₹5,000 per return.' },
+  { id:'g1-nov', date:'2025-12-11', title:'GSTR-1', form:'GSTR-1', month:'Nov 2025',   type:['regular','qrmp'], color:'yellow', desc:'Monthly outward supplies return for November 2025.', penalty:'Late fee: ₹50/day. Max ₹5,000 per return.' },
+  { id:'g1-dec', date:'2026-01-11', title:'GSTR-1', form:'GSTR-1', month:'Dec 2025',   type:['regular','qrmp'], color:'yellow', desc:'Monthly outward supplies return for December 2025.', penalty:'Late fee: ₹50/day. Max ₹5,000 per return.' },
+  { id:'g1-jan', date:'2026-02-11', title:'GSTR-1', form:'GSTR-1', month:'Jan 2026',   type:['regular','qrmp'], color:'yellow', desc:'Monthly outward supplies return for January 2026.', penalty:'Late fee: ₹50/day. Max ₹5,000 per return.' },
+  { id:'g1-feb', date:'2026-03-11', title:'GSTR-1', form:'GSTR-1', month:'Feb 2026',   type:['regular','qrmp'], color:'yellow', desc:'Monthly outward supplies return for February 2026.', penalty:'Late fee: ₹50/day. Max ₹5,000 per return.' },
+  { id:'g1-mar', date:'2026-04-11', title:'GSTR-1', form:'GSTR-1', month:'Mar 2026',   type:['regular','qrmp'], color:'yellow', desc:'Monthly outward supplies return for March 2026.', penalty:'Late fee: ₹50/day. Max ₹5,000 per return.' },
+
+  // ── GSTR-3B (Monthly) ──
+  { id:'g3b-apr', date:'2025-05-20', title:'GSTR-3B', form:'GSTR-3B', month:'April 2025', type:['regular'], color:'red', desc:'Monthly summary return + tax payment for April 2025. Report net ITC, outward/inward supplies, and pay GST liability.', penalty:'Late fee: ₹50/day. Interest: 18% p.a. on unpaid tax.' },
+  { id:'g3b-may', date:'2025-06-20', title:'GSTR-3B', form:'GSTR-3B', month:'May 2025',   type:['regular'], color:'red', desc:'Monthly summary return + tax payment for May 2025.', penalty:'Late fee: ₹50/day. Interest: 18% p.a. on unpaid tax.' },
+  { id:'g3b-jun', date:'2025-07-20', title:'GSTR-3B', form:'GSTR-3B', month:'June 2025',  type:['regular'], color:'red', desc:'Monthly summary return + tax payment for June 2025.', penalty:'Late fee: ₹50/day. Interest: 18% p.a. on unpaid tax.' },
+  { id:'g3b-jul', date:'2025-08-20', title:'GSTR-3B', form:'GSTR-3B', month:'July 2025',  type:['regular'], color:'red', desc:'Monthly summary return + tax payment for July 2025.', penalty:'Late fee: ₹50/day. Interest: 18% p.a. on unpaid tax.' },
+  { id:'g3b-aug', date:'2025-09-20', title:'GSTR-3B', form:'GSTR-3B', month:'August 2025',type:['regular'], color:'red', desc:'Monthly summary return + tax payment for August 2025.', penalty:'Late fee: ₹50/day. Interest: 18% p.a. on unpaid tax.' },
+  { id:'g3b-sep', date:'2025-10-20', title:'GSTR-3B', form:'GSTR-3B', month:'Sep 2025',   type:['regular'], color:'red', desc:'Monthly summary return + tax payment for September 2025.', penalty:'Late fee: ₹50/day. Interest: 18% p.a. on unpaid tax.' },
+  { id:'g3b-oct', date:'2025-11-20', title:'GSTR-3B', form:'GSTR-3B', month:'Oct 2025',   type:['regular'], color:'red', desc:'Monthly summary return + tax payment for October 2025.', penalty:'Late fee: ₹50/day. Interest: 18% p.a. on unpaid tax.' },
+  { id:'g3b-nov', date:'2025-12-20', title:'GSTR-3B', form:'GSTR-3B', month:'Nov 2025',   type:['regular'], color:'red', desc:'Monthly summary return + tax payment for November 2025.', penalty:'Late fee: ₹50/day. Interest: 18% p.a. on unpaid tax.' },
+  { id:'g3b-dec', date:'2026-01-20', title:'GSTR-3B', form:'GSTR-3B', month:'Dec 2025',   type:['regular'], color:'red', desc:'Monthly summary return + tax payment for December 2025.', penalty:'Late fee: ₹50/day. Interest: 18% p.a. on unpaid tax.' },
+  { id:'g3b-jan', date:'2026-02-20', title:'GSTR-3B', form:'GSTR-3B', month:'Jan 2026',   type:['regular'], color:'red', desc:'Monthly summary return + tax payment for January 2026.', penalty:'Late fee: ₹50/day. Interest: 18% p.a. on unpaid tax.' },
+  { id:'g3b-feb', date:'2026-03-20', title:'GSTR-3B', form:'GSTR-3B', month:'Feb 2026',   type:['regular'], color:'red', desc:'Monthly summary return + tax payment for February 2026.', penalty:'Late fee: ₹50/day. Interest: 18% p.a. on unpaid tax.' },
+  { id:'g3b-mar', date:'2026-04-20', title:'GSTR-3B', form:'GSTR-3B', month:'Mar 2026',   type:['regular'], color:'red', desc:'Monthly summary return + tax payment for March 2026.', penalty:'Late fee: ₹50/day. Interest: 18% p.a. on unpaid tax.' },
+
+  // ── GSTR-2B (Auto-drafted ITC) ──
+  { id:'g2b-apr', date:'2025-05-14', title:'GSTR-2B Available', form:'GSTR-2B', month:'April 2025', type:['regular','qrmp'], color:'green', desc:'Auto-drafted Input Tax Credit statement for April 2025 available on GST portal. Reconcile with purchase register before GSTR-3B filing.', penalty:'No penalty for GSTR-2B — informational only.' },
+  { id:'g2b-may', date:'2025-06-14', title:'GSTR-2B Available', form:'GSTR-2B', month:'May 2025',   type:['regular','qrmp'], color:'green', desc:'Auto-drafted ITC statement for May 2025 available.', penalty:'No penalty — informational.' },
+  { id:'g2b-jun', date:'2025-07-14', title:'GSTR-2B Available', form:'GSTR-2B', month:'June 2025',  type:['regular','qrmp'], color:'green', desc:'Auto-drafted ITC statement for June 2025 available.', penalty:'No penalty — informational.' },
+  { id:'g2b-jul', date:'2025-08-14', title:'GSTR-2B Available', form:'GSTR-2B', month:'July 2025',  type:['regular','qrmp'], color:'green', desc:'Auto-drafted ITC statement for July 2025 available.', penalty:'No penalty — informational.' },
+  { id:'g2b-aug', date:'2025-09-14', title:'GSTR-2B Available', form:'GSTR-2B', month:'Aug 2025',   type:['regular','qrmp'], color:'green', desc:'Auto-drafted ITC statement for August 2025 available.', penalty:'No penalty — informational.' },
+  { id:'g2b-sep', date:'2025-10-14', title:'GSTR-2B Available', form:'GSTR-2B', month:'Sep 2025',   type:['regular','qrmp'], color:'green', desc:'Auto-drafted ITC statement for September 2025 available.', penalty:'No penalty — informational.' },
+  { id:'g2b-oct', date:'2025-11-14', title:'GSTR-2B Available', form:'GSTR-2B', month:'Oct 2025',   type:['regular','qrmp'], color:'green', desc:'Auto-drafted ITC statement for October 2025 available.', penalty:'No penalty — informational.' },
+  { id:'g2b-nov', date:'2025-12-14', title:'GSTR-2B Available', form:'GSTR-2B', month:'Nov 2025',   type:['regular','qrmp'], color:'green', desc:'Auto-drafted ITC statement for November 2025 available.', penalty:'No penalty — informational.' },
+  { id:'g2b-dec', date:'2026-01-14', title:'GSTR-2B Available', form:'GSTR-2B', month:'Dec 2025',   type:['regular','qrmp'], color:'green', desc:'Auto-drafted ITC statement for December 2025 available.', penalty:'No penalty — informational.' },
+  { id:'g2b-jan', date:'2026-02-14', title:'GSTR-2B Available', form:'GSTR-2B', month:'Jan 2026',   type:['regular','qrmp'], color:'green', desc:'Auto-drafted ITC statement for January 2026 available.', penalty:'No penalty — informational.' },
+  { id:'g2b-feb', date:'2026-03-14', title:'GSTR-2B Available', form:'GSTR-2B', month:'Feb 2026',   type:['regular','qrmp'], color:'green', desc:'Auto-drafted ITC statement for February 2026 available.', penalty:'No penalty — informational.' },
+
+  // ── CMP-08 (Composition) ──
+  { id:'cmp-q1', date:'2025-07-18', title:'CMP-08 Q1', form:'CMP-08', month:'Q1 Apr-Jun 2025', type:['composition'], color:'gold', desc:'Composition taxpayer quarterly tax payment challan for Q1 (April–June 2025). Pay 1% of turnover (traders), 5% (restaurants), 6% (other services).', penalty:'Interest: 18% p.a. on delayed payment. Late fee: ₹50/day.' },
+  { id:'cmp-q2', date:'2025-10-18', title:'CMP-08 Q2', form:'CMP-08', month:'Q2 Jul-Sep 2025', type:['composition'], color:'gold', desc:'Composition taxpayer quarterly tax payment challan for Q2 (July–September 2025).', penalty:'Interest: 18% p.a. on delayed payment.' },
+  { id:'cmp-q3', date:'2026-01-18', title:'CMP-08 Q3', form:'CMP-08', month:'Q3 Oct-Dec 2025', type:['composition'], color:'gold', desc:'Composition taxpayer quarterly tax payment challan for Q3 (October–December 2025).', penalty:'Interest: 18% p.a. on delayed payment.' },
+  { id:'cmp-q4', date:'2026-04-18', title:'CMP-08 Q4', form:'CMP-08', month:'Q4 Jan-Mar 2026', type:['composition'], color:'gold', desc:'Composition taxpayer quarterly tax payment challan for Q4 (January–March 2026).', penalty:'Interest: 18% p.a. on delayed payment.' },
+
+  // ── GSTR-4 (Composition Annual) ──
+  { id:'g4-fy26', date:'2026-04-30', title:'GSTR-4 Annual', form:'GSTR-4', month:'FY 2025-26', type:['composition'], color:'gold', desc:'Annual return for Composition taxpayers for FY 2025-26. Summarize all quarterly CMP-08 payments and total turnover.', penalty:'Late fee: ₹50/day (₹25 CGST + ₹25 SGST). Max ₹2,000.' },
+
+  // ── GSTR-9 Annual Return ──
+  { id:'g9-fy26', date:'2026-12-31', title:'GSTR-9 Annual Return', form:'GSTR-9', month:'FY 2025-26', type:['regular'], color:'gold', desc:'Annual return for regular taxpayers (turnover > ₹2Cr). Reconcile all monthly returns filed during FY 2025-26. GSTR-9C (reconciliation statement) if turnover > ₹5Cr.', penalty:'Late fee: ₹200/day (₹100 CGST + ₹100 SGST). Max 0.25% of turnover.' },
+
+  // ── TDS under GST (GSTR-7) ──
+  { id:'g7-apr', date:'2025-05-10', title:'GSTR-7 TDS', form:'GSTR-7', month:'April 2025', type:['regular'], color:'blue', desc:'TDS return under GST for April 2025. Applicable to Govt entities, PSUs deducting TDS @ 2% on payments to suppliers.', penalty:'Late fee: ₹100/day (CGST+SGST). Max ₹5,000.' },
+  { id:'g7-may', date:'2025-06-10', title:'GSTR-7 TDS', form:'GSTR-7', month:'May 2025',   type:['regular'], color:'blue', desc:'TDS return under GST for May 2025.', penalty:'Late fee: ₹100/day. Max ₹5,000.' },
+  { id:'g7-jun', date:'2025-07-10', title:'GSTR-7 TDS', form:'GSTR-7', month:'June 2025',  type:['regular'], color:'blue', desc:'TDS return under GST for June 2025.', penalty:'Late fee: ₹100/day. Max ₹5,000.' },
+  { id:'g7-jul', date:'2025-08-10', title:'GSTR-7 TDS', form:'GSTR-7', month:'July 2025',  type:['regular'], color:'blue', desc:'TDS return under GST for July 2025.', penalty:'Late fee: ₹100/day. Max ₹5,000.' },
+  { id:'g7-aug', date:'2025-09-10', title:'GSTR-7 TDS', form:'GSTR-7', month:'Aug 2025',   type:['regular'], color:'blue', desc:'TDS return under GST for August 2025.', penalty:'Late fee: ₹100/day. Max ₹5,000.' },
+  { id:'g7-sep', date:'2025-10-10', title:'GSTR-7 TDS', form:'GSTR-7', month:'Sep 2025',   type:['regular'], color:'blue', desc:'TDS return under GST for September 2025.', penalty:'Late fee: ₹100/day. Max ₹5,000.' },
+];
+
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const SHORT_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+function parseDate(str) {
+  const [y,m,d] = str.split('-').map(Number);
+  return new Date(y, m-1, d);
+}
+
+function daysBetween(a, b) {
+  return Math.round((b - a) / 86400000);
+}
+
+function getStatus(dateStr) {
+  const d = parseDate(dateStr);
+  const diff = daysBetween(TODAY, d);
+  if (diff < 0)  return 'overdue';
+  if (diff === 0) return 'today';
+  if (diff <= 30) return 'upcoming';
+  return 'future';
+}
+
+function filtered() {
+  if (currentFilter === 'all') return DEADLINES;
+  return DEADLINES.filter(d => d.type.includes(currentFilter));
+}
+
+function setFilter(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll('.filters .filter-btn').forEach(b => {
+    if (b.textContent.toLowerCase().includes(f) || (f==='all' && b.textContent==='All')) b.classList.add('active');
+    else if (['all','regular','composition','qrmp'].some(x => b.textContent.toLowerCase().includes(x))) b.classList.remove('active');
+  });
+  btn.classList.add('active');
+  render();
+}
+
+function setView(v, btn) {
+  currentView = v;
+  document.getElementById('viewList').classList.toggle('active', v==='list');
+  document.getElementById('viewCal').classList.toggle('active', v==='calendar');
+  document.getElementById('listWrap').style.display = v==='list' ? 'block' : 'none';
+  document.getElementById('calendarWrap').style.display = v==='calendar' ? 'block' : 'none';
+  document.getElementById('monthNav').style.display = v==='calendar' ? 'flex' : 'none';
+  if (v==='calendar') renderCalendar();
+}
+
+function colorClass(d) {
+  const s = getStatus(d.date);
+  if (s==='overdue') return 'ev-red';
+  if (s==='today') return 'ev-yellow';
+  return `ev-${d.color}`;
+}
+
+function render() {
+  const data = filtered();
+  const overdue=[], today_=[], upcoming=[], future=[];
+  let statOv=0, statTo=0, statUp=0;
+
+  data.forEach(d => {
+    const s = getStatus(d.date);
+    if (s==='overdue')  { overdue.push(d);  statOv++; }
+    if (s==='today')    { today_.push(d);   statTo++; }
+    if (s==='upcoming') { upcoming.push(d); statUp++; }
+    if (s==='future')   { future.push(d); }
+  });
+
+  document.getElementById('statOverdue').textContent = statOv;
+  document.getElementById('statToday').textContent   = statTo;
+  document.getElementById('statUpcoming').textContent= statUp;
+  document.getElementById('statTotal').textContent   = data.length;
+
+  document.getElementById('overdueSection').innerHTML  = renderSection('⚠ Overdue', overdue, 'overdue');
+  document.getElementById('todaySection').innerHTML    = renderSection('🔴 Due Today', today_, 'today');
+  document.getElementById('upcomingSection').innerHTML = renderSection('📅 Upcoming (Next 30 Days)', upcoming, 'upcoming');
+  document.getElementById('futureSection').innerHTML   = renderSection('📋 Future Deadlines', future, 'future');
+
+  if (currentView==='calendar') renderCalendar();
+}
+
+function renderSection(title, items, status) {
+  if (!items.length) return '';
+  let html = `<div class="deadline-list"><div class="deadline-section-title">${title} (${items.length})</div>`;
+  items.forEach(d => {
+    const dt   = parseDate(d.date);
+    const diff = daysBetween(TODAY, dt);
+    const statusClass = status === 'overdue' ? 'overdue' : status === 'today' ? 'due-today' : 'upcoming';
+    const stLabel = status==='overdue' ? `${Math.abs(diff)} days overdue` : status==='today' ? 'Due Today' : `${diff} days left`;
+    const stClass = status==='overdue' ? 'st-overdue' : status==='today' ? 'st-today' : status==='upcoming' ? 'st-upcoming' : 'st-upcoming';
+    const badges = d.type.map(t => `<span class="badge badge-${t==='regular'?'reg':t==='composition'?'comp':'qrmp'}">${t}</span>`).join('');
+
+    html += `
+    <div class="deadline-item ${status!=='future'?statusClass:''}" onclick="showTooltip('${d.id}')">
+      <div class="dl-date">
+        <div class="dl-day" style="color:${status==='overdue'?'var(--red)':status==='today'?'var(--yellow)':'var(--gold)'}">${dt.getDate()}</div>
+        <div class="dl-mon">${SHORT_MONTHS[dt.getMonth()]} ${dt.getFullYear()}</div>
+      </div>
+      <div class="dl-info">
+        <div class="dl-title">${d.title} <span style="color:var(--muted); font-size:0.75rem; font-weight:300;">— ${d.month}</span></div>
+        <div class="dl-desc">${d.desc.substring(0,100)}…</div>
+        <div class="dl-tags">${badges}</div>
+      </div>
+      <div class="dl-right">
+        <div class="dl-status ${stClass}">${status==='overdue'?'Overdue':status==='today'?'Today':'Upcoming'}</div>
+        <div class="dl-days-left">${stLabel}</div>
+      </div>
+    </div>`;
+  });
+  html += '</div>';
+  return html;
+}
+
+function showTooltip(id) {
+  const d = DEADLINES.find(x => x.id===id);
+  if (!d) return;
+  const dt = parseDate(d.date);
+  const diff = daysBetween(TODAY, dt);
+  document.getElementById('ttTag').textContent  = d.form + ' · ' + d.month;
+  document.getElementById('ttTitle').textContent= d.title;
+  document.getElementById('ttBody').innerHTML   = `
+    <strong>Due Date:</strong> ${dt.getDate()} ${MONTHS[dt.getMonth()]} ${dt.getFullYear()}<br><br>
+    <strong>Description:</strong> ${d.desc}<br><br>
+    <strong>Penalty:</strong> ${d.penalty}<br><br>
+    <strong>Applicable to:</strong> ${d.type.map(t=>t.charAt(0).toUpperCase()+t.slice(1)).join(', ')} taxpayers<br><br>
+    <strong>Status:</strong> ${diff < 0 ? Math.abs(diff)+' days overdue' : diff===0 ? 'Due today' : diff+' days remaining'}
+  `;
+  document.getElementById('tooltipOverlay').classList.add('show');
+}
+
+function closeTooltip(e) {
+  if (e.target === document.getElementById('tooltipOverlay'))
+    document.getElementById('tooltipOverlay').classList.remove('show');
+}
+function closeTooltipBtn() {
+  document.getElementById('tooltipOverlay').classList.remove('show');
+}
+
+// ── CALENDAR ──────────────────────────────────────────────
+function renderCalendar() {
+  const grid = document.getElementById('calGrid');
+  // Remove old day cells (keep headers)
+  while (grid.children.length > 7) grid.removeChild(grid.lastChild);
+
+  document.getElementById('monthTitle').innerHTML =
+    `<span>${MONTHS[calMonth]}</span> ${calYear}`;
+
+  const first = new Date(calYear, calMonth, 1).getDay();
+  const days  = new Date(calYear, calMonth+1, 0).getDate();
+  const data  = filtered();
+
+  // Empty cells
+  for (let i=0; i<first; i++) {
+    const el = document.createElement('div');
+    el.className = 'cal-day empty';
+    grid.appendChild(el);
+  }
+
+  for (let d=1; d<=days; d++) {
+    const dateStr = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const el = document.createElement('div');
+    el.className = 'cal-day' + (dateStr===TODAY_STR?' today':'') + (new Date(calYear,calMonth,d).getDay()===0?' sunday':'');
+
+    const numEl = document.createElement('div');
+    numEl.className = 'cal-day-num';
+    numEl.textContent = d;
+    el.appendChild(numEl);
+
+    const dayEvents = data.filter(x => x.date===dateStr);
+    dayEvents.slice(0,3).forEach(ev => {
+      const evEl = document.createElement('div');
+      evEl.className = 'cal-event ' + colorClass(ev);
+      evEl.textContent = ev.title;
+      evEl.title = ev.desc;
+      evEl.onclick = () => showTooltip(ev.id);
+      el.appendChild(evEl);
+    });
+    if (dayEvents.length > 3) {
+      const moreEl = document.createElement('div');
+      moreEl.className = 'cal-event ev-gold';
+      moreEl.textContent = `+${dayEvents.length-3} more`;
+      el.appendChild(moreEl);
+    }
+    grid.appendChild(el);
+  }
+}
+
+function prevMonth() {
+  calMonth--; if (calMonth<0) { calMonth=11; calYear--; }
+  renderCalendar();
+}
+function nextMonth() {
+  calMonth++; if (calMonth>11) { calMonth=0; calYear++; }
+  renderCalendar();
+}
+function goToday() {
+  calMonth = TODAY.getMonth(); calYear = TODAY.getFullYear();
+  renderCalendar();
+}
+
+// ── PENALTY CALCULATOR ────────────────────────────────────
+function calculatePenalty() {
+  const returnType    = document.getElementById('penReturnType').value;
+  const dueDate       = document.getElementById('penDueDate').value;
+  const filingDate    = document.getElementById('penFilingDate').value;
+  const taxAmt        = parseFloat(document.getElementById('penTaxAmt').value) || 0;
+  const taxpayerType  = document.getElementById('penTaxpayerType').value;
+
+  if (!dueDate || !filingDate) { alert('Please select both due date and filing date.'); return; }
+
+  const due    = new Date(dueDate);
+  const filing = new Date(filingDate);
+  const days   = Math.max(0, Math.round((filing - due) / 86400000));
+
+  // Late fee per day
+  let dailyFee = 50; // ₹25 CGST + ₹25 SGST
+  if (taxpayerType === 'nil') dailyFee = 20;
+  if (returnType === 'gstr7') dailyFee = 100;
+  if (returnType === 'gstr9') dailyFee = 200;
+
+  // Max late fee
+  let maxFee = 5000;
+  if (returnType === 'gstr4') maxFee = 2000;
+  if (returnType === 'gstr9') maxFee = 999999; // 0.25% of turnover — no hard cap here
+
+  const lateFee = Math.min(days * dailyFee, maxFee);
+
+  // Interest: 18% p.a. on tax liability
+  const interest = returnType !== 'gstr1' && returnType !== 'gstr7'
+    ? Math.round(taxAmt * 0.18 * days / 365)
+    : 0;
+
+  const total = lateFee + interest;
+
+  document.getElementById('penDays').textContent    = days;
+  document.getElementById('penLateFeе').textContent = '₹' + lateFee.toLocaleString('en-IN');
+  document.getElementById('penInterest').textContent= '₹' + interest.toLocaleString('en-IN');
+  document.getElementById('penTotal').textContent   = '₹' + total.toLocaleString('en-IN');
+  document.getElementById('penaltyResult').style.display = 'grid';
+}
+
+// Set default dates in penalty calculator
+document.getElementById('penDueDate').valueAsDate = TODAY;
+const nextWeek = new Date(TODAY); nextWeek.setDate(nextWeek.getDate() + 7);
+document.getElementById('penFilingDate').valueAsDate = nextWeek;
+
+// Init
+render();
+</script>
+</body>
+</html>

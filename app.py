@@ -19,6 +19,7 @@ from core.verifier import run_accuracy_check
 from core.sqlite_indexer import build_index, drop_index, get_db
 from core.chat_engine import verify_data, chat as ai_chat
 from core.dashboard import run_dashboard
+from core.gstr1 import run_gstr1
 from supabase import create_client, Client
 
 SUPABASE_URL = os.environ.get('SUPABASE_URL')
@@ -1268,6 +1269,210 @@ def dashboard_export():
                      download_name=f'AarogyamFin_Report_{safe_name}.xlsx',
                      as_attachment=True,
                      mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+
+# ═══════════════════════════════════════════════════════════
+#  GSTR-3B ROUTE
+# ═══════════════════════════════════════════════════════════
+
+@app.route('/gstr3b', methods=['GET'])
+def gstr3b_page():
+    is_logged_in, user_email, user_id = _get_current_user()
+    if not is_logged_in:
+        return redirect('/login')
+    return render_template('gstr3b.html', data=None, is_logged_in=is_logged_in, user_email=user_email)
+
+
+@app.route('/gstr3b', methods=['POST'])
+def gstr3b_analyze():
+    ip = request.remote_addr
+    if is_rate_limited(ip):
+        abort(429)
+
+    is_logged_in, user_email, user_id = _get_current_user()
+    if not is_logged_in:
+        return redirect('/login')
+
+    from core.gstr3b import run_gstr3b
+    error_message    = ''
+    data             = None
+    transactions     = []
+    sales_filepath   = None
+    purchase_filepath= None
+
+    # ── Bank PDF ──
+    bank_pdf = request.files.get('bank_pdf')
+    if bank_pdf and bank_pdf.filename:
+        safe_name = secure_filename(bank_pdf.filename)
+        if not safe_name.lower().endswith('.pdf'):
+            error_message = 'Bank file must be a PDF.'
+        elif not _is_valid_pdf(bank_pdf):
+            error_message = 'Invalid bank PDF.'
+        else:
+            fhash  = _file_hash(bank_pdf)
+            cached = _cache_get(fhash)
+            if cached:
+                transactions = cached['transactions']
+            else:
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], safe_name)
+                bank_pdf.save(filepath)
+                try:
+                    transactions = parse_transactions(filepath)
+                    _cache_set(fhash, transactions, safe_name)
+                except Exception as e:
+                    error_message = f'Bank PDF parse error: {e}'
+                finally:
+                    if os.path.exists(filepath):
+                        os.remove(filepath)
+    else:
+        cached_hash = session.get('file_hash')
+        if cached_hash:
+            cached = _cache_get(cached_hash)
+            if cached:
+                transactions = cached['transactions']
+
+    if error_message:
+        return render_template('gstr3b.html', data=None, error_message=error_message,
+                               is_logged_in=is_logged_in, user_email=user_email)
+
+    # ── Sales Excel ──
+    sales_file = request.files.get('sales_excel')
+    if sales_file and sales_file.filename:
+        safe_s = secure_filename(sales_file.filename)
+        if safe_s.lower().endswith(('.xlsx', '.xls')):
+            sales_filepath = os.path.join(app.config['UPLOAD_FOLDER'], 'sales_' + safe_s)
+            sales_file.save(sales_filepath)
+
+    # ── Purchase Excel ──
+    purchase_file = request.files.get('purchase_excel')
+    if purchase_file and purchase_file.filename:
+        safe_p = secure_filename(purchase_file.filename)
+        if safe_p.lower().endswith(('.xlsx', '.xls')):
+            purchase_filepath = os.path.join(app.config['UPLOAD_FOLDER'], 'purchase_' + safe_p)
+            purchase_file.save(purchase_filepath)
+
+    try:
+        data = run_gstr3b(transactions, sales_filepath, purchase_filepath)
+    except Exception as e:
+        logger.exception("GSTR-3B error: %s", e)
+        error_message = f'Analysis error: {e}'
+    finally:
+        for fp in [sales_filepath, purchase_filepath]:
+            if fp and os.path.exists(fp):
+                os.remove(fp)
+
+    return render_template('gstr3b.html', data=data, error_message=error_message,
+                           is_logged_in=is_logged_in, user_email=user_email)
+
+
+# ═══════════════════════════════════════════════════════════
+#  GST CALENDAR ROUTE
+# ═══════════════════════════════════════════════════════════
+
+@app.route('/gst-calendar')
+def gst_calendar():
+    is_logged_in, user_email, user_id = _get_current_user()
+    from datetime import date
+    today = date.today()
+    return render_template('gst_calendar.html',
+        is_logged_in = is_logged_in,
+        user_email   = user_email,
+        today        = today.isoformat(),
+        current_month= today.month,
+        current_year = today.year,
+    )
+
+
+# ═══════════════════════════════════════════════════════════
+#  GSTR-1 ROUTE
+# ═══════════════════════════════════════════════════════════
+
+@app.route('/gstr1', methods=['GET'])
+def gstr1_page():
+    is_logged_in, user_email, user_id = _get_current_user()
+    if not is_logged_in:
+        return redirect('/login')
+    return render_template('gstr1.html', data=None, is_logged_in=is_logged_in, user_email=user_email)
+
+
+@app.route('/gstr1', methods=['POST'])
+def gstr1_analyze():
+    ip = request.remote_addr
+    if is_rate_limited(ip):
+        abort(429)
+
+    is_logged_in, user_email, user_id = _get_current_user()
+    if not is_logged_in:
+        return redirect('/login')
+
+    error_message = ''
+    data          = None
+    transactions  = []
+
+    # ── Bank PDF ──
+    bank_pdf = request.files.get('bank_pdf')
+    if bank_pdf and bank_pdf.filename:
+        safe_name = secure_filename(bank_pdf.filename)
+        if not safe_name.lower().endswith('.pdf'):
+            error_message = 'Bank file must be a PDF.'
+        elif not _is_valid_pdf(bank_pdf):
+            error_message = 'Invalid bank PDF.'
+        else:
+            # Check cache first
+            fhash  = _file_hash(bank_pdf)
+            cached = _cache_get(fhash)
+            if cached:
+                transactions = cached['transactions']
+            else:
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], safe_name)
+                bank_pdf.save(filepath)
+                try:
+                    transactions = parse_transactions(filepath)
+                    _cache_set(fhash, transactions, safe_name)
+                except Exception as e:
+                    error_message = f'Bank PDF parse error: {e}'
+                finally:
+                    if os.path.exists(filepath):
+                        os.remove(filepath)
+    else:
+        # Try session cache
+        cached_hash = session.get('file_hash')
+        if cached_hash:
+            cached = _cache_get(cached_hash)
+            if cached:
+                transactions = cached['transactions']
+
+    if error_message:
+        return render_template('gstr1.html', data=None, error_message=error_message,
+                               is_logged_in=is_logged_in, user_email=user_email)
+
+    # ── Invoice Excel ──
+    invoice_file = request.files.get('invoice_excel')
+    if not invoice_file or not invoice_file.filename:
+        error_message = 'Invoice Excel file required.'
+        return render_template('gstr1.html', data=None, error_message=error_message,
+                               is_logged_in=is_logged_in, user_email=user_email)
+
+    safe_inv = secure_filename(invoice_file.filename)
+    if not safe_inv.lower().endswith(('.xlsx', '.xls')):
+        error_message = 'Invoice file must be .xlsx or .xls'
+        return render_template('gstr1.html', data=None, error_message=error_message,
+                               is_logged_in=is_logged_in, user_email=user_email)
+
+    inv_filepath = os.path.join(app.config['UPLOAD_FOLDER'], safe_inv)
+    invoice_file.save(inv_filepath)
+
+    try:
+        data = run_gstr1(inv_filepath, transactions)
+    except Exception as e:
+        logger.exception("GSTR-1 analysis error: %s", e)
+        error_message = f'Analysis error: {e}'
+    finally:
+        if os.path.exists(inv_filepath):
+            os.remove(inv_filepath)
+
+    return render_template('gstr1.html', data=data, error_message=error_message,
+                           is_logged_in=is_logged_in, user_email=user_email)
 
 
 # ═══════════════════════════════════════════════════════════

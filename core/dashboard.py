@@ -666,6 +666,87 @@ def analyze_compliance(transactions: list) -> dict:
 
 
 # ═══════════════════════════════════════════════════════════
+#  6. GSTR-1 AUTO-FILL
+# ═══════════════════════════════════════════════════════════
+
+def analyze_gstr1(transactions: list) -> dict:
+    b2b_supplies    = []
+    b2c_supplies    = []
+    export_supplies = []
+    nil_exempt      = []
+
+    B2B_INDICATORS = [
+        'pvt', 'ltd', 'llp', 'inc', 'technologies', 'solutions', 'services',
+        'enterprises', 'trading', 'industries', 'consultancy', 'consulting',
+        'agency', 'associates', 'exports', 'imports', 'retail', 'wholesale',
+        'razorpay', 'cashfree', 'payu', 'instamojo',
+        'tramo', 'eko', 'meesho', 'shiprocket',
+    ]
+    EXPORT_INDICATORS = [
+        'swift', 'foreign', 'usd', 'eur', 'gbp', 'wire transfer',
+        'paypal', 'stripe', 'wise', 'remittance',
+    ]
+    NIL_EXEMPT_KW = [
+        'interest', 'dividend', 'gift', 'subsidy',
+    ]
+
+    monthly_sales = defaultdict(lambda: {'b2b': 0, 'b2c': 0, 'export': 0, 'nil': 0})
+
+    for t in transactions:
+        if t.get('type') != 'CR' or not t.get('amount'):
+            continue
+
+        desc  = (t.get('desc') or '').lower()
+        amt   = t['amount']
+        date  = t.get('date', '')
+        month = date[:7] if date else 'Unknown'
+
+        if is_loan_disbursal(desc) or is_family_transfer(desc) or is_self_transfer(desc):
+            continue
+        if any(k in desc for k in SALARY_KEYWORDS):
+            continue
+
+        if any(k in desc for k in EXPORT_INDICATORS):
+            export_supplies.append(t)
+            monthly_sales[month]['export'] += amt
+        elif any(k in desc for k in NIL_EXEMPT_KW):
+            nil_exempt.append(t)
+            monthly_sales[month]['nil'] += amt
+        elif any(k in desc for k in B2B_INDICATORS):
+            b2b_supplies.append(t)
+            monthly_sales[month]['b2b'] += amt
+        else:
+            b2c_supplies.append(t)
+            monthly_sales[month]['b2c'] += amt
+
+    total_b2b     = round(sum(t['amount'] for t in b2b_supplies), 2)
+    total_b2c     = round(sum(t['amount'] for t in b2c_supplies), 2)
+    total_export  = round(sum(t['amount'] for t in export_supplies), 2)
+    total_nil     = round(sum(t['amount'] for t in nil_exempt), 2)
+    total_taxable = round(total_b2b + total_b2c, 2)
+    estimated_gst = round(total_taxable * 0.18, 2)
+
+    return {
+        'b2b_supplies':    b2b_supplies,
+        'b2c_supplies':    b2c_supplies[:50],
+        'export_supplies': export_supplies,
+        'nil_exempt':      nil_exempt,
+        'total_b2b':       total_b2b,
+        'total_b2c':       total_b2c,
+        'total_export':    total_export,
+        'total_nil':       total_nil,
+        'total_taxable':   total_taxable,
+        'estimated_gst':   estimated_gst,
+        'monthly_sales':   dict(monthly_sales),
+        'months':          sorted(monthly_sales.keys()),
+        'b2b_count':       len(b2b_supplies),
+        'b2c_count':       len(b2c_supplies),
+        'export_count':    len(export_supplies),
+        'filing_status':   'Filing Required' if total_taxable > 0 else 'Verify with CA',
+    }
+
+
+# ═══════════════════════════════════════════════════════════
 #  MASTER FUNCTION
 # ═══════════════════════════════════════════════════════════
 
@@ -691,4 +772,5 @@ def run_dashboard(transactions: list) -> dict:
         'real_income':          itr_data.get('real_income_total', 0),
         'loan_disbursal_total': itr_data.get('loan_disbursal_total', 0),
         'family_transfer_total':itr_data.get('family_transfer_total', 0),
+        'gstr1':                analyze_gstr1(transactions),
     }

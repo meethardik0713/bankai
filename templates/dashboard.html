@@ -431,6 +431,7 @@ tr:hover td { background: rgba(201,168,76,0.02); }
       <button type="submit" style="background:transparent; border:1px solid rgba(248,113,113,0.3); color:#f87171; font-family:'DM Sans',sans-serif; font-size:0.72rem; letter-spacing:0.16em; text-transform:uppercase; padding:8px 16px; cursor:pointer;">✕ Change PDF</button>
     </form>
     <span class="nav-tag">Financial Dashboard</span>
+    <a href="/gstr1" class="nav-back">GST Filing →</a>
     <a href="/" class="nav-back">← Back to Analyzer</a>
     {% if data %}
     <a href="/dashboard/export" target="_blank" style="display:inline-flex; align-items:center; gap:7px; background:var(--gold); color:#060810; font-family:'DM Sans',sans-serif; font-size:0.72rem; font-weight:500; letter-spacing:0.16em; text-transform:uppercase; padding:8px 18px; text-decoration:none; transition:opacity 0.3s;">
@@ -511,11 +512,37 @@ tr:hover td { background: rgba(201,168,76,0.02); }
         Loan
         <span class="nav-badge {% if data.loan.credit_color == 'green' %}{% elif data.loan.credit_color == 'red' %}red{% else %}yellow{% endif %}">{{ data.loan.credit_indicator }}</span>
       </div>
+      <div class="nav-item" onclick="showPanel('gstr1', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        GSTR-1
+        <span class="nav-badge {% if data.gstr1.total_taxable > 0 %}yellow{% endif %}">{{ data.gstr1.filing_status.split(' ')[0] }}</span>
+      </div>
       <div class="nav-item" onclick="showPanel('compliance', this)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
         Compliance
         <span class="nav-badge {% if data.compliance.risk_level == 'High' %}red{% elif data.compliance.risk_level == 'Medium' %}yellow{% endif %}">{{ data.compliance.risk_level }}</span>
       </div>
+      <a href="/gstr3b" style="text-decoration:none;">
+        <div class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+          GSTR-3B
+          <span class="nav-badge yellow">GST</span>
+        </div>
+      </a>
+      <a href="/gstr1" style="text-decoration:none;">
+        <div class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>
+          GSTR-1
+          <span class="nav-badge yellow">GST</span>
+        </div>
+      </a>
+      <a href="/gst-calendar" style="text-decoration:none;">
+        <div class="nav-item">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          GST Calendar
+          <span class="nav-badge">FY26</span>
+        </div>
+      </a>
     </div>
   </aside>
 
@@ -953,6 +980,127 @@ tr:hover td { background: rgba(201,168,76,0.02); }
         <div class="chart-wrap">
           <canvas class="chart" id="cashflowChart"></canvas>
         </div>
+      </div>
+    </div>
+
+    <!-- ═══ GSTR-1 AUTO-FILL ═══ -->
+    <div class="panel" id="panel-gstr1">
+      <div class="panel-header">
+        <span class="panel-tag">Module 06</span>
+        <h2 class="panel-title">GSTR-1 Auto-Fill</h2>
+        <p class="panel-sub">Sales classification from bank credits — B2B, B2C, export supplies identified for GSTR-1 preparation.</p>
+      </div>
+
+      <div class="alert {% if data.gstr1.total_taxable > 0 %}alert-warn{% else %}alert-ok{% endif %}" style="margin-bottom:28px;">
+        <span class="alert-title">📋 Filing Status: {{ data.gstr1.filing_status }}</span>
+        Estimated GST Liability (@ 18% on taxable supplies): <strong>₹{{ "{:,.0f}".format(data.gstr1.estimated_gst) }}</strong> — Verify actual rate with CA before filing.
+      </div>
+
+      <div class="metrics">
+        <div class="metric">
+          <div class="metric-value green">₹{{ "{:,.0f}".format(data.gstr1.total_b2b) }}</div>
+          <div class="metric-label">B2B Supplies</div>
+          <div class="metric-sub">{{ data.gstr1.b2b_count }} transactions</div>
+        </div>
+        <div class="metric">
+          <div class="metric-value">₹{{ "{:,.0f}".format(data.gstr1.total_b2c) }}</div>
+          <div class="metric-label">B2C Supplies</div>
+          <div class="metric-sub">{{ data.gstr1.b2c_count }} transactions</div>
+        </div>
+        <div class="metric">
+          <div class="metric-value yellow">₹{{ "{:,.0f}".format(data.gstr1.total_export) }}</div>
+          <div class="metric-label">Export Supplies</div>
+          <div class="metric-sub">{{ data.gstr1.export_count }} transactions · 0% GST</div>
+        </div>
+        <div class="metric">
+          <div class="metric-value red">₹{{ "{:,.0f}".format(data.gstr1.estimated_gst) }}</div>
+          <div class="metric-label">Est. GST Liability</div>
+          <div class="metric-sub">18% on ₹{{ "{:,.0f}".format(data.gstr1.total_taxable) }}</div>
+        </div>
+      </div>
+
+      <!-- Monthly Sales Breakup -->
+      <div class="card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          Monthly Sales Summary
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Month</th><th>B2B (₹)</th><th>B2C (₹)</th><th>Export (₹)</th><th>Total Taxable (₹)</th></tr></thead>
+            <tbody>
+              {% for m in data.gstr1.months %}
+              {% set ms = data.gstr1.monthly_sales[m] %}
+              <tr>
+                <td class="td-muted">{{ m }}</td>
+                <td style="color:var(--green)">₹{{ "{:,.0f}".format(ms.b2b) }}</td>
+                <td>₹{{ "{:,.0f}".format(ms.b2c) }}</td>
+                <td style="color:var(--yellow)">₹{{ "{:,.0f}".format(ms.export) }}</td>
+                <td style="font-weight:500;">₹{{ "{:,.0f}".format(ms.b2b + ms.b2c) }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- B2B Transactions -->
+      {% if data.gstr1.b2b_supplies %}
+      <div class="card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg>
+          B2B Supplies — {{ data.gstr1.b2b_count }} Transactions
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Date</th><th>Description</th><th>Amount (₹)</th></tr></thead>
+            <tbody>
+              {% for t in data.gstr1.b2b_supplies[:15] %}
+              <tr>
+                <td class="td-muted">{{ t.date }}</td>
+                <td>{{ t.desc[:55] }}{% if t.desc|length > 55 %}…{% endif %}</td>
+                <td style="color:var(--green)">₹{{ "{:,.0f}".format(t.amount) }}</td>
+              </tr>
+              {% endfor %}
+              {% if data.gstr1.b2b_count > 15 %}
+              <tr><td colspan="3" style="text-align:center; color:var(--muted); font-size:0.72rem;">+{{ data.gstr1.b2b_count - 15 }} more</td></tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- B2C Transactions -->
+      {% if data.gstr1.b2c_supplies %}
+      <div class="card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          B2C Supplies — {{ data.gstr1.b2c_count }} Transactions
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Date</th><th>Description</th><th>Amount (₹)</th></tr></thead>
+            <tbody>
+              {% for t in data.gstr1.b2c_supplies[:15] %}
+              <tr>
+                <td class="td-muted">{{ t.date }}</td>
+                <td>{{ t.desc[:55] }}{% if t.desc|length > 55 %}…{% endif %}</td>
+                <td>₹{{ "{:,.0f}".format(t.amount) }}</td>
+              </tr>
+              {% endfor %}
+              {% if data.gstr1.b2c_count > 15 %}
+              <tr><td colspan="3" style="text-align:center; color:var(--muted); font-size:0.72rem;">+{{ data.gstr1.b2c_count - 15 }} more</td></tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="alert alert-warn">
+        <span class="alert-title">⚠ Important Disclaimer</span>
+        This is a bank statement-based approximation only. Actual GSTR-1 requires invoice-level data, customer GSTINs, and HSN codes. Always file with a CA or GST practitioner.
       </div>
     </div>
 
