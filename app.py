@@ -548,6 +548,12 @@ def home():
             transaction_data = filtered[start: start + PAGE_SIZE]
             count            = total_count
 
+            try:
+                dashboard_data = run_dashboard(all_transactions[:300])
+            except Exception as e:
+                logger.exception("Dashboard POST error: %s", e)
+                dashboard_data = None
+
     elif request.method == 'GET' and cached_hash:
         selected_filename = cached_name
         cached = _cache_get(cached_hash)
