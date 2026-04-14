@@ -47,13 +47,12 @@ Talisman(app,
     session_cookie_secure=is_prod,
     content_security_policy={
         'default-src': "'self'",
-        'script-src': ["'self'", "'unsafe-inline'", 'https://cdnjs.cloudflare.com', 'https://challenges.cloudflare.com', 'https://checkout.razorpay.com'],
-        'frame-src': ["'self'", 'https://api.razorpay.com', 'https://checkout.razorpay.com'],
+        'script-src': ["'self'", "'unsafe-inline'", 'https://cdnjs.cloudflare.com', 'https://challenges.cloudflare.com', 'https://checkout.razorpay.com', 'https://cdn.razorpay.com'],
+        'frame-src': ["'self'", 'https://api.razorpay.com', 'https://checkout.razorpay.com', 'https://cdn.razorpay.com'],
+        'connect-src': ["'self'", 'https://api.razorpay.com', 'https://checkout.razorpay.com', 'https://lumberjack.razorpay.com', 'https://cdn.razorpay.com'],
         'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
         'font-src': ["'self'", 'https://fonts.gstatic.com'],
         'img-src': ["'self'", 'data:', 'https:'],
-        'connect-src': "'self'",
-        'frame-src': "'none'",
         'object-src': "'none'",
     }
 )
