@@ -62,7 +62,7 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-CHAT_MESSAGE_LIMIT = 10
+CHAT_MESSAGE_LIMIT = 50
 CHAT_SESSION_HOURS = 48
 
 # ── Plan config ───────────────────────────────────────────
@@ -149,9 +149,7 @@ def _get_active_chat_session(user_id: str):
     try:
         result = supabase.table('chat_sessions').select('*').eq(
             'user_id', user_id
-        ).eq('is_active', True).lt(
-            'messages_used', CHAT_MESSAGE_LIMIT
-        ).order(
+        ).eq('is_active', True).order(
             'created_at', desc=True
         ).limit(1).execute()
 
@@ -248,14 +246,14 @@ def create_order():
 
     try:
         order = rzp_client.order.create({
-            'amount':          1000,
+            'amount':          4900,
             'currency':        'INR',
             'payment_capture': 1,
         })
 
         supabase.table('payments').insert({
             'user_id':           user_id,
-            'amount':            10,
+            'amount':            49,
             'status':            'pending',
             'razorpay_order_id': order['id'],
         }).execute()
@@ -312,11 +310,15 @@ def verify_payment():
         from datetime import datetime, timezone, timedelta
         expires_at = datetime.now(timezone.utc) + timedelta(hours=CHAT_SESSION_HOURS)
         supabase.table('chat_sessions').insert({
-            'user_id':       user_id,
-            'payment_id':    payment_id,
-            'messages_used': 0,
-            'is_active':     True,
-            'expires_at':    expires_at.isoformat(),
+            'user_id':            user_id,
+            'payment_id':         payment_id,
+            'messages_used':      0,
+            'is_active':          True,
+            'expires_at':         expires_at.isoformat(),
+            'input_tokens_limit': 75000,
+            'output_tokens_limit': 10000,
+            'input_tokens_used':  0,
+            'output_tokens_used': 0,
         }).execute()
 
         logger.info("Payment verified + session created for %s", user_email)
@@ -803,6 +805,9 @@ def dashboard_page():
     is_logged_in, user_email, user_id = _get_current_user()
     if not is_logged_in:
         return redirect('/login')
+    active = _get_active_chat_session(user_id)
+    if not active:
+        return redirect('/pay')
 
     data        = None
     cached_hash = session.get('file_hash')
@@ -829,6 +834,9 @@ def dashboard_analyze():
     is_logged_in, user_email, user_id = _get_current_user()
     if not is_logged_in:
         return redirect('/login')
+    active = _get_active_chat_session(user_id)
+    if not active:
+        return redirect('/pay')
 
     data          = None
     error_message = ''

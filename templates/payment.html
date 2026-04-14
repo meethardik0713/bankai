@@ -125,22 +125,22 @@
     </div>
 
     <div class="card-features">
-      <div class="feature-row">10 AI-powered questions about your statement</div>
+      <div class="feature-row">AI Chat — ask anything about your transactions</div>
+      <div class="feature-row">Financial Intelligence Dashboard — ITR, Loan, Compliance</div>
+      <div class="feature-row">GSTR-1, GSTR-3B, Audit & Reconciliation</div>
       <div class="feature-row">Valid for 48 hours from activation</div>
-      <div class="feature-row">Works with any uploaded bank statement</div>
-      <div class="feature-row">Instant answers — no waiting</div>
       <div class="feature-row">Your data stays private, never stored</div>
     </div>
 
     <div class="card-price">
-      <div class="price-amount">₹10</div>
-      <div class="price-label">one-time · 10 questions · 48 hrs</div>
+      <div class="price-amount">₹49</div>
+      <div class="price-label">one-time · Chat + Dashboard · 48 hrs</div>
     </div>
 
     <div class="card-action">
       <button id="pay-btn">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
-        Pay ₹10 & Unlock Chat
+        Pay ₹49 & Unlock Chat
       </button>
       <div class="error-box" id="errorBox"></div>
       <p class="secure-note">🔒 Secured by Razorpay · UPI, Cards, NetBanking accepted</p>
@@ -192,7 +192,7 @@ payBtn.addEventListener('click', async () => {
     if (!res.ok || data.error) {
       showError(data.error || 'Could not create order. Try again.');
       payBtn.disabled = false;
-      payBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg> Pay ₹10 & Unlock Chat';
+      payBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg> Pay ₹49 & Unlock Chat';
       return;
     }
 
@@ -202,7 +202,7 @@ payBtn.addEventListener('click', async () => {
       currency:   data.currency,
       order_id:   data.order_id,
       name:       'AarogyamFin',
-      description: 'AI Chat — 10 questions · 48 hrs',
+      description: 'AarogyamFin — Chat + Dashboard · 48 hrs',
       prefill: {
         email: data.email,
       },
@@ -234,7 +234,7 @@ payBtn.addEventListener('click', async () => {
       modal: {
         ondismiss: () => {
           payBtn.disabled = false;
-          payBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg> Pay ₹10 & Unlock Chat';
+          payBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg> Pay ₹49 & Unlock Chat';
         }
       }
     };
