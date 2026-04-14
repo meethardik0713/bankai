@@ -322,7 +322,7 @@ def verify_payment():
         }).execute()
 
         logger.info("Payment verified + session created for %s", user_email)
-        return jsonify({'success': True, 'redirect': '/chat'})
+        return jsonify({'success': True, 'redirect': '/dashboard'})
 
     except Exception as e:
         logger.exception("Post-payment DB error: %s", e)
