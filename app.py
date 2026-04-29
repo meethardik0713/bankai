@@ -875,8 +875,17 @@ def dashboard_analyze():
     elif not _is_valid_pdf(file):
         error_message = 'Invalid PDF file.'
     else:
-        fhash      = _file_hash(file)
-        old_hash   = session.get('file_hash')
+        fhash    = _file_hash(file)
+        old_hash = session.get('file_hash')
+
+        # Check Supabase for persistent hash
+        if not old_hash:
+            try:
+                u = supabase.table('users').select('statement_hash').eq('id', user_id).limit(1).execute()
+                if u.data:
+                    old_hash = u.data[0].get('statement_hash')
+            except Exception:
+                pass
 
         # New statement = new payment required
         if old_hash and old_hash != fhash:
@@ -902,6 +911,13 @@ def dashboard_analyze():
                 _cache_set(fhash, transactions, safe_name)
                 session['file_hash'] = fhash
                 session['file_name'] = safe_name
+                # Save hash to Supabase permanently
+                try:
+                    supabase.table('users').update({
+                        'statement_hash': fhash
+                    }).eq('id', user_id).execute()
+                except Exception:
+                    pass
                 logger.info("Dashboard parsed %s → %d txns in %.1fs",
                             safe_name, len(transactions), parse_time)
             except Exception as e:
