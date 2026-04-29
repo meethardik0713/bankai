@@ -364,10 +364,16 @@ def chat_page():
                 try:
                     transactions = parse_transactions(filepath)
                     if transactions:
-                        row_count     = build_index(session_id, transactions)
-                        verify_report = verify_data(session_id)
-                        db_ready      = True
-                        logger.info("Chat DB built: %d rows for session %s", row_count, session_id)
+                        if active_session.get('statements_used', 0) >= 1:
+                            upload_error = 'Statement limit reached. Please purchase a new session.'
+                        else:
+                            row_count     = build_index(session_id, transactions)
+                            verify_report = verify_data(session_id)
+                            db_ready      = True
+                            supabase.table('chat_sessions').update({
+                                'statements_used': 1
+                            }).eq('id', active_session['id']).execute()
+                            logger.info("Chat DB built: %d rows for session %s", row_count, session_id)
                     else:
                         upload_error = 'No transactions found in PDF.'
                 except Exception as e:
