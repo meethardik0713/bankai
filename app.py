@@ -880,14 +880,12 @@ def dashboard_analyze():
 
         # New statement = new payment required
         if old_hash and old_hash != fhash:
-            active = _get_active_chat_session(user_id)
-            if not active:
-                return render_template('dashboard.html',
-                    data          = None,
-                    error_message = 'New bank statement detected. Please purchase a new session.',
-                    is_logged_in  = is_logged_in,
-                    user_email    = user_email,
-                )
+            return render_template('dashboard.html',
+                data          = None,
+                error_message = 'New bank statement detected. Please purchase a new session to analyze a different PDF.',
+                is_logged_in  = is_logged_in,
+                user_email    = user_email,
+            )
 
         cached = _cache_get(fhash)
 
