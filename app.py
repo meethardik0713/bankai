@@ -859,6 +859,7 @@ def dashboard_analyze():
 
     # ── New PDF upload ─────────────────────────────────────
     file = request.files.get('pdf_file')
+    logger.info("DEBUG: session file_hash=%s, user_id=%s", session.get('file_hash'), user_id)
     if not file or not file.filename:
         return render_template('dashboard.html',
             data          = None,
