@@ -875,7 +875,20 @@ def dashboard_analyze():
     elif not _is_valid_pdf(file):
         error_message = 'Invalid PDF file.'
     else:
-        fhash  = _file_hash(file)
+        fhash      = _file_hash(file)
+        old_hash   = session.get('file_hash')
+
+        # New statement = new payment required
+        if old_hash and old_hash != fhash:
+            active = _get_active_chat_session(user_id)
+            if not active:
+                return render_template('dashboard.html',
+                    data          = None,
+                    error_message = 'New bank statement detected. Please purchase a new session.',
+                    is_logged_in  = is_logged_in,
+                    user_email    = user_email,
+                )
+
         cached = _cache_get(fhash)
 
         if cached:
@@ -1928,3 +1941,7 @@ def file_too_large(e):
 if __name__ == '__main__':
     debug_mode = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
     app.run(debug=debug_mode)
+    
+
+
+

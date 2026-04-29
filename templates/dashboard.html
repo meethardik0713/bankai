@@ -522,34 +522,21 @@ tr:hover td { background: rgba(201,168,76,0.02); }
         Compliance
         <span class="nav-badge {% if data.compliance.risk_level == 'High' %}red{% elif data.compliance.risk_level == 'Medium' %}yellow{% endif %}">{{ data.compliance.risk_level }}</span>
       </div>
-      <a href="/gstr2b" style="text-decoration:none;">
-        <div class="nav-item">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
-          GSTR-2B Recon
-          <span class="nav-badge">ITC</span>
-        </div>
-      </a>
-      <a href="/gstr3b" style="text-decoration:none;">
-        <div class="nav-item">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
-          GSTR-3B
-          <span class="nav-badge yellow">GST</span>
-        </div>
-      </a>
-      <a href="/gstr1" style="text-decoration:none;">
-        <div class="nav-item">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>
-          GSTR-1
-          <span class="nav-badge yellow">GST</span>
-        </div>
-      </a>
-      <a href="/gst-calendar" style="text-decoration:none;">
-        <div class="nav-item">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-          GST Calendar
-          <span class="nav-badge">FY26</span>
-        </div>
-      </a>
+      <div class="nav-item" onclick="window.location='/gstr2b'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+        GSTR-2B Recon
+        <span class="nav-badge">ITC</span>
+      </div>
+      <div class="nav-item" onclick="window.location='/gstr3b'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+        GSTR-3B
+        <span class="nav-badge yellow">GST</span>
+      </div>
+      <div class="nav-item" onclick="window.location='/gst-calendar'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        GST Calendar
+        <span class="nav-badge">FY26</span>
+      </div>
     </div>
   </aside>
 
@@ -1111,7 +1098,15 @@ tr:hover td { background: rgba(201,168,76,0.02); }
       </div>
     </div>
 
-    <!-- ═══ COMPLIANCE REPORTING ═══ -->
+    <!-- ═══ GST CALENDAR ═══ -->
+<div class="panel" id="panel-gstcal">
+  <div class="panel-header">
+    <span class="panel-tag">GST Module</span>
+    <h2 class="panel-title">GST Compliance Calendar</h2>
+    <p class="panel-sub">FY 2025-26 filing deadlines — GSTR-1, GSTR-3B, GSTR-2B, CMP-08 due dates.</p>
+  </div>
+  <div id="gstCalendarContent"></div>
+</div>
     <div class="panel" id="panel-compliance">
       <div class="panel-header">
         <span class="panel-tag">Module 05</span>
@@ -1248,6 +1243,7 @@ function showPanel(name, el) {
   document.getElementById('panel-' + name).classList.add('active');
   el.classList.add('active');
   initCharts();
+  if (name === 'gstcal') initGSTCalendar();
 }
 
 // CHARTS
@@ -1311,6 +1307,7 @@ function initCharts() {
   }
 }
 
+// TOGGLE CAT
 function toggleCat(header) {
   const txns = header.nextElementSibling;
   const toggle = header.querySelector('.cat-toggle');
@@ -1323,6 +1320,76 @@ function toggleCat(header) {
     if (toggle) toggle.textContent = toggle.textContent.replace('▼', '▶');
   }
 }
+
+// GST CALENDAR
+function initGSTCalendar() {
+  const el = document.getElementById('gstCalendarContent');
+  if (!el || el.innerHTML) return;
+
+  const TODAY = new Date();
+  const DEADLINES = [
+    { date:'2025-05-11', title:'GSTR-1', month:'April 2025', color:'#fbbf24' },
+    { date:'2025-05-20', title:'GSTR-3B', month:'April 2025', color:'#f87171' },
+    { date:'2025-06-11', title:'GSTR-1', month:'May 2025', color:'#fbbf24' },
+    { date:'2025-06-20', title:'GSTR-3B', month:'May 2025', color:'#f87171' },
+    { date:'2025-07-11', title:'GSTR-1', month:'June 2025', color:'#fbbf24' },
+    { date:'2025-07-20', title:'GSTR-3B', month:'June 2025', color:'#f87171' },
+    { date:'2025-08-11', title:'GSTR-1', month:'July 2025', color:'#fbbf24' },
+    { date:'2025-08-20', title:'GSTR-3B', month:'July 2025', color:'#f87171' },
+    { date:'2025-09-11', title:'GSTR-1', month:'August 2025', color:'#fbbf24' },
+    { date:'2025-09-20', title:'GSTR-3B', month:'August 2025', color:'#f87171' },
+    { date:'2025-10-11', title:'GSTR-1', month:'Sep 2025', color:'#fbbf24' },
+    { date:'2025-10-20', title:'GSTR-3B', month:'Sep 2025', color:'#f87171' },
+    { date:'2025-11-11', title:'GSTR-1', month:'Oct 2025', color:'#fbbf24' },
+    { date:'2025-11-20', title:'GSTR-3B', month:'Oct 2025', color:'#f87171' },
+    { date:'2025-12-11', title:'GSTR-1', month:'Nov 2025', color:'#fbbf24' },
+    { date:'2025-12-20', title:'GSTR-3B', month:'Nov 2025', color:'#f87171' },
+    { date:'2026-01-11', title:'GSTR-1', month:'Dec 2025', color:'#fbbf24' },
+    { date:'2026-01-20', title:'GSTR-3B', month:'Dec 2025', color:'#f87171' },
+    { date:'2026-02-11', title:'GSTR-1', month:'Jan 2026', color:'#fbbf24' },
+    { date:'2026-02-20', title:'GSTR-3B', month:'Jan 2026', color:'#f87171' },
+    { date:'2026-03-11', title:'GSTR-1', month:'Feb 2026', color:'#fbbf24' },
+    { date:'2026-03-20', title:'GSTR-3B', month:'Feb 2026', color:'#f87171' },
+    { date:'2026-04-11', title:'GSTR-1', month:'Mar 2026', color:'#fbbf24' },
+    { date:'2026-04-20', title:'GSTR-3B', month:'Mar 2026', color:'#f87171' },
+    { date:'2025-07-18', title:'CMP-08 Q1', month:'Q1 Apr-Jun', color:'#c9a84c' },
+    { date:'2025-10-18', title:'CMP-08 Q2', month:'Q2 Jul-Sep', color:'#c9a84c' },
+    { date:'2026-01-18', title:'CMP-08 Q3', month:'Q3 Oct-Dec', color:'#c9a84c' },
+    { date:'2026-04-18', title:'CMP-08 Q4', month:'Q4 Jan-Mar', color:'#c9a84c' },
+    { date:'2026-12-31', title:'GSTR-9 Annual', month:'FY 2025-26', color:'#c9a84c' },
+  ];
+
+  const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  let html = '<div style="display:flex; flex-direction:column; gap:8px;">';
+
+  DEADLINES.forEach(d => {
+    const dt = new Date(d.date + 'T00:00:00');
+    const diff = Math.round((dt - TODAY) / 86400000);
+    let status, statusColor, borderColor;
+    if (diff < 0) { status = Math.abs(diff) + ' days overdue'; statusColor = '#f87171'; borderColor = '#f87171'; }
+    else if (diff === 0) { status = 'Due Today'; statusColor = '#fbbf24'; borderColor = '#fbbf24'; }
+    else if (diff <= 30) { status = diff + ' days left'; statusColor = '#4ade80'; borderColor = '#4ade80'; }
+    else { status = diff + ' days left'; statusColor = 'rgba(232,228,217,0.45)'; borderColor = 'rgba(201,168,76,0.15)'; }
+
+    html += `
+    <div style="display:flex; align-items:center; gap:16px; padding:14px 20px; background:rgba(255,255,255,0.02); border:1px solid ${borderColor}; border-left:3px solid ${d.color};">
+      <div style="min-width:48px; text-align:center;">
+        <div style="font-family:'Cormorant Garamond',serif; font-size:1.6rem; font-weight:300; color:${d.color}; line-height:1;">${dt.getDate()}</div>
+        <div style="font-size:0.6rem; letter-spacing:0.14em; text-transform:uppercase; color:rgba(232,228,217,0.45);">${SHORT[dt.getMonth()]} ${dt.getFullYear()}</div>
+      </div>
+      <div style="flex:1;">
+        <div style="font-size:0.88rem; font-weight:500; color:#e8e4d9;">${d.title} <span style="color:rgba(232,228,217,0.45); font-size:0.75rem; font-weight:300;">— ${d.month}</span></div>
+      </div>
+      <div style="font-size:0.7rem; color:${statusColor}; white-space:nowrap;">${status}</div>
+    </div>`;
+  });
+
+  html += '</div>';
+  el.innerHTML = html;
+}
+  
 
 // Init on load
 window.addEventListener('load', () => {
