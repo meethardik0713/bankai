@@ -65,6 +65,8 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 CHAT_MESSAGE_LIMIT = 50
 CHAT_SESSION_HOURS = 48
 
+NEW_STATEMENT_ERROR = 'New bank statement detected. Your ₹49 session is locked to one statement. Please purchase a new session to analyze a different PDF.'
+
 # ── Plan config ───────────────────────────────────────────
 PLAN_CONFIG = {
     'Basic':    {'price': 10,  'input_tokens': 25000,   'output_tokens': 5000,  'validity_hours': 24},
@@ -165,6 +167,44 @@ def _get_active_chat_session(user_id: str):
     except Exception as e:
         logger.exception("Error checking chat session: %s", e)
     return None
+
+
+def _get_locked_hash(user_id: str):
+    """Returns the statement_hash this user's current paid session is locked to.
+    None means: no lock yet (first upload will set it)."""
+    if not user_id:
+        return None
+    try:
+        u = supabase.table('users').select('statement_hash').eq('id', user_id).limit(1).execute()
+        if u.data:
+            return u.data[0].get('statement_hash')
+    except Exception:
+        pass
+    return None
+
+
+def _set_locked_hash(user_id: str, fhash: str):
+    """Lock this user's paid session to this statement hash."""
+    if not user_id or not fhash:
+        return
+    try:
+        supabase.table('users').update({
+            'statement_hash': fhash
+        }).eq('id', user_id).execute()
+    except Exception as e:
+        logger.exception("Failed to set statement_hash: %s", e)
+
+
+def _clear_locked_hash(user_id: str):
+    """Clear the lock — called on payment success so the next upload can lock fresh."""
+    if not user_id:
+        return
+    try:
+        supabase.table('users').update({
+            'statement_hash': None
+        }).eq('id', user_id).execute()
+    except Exception as e:
+        logger.exception("Failed to clear statement_hash: %s", e)
 
 
 # ═══════════════════════════════════════════════════════════
@@ -321,6 +361,12 @@ def verify_payment():
             'output_tokens_used': 0,
         }).execute()
 
+        # Fresh payment = unlock so user can upload exactly 1 new statement
+        _clear_locked_hash(user_id)
+        # Also clear any stale Flask session reference to old PDF
+        session.pop('file_hash', None)
+        session.pop('file_name', None)
+
         logger.info("Payment verified + session created for %s", user_email)
         return jsonify({'success': True, 'redirect': '/dashboard'})
 
@@ -359,28 +405,40 @@ def chat_page():
             elif not _is_valid_pdf(file):
                 upload_error = 'Invalid PDF file.'
             else:
-                filepath = os.path.join(app.config['UPLOAD_FOLDER'], safe_name)
-                file.save(filepath)
-                try:
-                    transactions = parse_transactions(filepath)
-                    if transactions:
-                        if active_session.get('statements_used', 0) >= 1:
-                            upload_error = 'Statement limit reached. Please purchase a new session.'
+                fhash       = _file_hash(file)
+                locked_hash = _get_locked_hash(user_id)
+
+                # Strict 1-statement lock
+                if locked_hash and locked_hash != fhash:
+                    upload_error = NEW_STATEMENT_ERROR
+                else:
+                    filepath = os.path.join(app.config['UPLOAD_FOLDER'], safe_name)
+                    file.save(filepath)
+                    try:
+                        transactions = parse_transactions(filepath)
+                        if transactions:
+                            if active_session.get('statements_used', 0) >= 1 and not locked_hash:
+                                upload_error = 'Statement limit reached. Please purchase a new session.'
+                            else:
+                                row_count     = build_index(session_id, transactions)
+                                verify_report = verify_data(session_id)
+                                db_ready      = True
+                                _cache_set(fhash, transactions, safe_name)
+                                session['file_hash'] = fhash
+                                session['file_name'] = safe_name
+                                if not locked_hash:
+                                    _set_locked_hash(user_id, fhash)
+                                supabase.table('chat_sessions').update({
+                                    'statements_used': 1
+                                }).eq('id', active_session['id']).execute()
+                                logger.info("Chat DB built: %d rows for session %s", row_count, session_id)
                         else:
-                            row_count     = build_index(session_id, transactions)
-                            verify_report = verify_data(session_id)
-                            db_ready      = True
-                            supabase.table('chat_sessions').update({
-                                'statements_used': 1
-                            }).eq('id', active_session['id']).execute()
-                            logger.info("Chat DB built: %d rows for session %s", row_count, session_id)
-                    else:
-                        upload_error = 'No transactions found in PDF.'
-                except Exception as e:
-                    upload_error = f'Parse error: {e}'
-                finally:
-                    if os.path.exists(filepath):
-                        os.remove(filepath)
+                            upload_error = 'No transactions found in PDF.'
+                    except Exception as e:
+                        upload_error = f'Parse error: {e}'
+                    finally:
+                        if os.path.exists(filepath):
+                            os.remove(filepath)
 
     elif not db_ready:
         cached_hash = session.get('file_hash')
@@ -489,31 +547,50 @@ def home():
             elif not _is_valid_pdf(file):
                 error_message = 'Uploaded file does not appear to be a valid PDF.'
             else:
-                fhash  = _file_hash(file)
-                cached = _cache_get(fhash)
-                if cached:
-                    all_transactions  = cached['transactions']
-                    selected_filename = cached['filename']
-                    logger.info("Cache hit for %s", safe_name)
-                else:
-                    selected_filename = safe_name
-                    filepath = os.path.join(app.config['UPLOAD_FOLDER'], safe_name)
-                    file.save(filepath)
-                    try:
-                        t0               = time.time()
-                        all_transactions = parse_transactions(filepath)
-                        parse_time       = round(time.time() - t0, 1)
-                        _cache_set(fhash, all_transactions, safe_name)
+                fhash = _file_hash(file)
+
+                # Strict 1-statement lock — only enforce for logged-in paid users
+                locked_hash = None
+                has_active  = False
+                if is_logged_in:
+                    active_sess = _get_active_chat_session(user_id)
+                    has_active  = bool(active_sess)
+                    if has_active:
+                        locked_hash = _get_locked_hash(user_id)
+                        if locked_hash and locked_hash != fhash:
+                            error_message = NEW_STATEMENT_ERROR
+
+                if not error_message:
+                    cached = _cache_get(fhash)
+                    if cached:
+                        all_transactions  = cached['transactions']
+                        selected_filename = cached['filename']
                         session['file_hash'] = fhash
-                        session['file_name'] = safe_name
-                        logger.info("Parsed %s → %d txns in %.1fs",
-                                    safe_name, len(all_transactions), parse_time)
-                    except Exception as e:
-                        logger.exception("Error parsing %s", safe_name)
-                        error_message = f'Could not parse the file: {e}'
-                    finally:
-                        if os.path.exists(filepath):
-                            os.remove(filepath)
+                        session['file_name'] = selected_filename
+                        if has_active and not locked_hash:
+                            _set_locked_hash(user_id, fhash)
+                        logger.info("Cache hit for %s", safe_name)
+                    else:
+                        selected_filename = safe_name
+                        filepath = os.path.join(app.config['UPLOAD_FOLDER'], safe_name)
+                        file.save(filepath)
+                        try:
+                            t0               = time.time()
+                            all_transactions = parse_transactions(filepath)
+                            parse_time       = round(time.time() - t0, 1)
+                            _cache_set(fhash, all_transactions, safe_name)
+                            session['file_hash'] = fhash
+                            session['file_name'] = safe_name
+                            if has_active and not locked_hash:
+                                _set_locked_hash(user_id, fhash)
+                            logger.info("Parsed %s → %d txns in %.1fs",
+                                        safe_name, len(all_transactions), parse_time)
+                        except Exception as e:
+                            logger.exception("Error parsing %s", safe_name)
+                            error_message = f'Could not parse the file: {e}'
+                        finally:
+                            if os.path.exists(filepath):
+                                os.remove(filepath)
 
         elif cached_hash:
             cached = _cache_get(cached_hash)
@@ -567,12 +644,6 @@ def home():
         selected_filename = cached_name
         cached = _cache_get(cached_hash)
         if cached and cached.get('transactions'):
-            try:
-                dashboard_data = run_dashboard(cached['transactions'][:300])
-            except Exception:
-                dashboard_data = None
-        cached = _cache_get(cached_hash)
-        if cached:
             try:
                 dashboard_data = run_dashboard(cached['transactions'][:300])
             except Exception as e:
@@ -817,8 +888,10 @@ def dashboard_page():
 
     data        = None
     cached_hash = session.get('file_hash')
+    locked_hash = _get_locked_hash(user_id)
 
-    if cached_hash:
+    # Only show dashboard data if cached PDF matches the locked statement
+    if cached_hash and (not locked_hash or cached_hash == locked_hash):
         cached = _cache_get(cached_hash)
         if cached:
             data = run_dashboard(cached['transactions'])
@@ -850,12 +923,15 @@ def dashboard_analyze():
     # ── Use already-cached file ────────────────────────────
     if request.form.get('use_cached'):
         cached_hash = session.get('file_hash')
-        if cached_hash:
+        locked_hash = _get_locked_hash(user_id)
+        if cached_hash and (not locked_hash or cached_hash == locked_hash):
             cached = _cache_get(cached_hash)
             if cached:
                 data = run_dashboard(cached['transactions'])
             else:
                 error_message = 'Session expired. Please re-upload.'
+        else:
+            error_message = NEW_STATEMENT_ERROR
         return render_template('dashboard.html',
             data          = data,
             error_message = error_message,
@@ -882,23 +958,14 @@ def dashboard_analyze():
     elif not _is_valid_pdf(file):
         error_message = 'Invalid PDF file.'
     else:
-        fhash    = _file_hash(file)
-        old_hash = session.get('file_hash')
+        fhash       = _file_hash(file)
+        locked_hash = _get_locked_hash(user_id)
 
-        # Check Supabase for persistent hash
-        if not old_hash:
-            try:
-                u = supabase.table('users').select('statement_hash').eq('id', user_id).limit(1).execute()
-                if u.data:
-                    old_hash = u.data[0].get('statement_hash')
-            except Exception:
-                pass
-
-        # New statement = new payment required
-        if old_hash and old_hash != fhash:
+        # Strict: paid session is locked to one statement only
+        if locked_hash and locked_hash != fhash:
             return render_template('dashboard.html',
                 data          = None,
-                error_message = 'New bank statement detected. Please purchase a new session to analyze a different PDF.',
+                error_message = NEW_STATEMENT_ERROR,
                 is_logged_in  = is_logged_in,
                 user_email    = user_email,
             )
@@ -907,6 +974,10 @@ def dashboard_analyze():
 
         if cached:
             transactions = cached['transactions']
+            session['file_hash'] = fhash
+            session['file_name'] = cached.get('filename', safe_name)
+            if not locked_hash:
+                _set_locked_hash(user_id, fhash)
             logger.info("Dashboard cache hit for %s", safe_name)
         else:
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], safe_name)
@@ -918,13 +989,8 @@ def dashboard_analyze():
                 _cache_set(fhash, transactions, safe_name)
                 session['file_hash'] = fhash
                 session['file_name'] = safe_name
-                # Save hash to Supabase permanently
-                try:
-                    supabase.table('users').update({
-                        'statement_hash': fhash
-                    }).eq('id', user_id).execute()
-                except Exception:
-                    pass
+                if not locked_hash:
+                    _set_locked_hash(user_id, fhash)
                 logger.info("Dashboard parsed %s → %d txns in %.1fs",
                             safe_name, len(transactions), parse_time)
             except Exception as e:
@@ -964,6 +1030,11 @@ def dashboard_export():
     cached_hash = session.get('file_hash')
     if not cached_hash:
         return "No data available. Please upload a PDF first.", 400
+
+    # Lock check: only allow export of the locked statement
+    locked_hash = _get_locked_hash(user_id)
+    if locked_hash and cached_hash != locked_hash:
+        return NEW_STATEMENT_ERROR, 403
 
     cached = _cache_get(cached_hash)
     if not cached:
@@ -1427,21 +1498,29 @@ def gstr3b_analyze():
         elif not _is_valid_pdf(bank_pdf):
             error_message = 'Invalid bank PDF.'
         else:
-            fhash  = _file_hash(bank_pdf)
-            cached = _cache_get(fhash)
-            if cached:
-                transactions = cached['transactions']
+            fhash       = _file_hash(bank_pdf)
+            locked_hash = _get_locked_hash(user_id)
+            if locked_hash and locked_hash != fhash:
+                error_message = NEW_STATEMENT_ERROR
             else:
-                filepath = os.path.join(app.config['UPLOAD_FOLDER'], safe_name)
-                bank_pdf.save(filepath)
-                try:
-                    transactions = parse_transactions(filepath)
-                    _cache_set(fhash, transactions, safe_name)
-                except Exception as e:
-                    error_message = f'Bank PDF parse error: {e}'
-                finally:
-                    if os.path.exists(filepath):
-                        os.remove(filepath)
+                cached = _cache_get(fhash)
+                if cached:
+                    transactions = cached['transactions']
+                else:
+                    filepath = os.path.join(app.config['UPLOAD_FOLDER'], safe_name)
+                    bank_pdf.save(filepath)
+                    try:
+                        transactions = parse_transactions(filepath)
+                        _cache_set(fhash, transactions, safe_name)
+                    except Exception as e:
+                        error_message = f'Bank PDF parse error: {e}'
+                    finally:
+                        if os.path.exists(filepath):
+                            os.remove(filepath)
+                if not error_message and transactions and not locked_hash:
+                    _set_locked_hash(user_id, fhash)
+                    session['file_hash'] = fhash
+                    session['file_name'] = safe_name
     else:
         cached_hash = session.get('file_hash')
         if cached_hash:
@@ -1536,24 +1615,30 @@ def gstr1_analyze():
         elif not _is_valid_pdf(bank_pdf):
             error_message = 'Invalid bank PDF.'
         else:
-            # Check cache first
-            fhash  = _file_hash(bank_pdf)
-            cached = _cache_get(fhash)
-            if cached:
-                transactions = cached['transactions']
+            fhash       = _file_hash(bank_pdf)
+            locked_hash = _get_locked_hash(user_id)
+            if locked_hash and locked_hash != fhash:
+                error_message = NEW_STATEMENT_ERROR
             else:
-                filepath = os.path.join(app.config['UPLOAD_FOLDER'], safe_name)
-                bank_pdf.save(filepath)
-                try:
-                    transactions = parse_transactions(filepath)
-                    _cache_set(fhash, transactions, safe_name)
-                except Exception as e:
-                    error_message = f'Bank PDF parse error: {e}'
-                finally:
-                    if os.path.exists(filepath):
-                        os.remove(filepath)
+                cached = _cache_get(fhash)
+                if cached:
+                    transactions = cached['transactions']
+                else:
+                    filepath = os.path.join(app.config['UPLOAD_FOLDER'], safe_name)
+                    bank_pdf.save(filepath)
+                    try:
+                        transactions = parse_transactions(filepath)
+                        _cache_set(fhash, transactions, safe_name)
+                    except Exception as e:
+                        error_message = f'Bank PDF parse error: {e}'
+                    finally:
+                        if os.path.exists(filepath):
+                            os.remove(filepath)
+                if not error_message and transactions and not locked_hash:
+                    _set_locked_hash(user_id, fhash)
+                    session['file_hash'] = fhash
+                    session['file_name'] = safe_name
     else:
-        # Try session cache
         cached_hash = session.get('file_hash')
         if cached_hash:
             cached = _cache_get(cached_hash)
@@ -1963,6 +2048,3 @@ if __name__ == '__main__':
     debug_mode = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
     app.run(debug=debug_mode)
     
-
-
-
