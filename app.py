@@ -267,10 +267,6 @@ def pay_page():
     if not is_logged_in:
         return redirect('/login')
 
-    active = _get_active_chat_session(user_id)
-    if active:
-        return redirect('/chat')
-
     return render_template('payment.html',
         razorpay_key_id = RAZORPAY_KEY_ID,
         user_email      = user_email,
