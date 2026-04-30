@@ -65,7 +65,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 CHAT_MESSAGE_LIMIT = 50
 CHAT_SESSION_HOURS = 48
 
-NEW_STATEMENT_ERROR = 'New bank statement detected. Your ₹49 session is locked to one statement. Please purchase a new session to analyze a different PDF.'
+NEW_STATEMENT_ERROR = 'New bank statement detected. Your ₹49 session is locked to one statement. <a href="/pay" style="color:#C9A84C;text-decoration:underline;font-weight:600;">Click here to purchase a new session</a> to analyze a different PDF.'
 
 # ── Plan config ───────────────────────────────────────────
 PLAN_CONFIG = {
@@ -2047,4 +2047,3 @@ def file_too_large(e):
 if __name__ == '__main__':
     debug_mode = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
     app.run(debug=debug_mode)
-    
