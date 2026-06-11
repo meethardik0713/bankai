@@ -3,18 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>About — AarogyamFin | AI Bank Statement Analyzer for India</title>
+<title>About — AarogyamFin | AI CA Workflow Platform for India</title>
 <link rel="canonical" href="https://aarogyamfin.com/about" />
-<meta property="og:title" content="About AarogyamFin — Built by an Indian Trader for Every Indian" />
-<meta property="og:description" content="AarogyamFin is built by an Indian trader and developer to help every Indian analyze bank statements instantly using AI. Learn our story, vision, and roadmap." />
+<meta property="og:title" content="About AarogyamFin — AI-Powered CA Workflow Platform Built in India" />
+<meta property="og:description" content="AarogyamFin automates books finalisation, GST compliance, and bank statement analysis for Indian CAs and businesses. Learn our story, vision, and roadmap." />
 <meta property="og:url" content="https://aarogyamfin.com/about" />
 <meta property="og:type" content="website" />
 <meta property="og:image" content="https://aarogyamfin.com/static/og-image.png" />
 <meta name="twitter:card" content="summary_large_image" />
-<meta name="twitter:title" content="About AarogyamFin — Built by an Indian Trader for Every Indian" />
-<meta name="twitter:description" content="AarogyamFin is built by an Indian trader and developer to help every Indian analyze bank statements instantly using AI." />
+<meta name="twitter:title" content="About AarogyamFin — AI-Powered CA Workflow Platform Built in India" />
+<meta name="twitter:description" content="AarogyamFin automates books finalisation, GST compliance, and bank statement analysis for Indian CAs and businesses." />
 <meta name="twitter:image" content="https://aarogyamfin.com/static/og-image.png" />
-<meta name="description" content="AarogyamFin is built by an Indian trader and developer to help every Indian analyze bank statements instantly using AI. Learn our story, vision, and roadmap." />
+<meta name="description" content="AarogyamFin automates books finalisation, GST compliance, and bank statement analysis for Indian CAs and businesses. Built by an Indian developer to reduce manual CA workload." />
 <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
@@ -139,6 +139,7 @@
     .vision-grid { grid-template-columns: 1fr; }
     .roadmap-item { grid-template-columns: 1fr; }
     .roadmap-phase { border-right: none; border-bottom: 1px solid var(--border); }
+    .vision-section [style*="grid-template-columns: 1fr 1fr"] { grid-template-columns: 1fr !important; gap: 32px !important; }
     footer { flex-direction: column; gap: 24px; text-align: center; padding: 40px 24px; }
     body { cursor: auto; }
     .cursor, .cursor-ring { display: none; }
@@ -154,10 +155,10 @@
   <a href="/" class="nav-logo">Aarogyam<span>Fin</span></a>
   <ul class="nav-links">
     <li><a href="/#analyzer">Analyze</a></li>
-    <li><a href="/#how">How It Works</a></li>
+    <li><a href="/dashboard">Dashboard</a></li>
     <li><a href="/about" class="active">About</a></li>
   </ul>
-  <a href="/#analyzer" class="nav-cta">Analyze Statement</a>
+  <a href="/dashboard" class="nav-cta">Open Dashboard</a>
 </nav>
 
 <!-- HERO -->
@@ -165,11 +166,11 @@
   <div class="hero-left">
     <div class="hero-tag">Our Story</div>
     <h1 class="hero-headline">
-      Built by a trader,<br>
-      <em>for every Indian</em><br>
-      who deserves clarity.
+      Built to automate<br>
+      <em>what CAs do</em><br>
+      manually every day.
     </h1>
-    <p class="hero-sub">AarogyamFin was born from a simple frustration — understanding your own money shouldn't be hard. We're using AI to change that, one statement at a time.</p>
+    <p class="hero-sub">AarogyamFin started as a bank statement analyzer. After speaking with CAs, we realized the real pain is books finalisation — clubbing 26AS, AIS, GST data, and bank statements into Schedule III financials. So we built that.</p>
   </div>
   <div class="hero-right">
     <div class="founder-card">
@@ -181,34 +182,34 @@
         <span class="role-badge">Trader</span>
         <span class="role-badge">Student</span>
       </div>
-      <p class="founder-quote">"I built the tool I always wished existed — one that understands Indian banking and gives you real answers, instantly."</p>
+      <p class="founder-quote">"A CA told me — categorizing bank statements is 10% of the work. The real grind is consolidating 26AS, AIS, GST, and TDS into final financials. That's what we're solving."</p>
     </div>
   </div>
 </div>
 
 <!-- VISION -->
 <section class="vision-section">
-  <span class="section-tag reveal">Our Vision</span>
-  <h2 class="section-title reveal">Financial clarity for every Indian, powered by AI</h2>
+  <span class="section-tag reveal">What We Do</span>
+  <h2 class="section-title reveal">End-to-end CA workflow automation, powered by AI</h2>
 
   <div class="vision-grid">
     <div class="vision-card reveal">
       <div class="vision-num">01</div>
-      <div class="vision-icon">🎯</div>
-      <h3>Track Every Rupee</h3>
-      <p>Most Indians have no idea where their money goes. We make it effortless to see every transaction, categorized and searchable in seconds.</p>
+      <div class="vision-icon">📊</div>
+      <h3>Books Finalisation</h3>
+      <p>Upload 26AS, AIS, and bank statements — get reconciled income, TDS credits, and Schedule III Balance Sheet & P&L. Hours of CA work, done in seconds.</p>
     </div>
     <div class="vision-card reveal">
       <div class="vision-num">02</div>
-      <div class="vision-icon">📈</div>
-      <h3>Achieve Financial Goals</h3>
-      <p>Whether it's saving for a dream, paying off debt, or building wealth — AarogyamFin will help you understand your patterns and reach your goals faster.</p>
+      <div class="vision-icon">📋</div>
+      <h3>GST Compliance Suite</h3>
+      <p>GSTR-1 auto-fill from invoices, GSTR-3B tax computation, GSTR-2A/2B ITC reconciliation, and a compliance calendar — all GST workflows in one place.</p>
     </div>
     <div class="vision-card reveal">
       <div class="vision-num">03</div>
-      <div class="vision-icon">🇮🇳</div>
-      <h3>Built for Bharat</h3>
-      <p>Not a foreign tool adapted for India — built from scratch for Indian banks, UPI, and the way Indians actually manage money.</p>
+      <div class="vision-icon">🏦</div>
+      <h3>Bank Statement Intelligence</h3>
+      <p>Upload any Indian bank PDF — get categorized transactions, ITR form suggestion, loan eligibility, audit checks, FOIR, compliance flags, and Excel exports.</p>
     </div>
   </div>
 </section>
@@ -218,13 +219,62 @@
   <div class="story-inner">
     <div>
       <span class="section-tag reveal">The Story</span>
-      <h2 class="section-title reveal" style="font-size: clamp(1.8rem, 3vw, 2.5rem);">Why I built this</h2>
+      <h2 class="section-title reveal" style="font-size: clamp(1.8rem, 3vw, 2.5rem);">How we got here</h2>
     </div>
     <div class="story-text reveal">
-      <p>As a <strong>trader and student</strong>, I was constantly downloading bank statements, scrolling through hundreds of transactions, trying to figure out where money was going. It was painful, slow, and error-prone.</p>
-      <p>Existing tools were either too complex, too expensive, or just not built for Indian banking. So I built <strong>AarogyamFin</strong> — a tool that understands Canara, Kotak, and all major Indian banks natively.</p>
-      <p>The vision is bigger than just a statement analyzer. I want AarogyamFin to become <strong>India's AI financial companion</strong> — helping every person, from students to traders to business owners, take complete control of their financial health.</p>
-      <p>This is just the beginning. <strong>More features. A mobile app. Smarter AI.</strong> Everything is coming — built with the same obsession for simplicity and accuracy.</p>
+      <p>It started with a simple problem — as a <strong>trader and student</strong>, I was downloading bank statements and manually scrolling through hundreds of transactions. So I built a parser that could read any Indian bank PDF and categorize everything instantly.</p>
+      <p>Then an investor saw the potential and pushed us toward <strong>GST compliance</strong> — GSTR-1 auto-fill, GSTR-3B computation, 2A/2B reconciliation. My father, who has deep GST domain expertise, shaped how these modules actually work in practice.</p>
+      <p>The real turning point was a conversation with <strong>CA Harsh Gupta</strong>. He told me bluntly — bank statement categorization saves a CA 10% of their time. The real pain is <strong>books finalisation</strong> — clubbing 26AS, AIS, GST data, TDS returns into a final Balance Sheet and P&L in Schedule III format. That's where CAs spend hours.</p>
+      <p>So we built the <strong>Multi-Source Financial Consolidator</strong> — upload your bank statement, 26AS, and AIS together, and get reconciled financials instantly. No data sent to external AI APIs. Everything processed locally.</p>
+      <p>We incorporated as <strong>AarogyamFin Financial Services Pvt. Ltd.</strong>, applied for DPIIT recognition — and the Government of India validated what we'd been building. <strong>Certificate No. DIPP265941. Finance Technology. Business Finance.</strong> That's not just a badge. That's the government saying this problem is real and our approach works.</p>
+    </div>
+  </div>
+</section>
+
+<!-- DPIIT RECOGNITION -->
+<section class="vision-section" style="padding-bottom: 40px;">
+  <span class="section-tag reveal">Government Recognized</span>
+  <h2 class="section-title reveal" style="max-width: 700px;">The Government of India recognizes what we're building.</h2>
+
+  <div class="reveal" style="display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: center; margin-bottom: 60px;">
+    <div>
+      <p style="font-size: 0.95rem; line-height: 2; color: var(--muted); margin-bottom: 20px;">
+        AarogyamFin Financial Services Pvt. Ltd. has been officially recognized as a startup by the <strong style="color: var(--text);">Department for Promotion of Industry and Internal Trade (DPIIT)</strong>, under the Ministry of Commerce & Industry, Government of India.
+      </p>
+      <p style="font-size: 0.95rem; line-height: 2; color: var(--muted); margin-bottom: 20px;">
+        This recognition is not handed out to just anyone. DPIIT evaluates startups on their <strong style="color: var(--text);">innovation, scalability, and potential to solve real problems</strong> in the Indian economy. Out of the thousands of applications they receive, only those building something genuinely impactful make the cut.
+      </p>
+      <p style="font-size: 0.95rem; line-height: 2; color: var(--muted); margin-bottom: 20px;">
+        For AarogyamFin, the recognition came under <strong style="color: var(--text);">Finance Technology</strong> industry and <strong style="color: var(--text);">Business Finance</strong> sector — a direct acknowledgement that the problem we're solving — automating CA workflows, GST compliance, and books finalisation — is a real, validated need in India's financial ecosystem.
+      </p>
+      <p style="font-size: 0.95rem; line-height: 2; color: var(--muted); margin-bottom: 28px;">
+        When a CA or business owner uses AarogyamFin, they're not trusting a random tool built in someone's bedroom. They're trusting a <strong style="color: var(--text);">government-recognized fintech company</strong> that has been vetted, registered, and certified by the same department that oversees India's startup ecosystem.
+      </p>
+
+      <div style="display: flex; flex-wrap: wrap; gap: 12px;">
+        <div style="background: rgba(201,168,76,0.08); border: 1px solid rgba(201,168,76,0.25); padding: 10px 16px;">
+          <span style="font-size: 0.6rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 4px;">Certificate No</span>
+          <span style="font-size: 0.9rem; font-weight: 500; color: var(--gold);">DIPP265941</span>
+        </div>
+        <div style="background: rgba(201,168,76,0.08); border: 1px solid rgba(201,168,76,0.25); padding: 10px 16px;">
+          <span style="font-size: 0.6rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 4px;">Issued</span>
+          <span style="font-size: 0.9rem; font-weight: 500; color: var(--gold);">06 June 2026</span>
+        </div>
+        <div style="background: rgba(201,168,76,0.08); border: 1px solid rgba(201,168,76,0.25); padding: 10px 16px;">
+          <span style="font-size: 0.6rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 4px;">Valid Until</span>
+          <span style="font-size: 0.9rem; font-weight: 500; color: var(--gold);">05 May 2036</span>
+        </div>
+        <div style="background: rgba(201,168,76,0.08); border: 1px solid rgba(201,168,76,0.25); padding: 10px 16px;">
+          <span style="font-size: 0.6rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 4px;">Entity</span>
+          <span style="font-size: 0.9rem; font-weight: 500; color: var(--gold);">Private Limited Company</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(201,168,76,0.3); padding: 16px; position: relative; overflow: hidden;">
+      <div style="position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, var(--gold), transparent);"></div>
+      <img src="{{ url_for('static', filename='dpiit-certificate.png') }}" alt="DPIIT Certificate of Recognition — AarogyamFin Financial Services Pvt. Ltd. — Certificate No DIPP265941 — Government of India" style="width: 100%; height: auto; display: block; border: 1px solid rgba(201,168,76,0.1); cursor: pointer;" onclick="document.getElementById('certLightbox').style.display='flex'" title="Click to view full certificate">
+      <p style="text-align: center; font-size: 0.68rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold); margin-top: 14px; margin-bottom: 0;">Certificate of Recognition · Government of India · <span style="color:var(--muted); cursor:pointer;" onclick="document.getElementById('certLightbox').style.display='flex'">Click to view full</span></p>
     </div>
   </div>
 </section>
@@ -232,54 +282,66 @@
 <!-- ROADMAP -->
 <section class="roadmap-section">
   <span class="section-tag reveal">Roadmap</span>
-  <h2 class="section-title reveal">What's coming next</h2>
+  <h2 class="section-title reveal">Where we are and what's next</h2>
 
   <div class="roadmap">
     <div class="roadmap-item active reveal">
       <div class="roadmap-phase">
         <div class="phase-label">Phase 1</div>
-        <div class="phase-name">Now</div>
+        <div class="phase-name">Complete</div>
       </div>
       <div class="roadmap-content">
-        <h4>AI Bank Statement Analyzer</h4>
-        <p>Upload any Indian bank statement PDF. Instantly search, analyze, and export transactions with Credit/Debit detection. Supports Canara, Kotak, and more.</p>
+        <h4>Bank Statement Analyzer + Financial Dashboard</h4>
+        <p>Multi-bank PDF parsing, transaction categorization, 5-module financial dashboard (Expense, ITR, Audit, Loan Assessment, Compliance), keyword search, Excel export.</p>
+        <span class="status-badge status-live">● Live</span>
+      </div>
+    </div>
+
+    <div class="roadmap-item active reveal">
+      <div class="roadmap-phase">
+        <div class="phase-label">Phase 2</div>
+        <div class="phase-name">Complete</div>
+      </div>
+      <div class="roadmap-content">
+        <h4>GST Compliance Suite</h4>
+        <p>GSTR-1 auto-fill (bank PDF + invoice Excel), GSTR-3B tax computation with ITC utilization, GSTR-2A/2B reconciliation with mismatch detection, GST compliance calendar.</p>
+        <span class="status-badge status-live">● Live</span>
+      </div>
+    </div>
+
+    <div class="roadmap-item active reveal">
+      <div class="roadmap-phase">
+        <div class="phase-label">Phase 3</div>
+        <div class="phase-name">Complete</div>
+      </div>
+      <div class="roadmap-content">
+        <h4>Multi-Source Financial Consolidator</h4>
+        <p>Upload bank statement + 26AS + AIS together. Reconciled income across sources, TDS credit matching, and indicative Balance Sheet & P&L in Schedule III format.</p>
         <span class="status-badge status-live">● Live</span>
       </div>
     </div>
 
     <div class="roadmap-item reveal">
       <div class="roadmap-phase">
-        <div class="phase-label">Phase 2</div>
-        <div class="phase-name">Soon</div>
+        <div class="phase-label">Phase 4</div>
+        <div class="phase-name">Next</div>
       </div>
       <div class="roadmap-content">
-        <h4>Spending Categories & Insights</h4>
-        <p>AI will automatically categorize your transactions — Food, EMIs, Entertainment, Utilities — and show you exactly where your money is going each month.</p>
+        <h4>Multi-Client CA Dashboard</h4>
+        <p>CAs can onboard multiple clients, upload documents per client, track filing status, and share insights — turning AarogyamFin into a full practice management tool for CA firms.</p>
         <span class="status-badge status-soon">◐ Coming Soon</span>
       </div>
     </div>
 
     <div class="roadmap-item reveal">
       <div class="roadmap-phase">
-        <div class="phase-label">Phase 3</div>
-        <div class="phase-name">2026</div>
-      </div>
-      <div class="roadmap-content">
-        <h4>Mobile App Launch</h4>
-        <p>AarogyamFin on iOS and Android. Scan statements with your camera, get instant analysis, and track your finances on the go.</p>
-        <span class="status-badge status-planned">○ Planned</span>
-      </div>
-    </div>
-
-    <div class="roadmap-item reveal">
-      <div class="roadmap-phase">
-        <div class="phase-label">Phase 4</div>
+        <div class="phase-label">Phase 5</div>
         <div class="phase-name">Future</div>
       </div>
       <div class="roadmap-content">
-        <h4>AI Financial Goals Coach</h4>
-        <p>Set financial goals and let AI guide you. Smart suggestions, savings plans, and personalized advice based on your actual spending patterns.</p>
-        <span class="status-badge status-planned">○ Planned</span>
+        <h4>Mobile App + Advanced Automation</h4>
+        <p>Android app on Google Play Store (currently in testing). Automatic ITR form generation, multi-statement comparison across financial years, and deeper CA workflow integrations.</p>
+        <span class="status-badge status-planned">○ In Progress</span>
       </div>
     </div>
   </div>
@@ -288,26 +350,38 @@
 <!-- CTA -->
 <section class="cta-section">
   <div class="cta-inner">
-    <h2 class="reveal">Ready to understand<br><em>your money?</em></h2>
-    <p class="reveal">Join thousands of Indians taking control of their financial life with AarogyamFin.</p>
-    <a href="/#analyzer" class="btn-primary reveal">
+    <h2 class="reveal">Ready to automate<br><em>your CA workflow?</em></h2>
+    <p class="reveal">Books finalisation, GST compliance, bank analysis — everything in one platform. No data stored, no external AI APIs.</p>
+    <a href="/dashboard" class="btn-primary reveal">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-      Analyze My Statement
+      Open Dashboard
     </a>
   </div>
 </section>
 
 <footer>
   <div class="footer-logo">Aarogyam<span>Fin</span></div>
-  <p class="footer-copy">© 2026 AarogyamFin. All rights reserved.</p>
+  <p class="footer-copy">© 2026 AarogyamFin Financial Services Pvt. Ltd. · DPIIT Recognized (DIPP265941)</p>
   <ul class="footer-links">
     <li><a href="/">Home</a></li>
-    <li><a href="/#trust">Security</a></li>
+    <li><a href="/privacy">Privacy</a></li>
+    <li><a href="/terms">Terms</a></li>
     <li><a href="/about">About</a></li>
   </ul>
 </footer>
 
+<!-- Certificate Lightbox -->
+<div id="certLightbox" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(6,8,16,0.95); align-items:center; justify-content:center; cursor:pointer; padding:40px;" onclick="this.style.display='none'">
+  <span style="position:absolute; top:24px; right:32px; font-size:1.8rem; color:var(--gold); font-weight:300; font-family:'Cormorant Garamond',serif;">✕</span>
+  <img src="{{ url_for('static', filename='dpiit-certificate.png') }}" alt="DPIIT Certificate" style="max-width:90vw; max-height:85vh; object-fit:contain; border:1px solid rgba(201,168,76,0.3); box-shadow:0 0 80px rgba(201,168,76,0.15);" onclick="event.stopPropagation()">
+</div>
+
 <script>
+// LIGHTBOX ESC
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.getElementById('certLightbox').style.display = 'none';
+});
+
 // CURSOR
 const cursor = document.getElementById('cursor');
 const ring = document.getElementById('cursorRing');

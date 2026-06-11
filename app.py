@@ -2027,6 +2027,147 @@ def api_chat_message():
 
 
 # ═══════════════════════════════════════════════════════════
+#  FINANCIAL CONSOLIDATOR ROUTES
+#  Add these routes to app.py — paste before the ERROR HANDLERS section
+# ═══════════════════════════════════════════════════════════
+
+@app.route('/consolidator', methods=['GET'])
+def consolidator_page():
+    is_logged_in, user_email, user_id = _get_current_user()
+    if not is_logged_in:
+        return redirect('/login')
+    active = _get_active_chat_session(user_id)
+    if not active:
+        return redirect('/pay')
+    return render_template('consolidator.html',
+        data=None,
+        is_logged_in=is_logged_in,
+        user_email=user_email,
+    )
+
+
+@app.route('/consolidator', methods=['POST'])
+def consolidator_analyze():
+    ip = request.remote_addr
+    if is_rate_limited(ip):
+        abort(429)
+
+    is_logged_in, user_email, user_id = _get_current_user()
+    if not is_logged_in:
+        return redirect('/login')
+    active = _get_active_chat_session(user_id)
+    if not active:
+        return redirect('/pay')
+
+    from parsers.form26as import parse_26as
+    from parsers.form_ais  import parse_ais
+    from core.financial_consolidator import consolidate
+
+    error_message   = ''
+    data            = None
+    transactions    = []
+    data_26as       = None
+    data_ais        = None
+
+    # ── Bank PDF ──────────────────────────────────────────
+    bank_pdf = request.files.get('bank_pdf')
+    if bank_pdf and bank_pdf.filename:
+        safe_name = secure_filename(bank_pdf.filename)
+        if safe_name.lower().endswith('.pdf') and _is_valid_pdf(bank_pdf):
+            fhash  = _file_hash(bank_pdf)
+            cached = _cache_get(fhash)
+            if cached:
+                transactions = cached['transactions']
+            else:
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], safe_name)
+                bank_pdf.save(filepath)
+                try:
+                    transactions = parse_transactions(filepath)
+                    _cache_set(fhash, transactions, safe_name)
+                    session['file_hash'] = fhash
+                    session['file_name'] = safe_name
+                except Exception as e:
+                    error_message = f'Bank PDF parse error: {e}'
+                finally:
+                    if os.path.exists(filepath):
+                        os.remove(filepath)
+    else:
+        # Use cached bank statement
+        cached_hash = session.get('file_hash')
+        if cached_hash:
+            cached = _cache_get(cached_hash)
+            if cached:
+                transactions = cached['transactions']
+
+    if error_message:
+        return render_template('consolidator.html', data=None,
+            error_message=error_message, is_logged_in=is_logged_in, user_email=user_email)
+
+    # ── 26AS PDF ──────────────────────────────────────────
+    f26as = request.files.get('form_26as')
+    if f26as and f26as.filename:
+        safe_name = secure_filename(f26as.filename)
+        if safe_name.lower().endswith('.pdf'):
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], '26as_' + safe_name)
+            f26as.save(filepath)
+            try:
+                data_26as = parse_26as(filepath)
+            except Exception as e:
+                logger.exception("26AS parse error: %s", e)
+                error_message += f' | 26AS error: {e}'
+            finally:
+                if os.path.exists(filepath):
+                    os.remove(filepath)
+
+    # ── AIS PDF ───────────────────────────────────────────
+    fais = request.files.get('form_ais')
+    if fais and fais.filename:
+        safe_name = secure_filename(fais.filename)
+        if safe_name.lower().endswith('.pdf'):
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], 'ais_' + safe_name)
+            fais.save(filepath)
+            try:
+                data_ais = parse_ais(filepath)
+            except Exception as e:
+                logger.exception("AIS parse error: %s", e)
+                error_message += f' | AIS error: {e}'
+            finally:
+                if os.path.exists(filepath):
+                    os.remove(filepath)
+
+    # ── Opening Balance ───────────────────────────────────
+    opening_balance = 0.0
+    ob_raw = request.form.get('opening_balance', '0').replace(',', '').strip()
+    try:
+        opening_balance = float(ob_raw) if ob_raw else 0.0
+    except Exception:
+        opening_balance = 0.0
+
+    # ── Consolidate ───────────────────────────────────────
+    if not transactions and not data_26as and not data_ais:
+        error_message = 'Please upload at least one document (Bank PDF or 26AS or AIS).'
+        return render_template('consolidator.html', data=None,
+            error_message=error_message, is_logged_in=is_logged_in, user_email=user_email)
+
+    try:
+        data = consolidate(
+            bank_transactions=transactions,
+            data_26as=data_26as,
+            data_ais=data_ais,
+            opening_balance=opening_balance,
+        )
+    except Exception as e:
+        logger.exception("Consolidation error: %s", e)
+        error_message = f'Consolidation error: {e}'
+
+    return render_template('consolidator.html',
+        data=data,
+        error_message=error_message,
+        is_logged_in=is_logged_in,
+        user_email=user_email,
+    )
+
+# ═══════════════════════════════════════════════════════════
 #  ERROR HANDLERS
 # ═══════════════════════════════════════════════════════════
 

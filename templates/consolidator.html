@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AarogyamFin — Financial Consolidator</title>
+<link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --gold: #c9a84c; --gold-light: #e8cc7a; --bg: #060810;
+  --surface: rgba(255,255,255,0.03); --border: rgba(201,168,76,0.15);
+  --border-hover: rgba(201,168,76,0.35); --text: #e8e4d9;
+  --muted: rgba(232,228,217,0.45); --green: #4ade80; --red: #f87171; --yellow: #fbbf24; --blue: #60a5fa;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; font-weight: 300; min-height: 100vh; }
+
+nav {
+  position: sticky; top: 0; z-index: 100; padding: 20px 48px;
+  display: flex; justify-content: space-between; align-items: center;
+  background: rgba(6,8,16,0.92); border-bottom: 1px solid var(--border); backdrop-filter: blur(12px);
+}
+.nav-logo { font-family: 'Cormorant Garamond', serif; font-size: 1.3rem; font-weight: 500; letter-spacing: 0.12em; color: var(--text); text-decoration: none; }
+.nav-logo span { color: var(--gold); }
+.nav-right { display: flex; align-items: center; gap: 16px; }
+.nav-tag { font-size: 0.68rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold); border: 1px solid var(--border); padding: 6px 14px; }
+.nav-back { font-size: 0.72rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); text-decoration: none; transition: color 0.3s; }
+.nav-back:hover { color: var(--gold); }
+
+/* LAYOUT */
+.layout { display: grid; grid-template-columns: 240px 1fr; min-height: calc(100vh - 65px); }
+
+/* SIDEBAR */
+.sidebar { border-right: 1px solid var(--border); padding: 32px 0; position: sticky; top: 65px; height: calc(100vh - 65px); overflow-y: auto; background: rgba(255,255,255,0.01); }
+.nav-item { display: flex; align-items: center; gap: 10px; padding: 11px 16px; font-size: 0.8rem; color: var(--muted); cursor: pointer; border-left: 2px solid transparent; transition: all 0.25s; text-decoration: none; }
+.nav-item:hover { color: var(--text); background: var(--surface); border-left-color: var(--border); }
+.nav-item.active { color: var(--gold); background: rgba(201,168,76,0.06); border-left-color: var(--gold); }
+.nav-item svg { width: 15px; height: 15px; flex-shrink: 0; opacity: 0.7; }
+.nav-item.active svg { opacity: 1; }
+.nav-badge { margin-left: auto; font-size: 0.6rem; padding: 2px 6px; border-radius: 10px; background: rgba(201,168,76,0.15); color: var(--gold); }
+.nav-sep { height: 1px; background: var(--border); margin: 8px 16px; }
+
+/* MAIN */
+.main { padding: 40px 48px; overflow-y: auto; }
+
+.page-header { margin-bottom: 40px; }
+.page-tag { font-size: 0.62rem; letter-spacing: 0.28em; text-transform: uppercase; color: var(--gold); margin-bottom: 10px; display: block; }
+.page-title { font-family: 'Cormorant Garamond', serif; font-size: 2.6rem; font-weight: 300; line-height: 1.1; }
+.page-title em { color: var(--gold-light); font-style: italic; }
+.page-sub { font-size: 0.88rem; color: var(--muted); margin-top: 10px; line-height: 1.7; max-width: 640px; }
+
+/* UPLOAD GRID */
+.upload-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
+.upload-box { border: 1px dashed rgba(201,168,76,0.35); padding: 20px 16px; background: rgba(255,255,255,0.02); cursor: pointer; transition: all 0.3s; text-align: center; }
+.upload-box:hover { border-color: rgba(201,168,76,0.6); background: rgba(201,168,76,0.04); }
+.upload-box.has-file { border-color: rgba(74,222,128,0.4); background: rgba(74,222,128,0.04); border-style: solid; }
+.upload-box.optional { border-color: rgba(232,228,217,0.12); }
+.upload-icon { width: 28px; height: 28px; margin: 0 auto 10px; color: var(--gold); opacity: 0.7; }
+.upload-box.has-file .upload-icon { color: var(--green); }
+.upload-box-title { font-size: 0.78rem; font-weight: 500; color: var(--text); margin-bottom: 4px; }
+.upload-box.optional .upload-box-title { color: var(--muted); }
+.upload-box-sub { font-size: 0.66rem; color: var(--muted); }
+.opt-tag { font-size: 0.55rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); border: 1px solid rgba(232,228,217,0.12); padding: 1px 5px; margin-left: 4px; }
+.file-sel { font-size: 0.64rem; color: var(--green); margin-top: 6px; }
+.upload-box input[type="file"] { display: none; }
+
+/* OB INPUT */
+.ob-row { display: flex; gap: 14px; align-items: flex-end; margin-bottom: 20px; }
+.ob-group { flex: 1; }
+.ob-label { display: block; font-size: 0.62rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+.ob-input { width: 100%; padding: 12px 16px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 0.88rem; outline: none; transition: border-color 0.25s; }
+.ob-input:focus { border-color: var(--gold); }
+
+.submit-btn { padding: 12px 28px; background: var(--gold); color: #060810; border: none; font-family: 'DM Sans', sans-serif; font-size: 0.8rem; font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase; cursor: pointer; transition: opacity 0.3s; white-space: nowrap; }
+.submit-btn:hover { opacity: 0.85; }
+.submit-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ALERTS */
+.alert { padding: 16px 20px; border-left: 3px solid; margin-bottom: 20px; font-size: 0.84rem; line-height: 1.6; }
+.alert-warn { border-color: var(--yellow); background: rgba(251,191,36,0.05); }
+.alert-danger { border-color: var(--red); background: rgba(248,113,113,0.05); }
+.alert-ok { border-color: var(--green); background: rgba(74,222,128,0.05); }
+.alert-blue { border-color: var(--blue); background: rgba(96,165,250,0.05); }
+.alert-title { font-weight: 500; color: var(--text); display: block; margin-bottom: 3px; }
+
+/* METRICS */
+.metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 28px; }
+.metric { background: var(--surface); border: 1px solid var(--border); padding: 20px 18px; transition: border-color 0.3s; }
+.metric:hover { border-color: var(--border-hover); }
+.metric-value { font-family: 'Cormorant Garamond', serif; font-size: 1.8rem; font-weight: 300; color: var(--gold); line-height: 1; margin-bottom: 5px; }
+.metric-value.green { color: var(--green); }
+.metric-value.red { color: var(--red); }
+.metric-value.yellow { color: var(--yellow); }
+.metric-label { font-size: 0.62rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
+.metric-sub { font-size: 0.7rem; color: var(--muted); margin-top: 3px; }
+
+/* CARD */
+.card { background: var(--surface); border: 1px solid var(--border); padding: 24px 28px; margin-bottom: 20px; }
+.card-title { font-family: 'Cormorant Garamond', serif; font-size: 1.15rem; font-weight: 400; margin-bottom: 18px; display: flex; align-items: center; gap: 10px; }
+.card-title svg { width: 16px; height: 16px; color: var(--gold); }
+
+/* GRID */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px; }
+
+/* SOURCE COMPARISON TABLE */
+.compare-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.compare-table th { font-size: 0.6rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); font-weight: 400; }
+.compare-table td { padding: 10px 14px; border-bottom: 1px solid rgba(255,255,255,0.03); }
+.compare-table tr:hover td { background: rgba(201,168,76,0.02); }
+.td-muted { color: var(--muted); font-size: 0.76rem; }
+.td-gold { color: var(--gold); font-weight: 500; }
+.td-green { color: var(--green); font-weight: 500; }
+.td-red { color: var(--red); }
+
+/* BADGE */
+.badge { display: inline-flex; font-size: 0.58rem; letter-spacing: 0.1em; text-transform: uppercase; padding: 2px 7px; border-radius: 2px; }
+.badge-ok { background: rgba(74,222,128,0.1); border: 1px solid rgba(74,222,128,0.2); color: var(--green); }
+.badge-warn { background: rgba(251,191,36,0.1); border: 1px solid rgba(251,191,36,0.2); color: var(--yellow); }
+.badge-err { background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.2); color: var(--red); }
+.badge-gold { background: rgba(201,168,76,0.1); border: 1px solid rgba(201,168,76,0.2); color: var(--gold); }
+
+/* DISCREPANCY CARD */
+.disc-item { display: flex; gap: 14px; padding: 14px 18px; border-left: 3px solid; margin-bottom: 8px; background: rgba(255,255,255,0.02); }
+.disc-item.high { border-color: var(--red); }
+.disc-item.medium { border-color: var(--yellow); }
+.disc-item.low { border-color: var(--blue); }
+.disc-icon { font-size: 1rem; flex-shrink: 0; margin-top: 2px; }
+.disc-msg { font-size: 0.82rem; color: var(--muted); line-height: 1.6; }
+.disc-sev { font-size: 0.6rem; letter-spacing: 0.14em; text-transform: uppercase; display: block; margin-bottom: 4px; }
+.disc-sev.high { color: var(--red); }
+.disc-sev.medium { color: var(--yellow); }
+.disc-sev.low { color: var(--blue); }
+
+/* BS/PL ROW */
+.bspl-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 0.82rem; }
+.bspl-row:last-child { border-bottom: none; }
+.bspl-row.total { font-weight: 500; color: var(--text); border-top: 1px solid var(--border); padding-top: 12px; margin-top: 4px; }
+.bspl-label { color: var(--muted); }
+.bspl-val { font-family: 'Cormorant Garamond', serif; font-size: 1rem; }
+
+/* SOURCES BADGE ROW */
+.sources-row { display: flex; gap: 10px; margin-bottom: 24px; flex-wrap: wrap; }
+.source-chip { display: flex; align-items: center; gap: 6px; padding: 6px 12px; border: 1px solid var(--border); font-size: 0.72rem; color: var(--muted); }
+.source-chip.active { border-color: rgba(74,222,128,0.4); color: var(--green); background: rgba(74,222,128,0.06); }
+.source-chip.inactive { opacity: 0.4; }
+
+/* READINESS BANNER */
+.readiness { display: flex; align-items: center; gap: 20px; padding: 20px 24px; border: 1px solid var(--border); background: var(--surface); margin-bottom: 28px; }
+.readiness-icon { font-size: 2rem; flex-shrink: 0; }
+.readiness-title { font-family: 'Cormorant Garamond', serif; font-size: 1.2rem; font-weight: 400; margin-bottom: 4px; }
+.readiness-sub { font-size: 0.78rem; color: var(--muted); }
+
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; }
+  .sidebar { display: none; }
+  .main { padding: 20px 16px; }
+  .upload-grid { grid-template-columns: repeat(2, 1fr); }
+  .grid-2 { grid-template-columns: 1fr; }
+  .grid-3 { grid-template-columns: 1fr; }
+  .metrics { grid-template-columns: repeat(2, 1fr); }
+  .page-title { font-size: 2rem; }
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="nav-logo">Aarogyam<span>Fin</span></a>
+  <div class="nav-right">
+    <span class="nav-tag">Financial Consolidator</span>
+    <a href="/dashboard" class="nav-back">← Dashboard</a>
+    <a href="/" class="nav-back">Home</a>
+  </div>
+</nav>
+
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div style="padding:0 8px;">
+      <a href="/dashboard" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M8 12h8M12 8v8"/></svg>Dashboard
+      </a>
+      <a href="/consolidator" class="nav-item active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>Consolidator
+        <span class="nav-badge">New</span>
+      </a>
+      <div class="nav-sep"></div>
+      <a href="/gstr2b" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>GSTR-2B Recon
+      </a>
+      <a href="/gstr3b" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>GSTR-3B
+      </a>
+      <a href="/gstr1" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>GSTR-1
+      </a>
+      <a href="/gst-calendar" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>GST Calendar
+      </a>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <div class="page-header">
+      <span class="page-tag">Multi-Source · Books Finalisation</span>
+      <h1 class="page-title">Financial <em>Consolidator</em></h1>
+      <p class="page-sub">Upload Bank Statement + 26AS + AIS together. Get reconciled income, TDS credit, Balance Sheet + P&L — the exact data CA needs for books finalisation.</p>
+    </div>
+
+    <!-- UPLOAD FORM -->
+    <form method="POST" action="/consolidator" enctype="multipart/form-data" id="conForm">
+
+      <div class="upload-grid">
+
+        <div class="upload-box" id="bankBox" onclick="document.getElementById('bank_pdf').click()">
+          <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          <div class="upload-box-title">Bank Statement</div>
+          <div class="upload-box-sub">PDF · Any Indian bank</div>
+          <div class="file-sel" id="bankSel" style="display:none;"></div>
+          <input type="file" id="bank_pdf" name="bank_pdf" accept=".pdf" onchange="fileSel('bank_pdf','bankBox','bankSel')">
+        </div>
+
+        <div class="upload-box" id="f26Box" onclick="document.getElementById('form_26as').click()">
+          <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="9" x2="9" y2="21"/></svg>
+          <div class="upload-box-title">Form 26AS</div>
+          <div class="upload-box-sub">TRACES portal · PDF</div>
+          <div class="file-sel" id="f26Sel" style="display:none;"></div>
+          <input type="file" id="form_26as" name="form_26as" accept=".pdf" onchange="fileSel('form_26as','f26Box','f26Sel')">
+        </div>
+
+        <div class="upload-box optional" id="aisBox" onclick="document.getElementById('form_ais').click()">
+          <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+          <div class="upload-box-title">AIS <span class="opt-tag">Optional</span></div>
+          <div class="upload-box-sub">incometax.gov.in · PDF</div>
+          <div class="file-sel" id="aisSel" style="display:none;"></div>
+          <input type="file" id="form_ais" name="form_ais" accept=".pdf" onchange="fileSel('form_ais','aisBox','aisSel')">
+        </div>
+
+        <div class="upload-box optional" style="cursor:default; display:flex; flex-direction:column; justify-content:center;">
+          <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <div class="upload-box-title" style="color:var(--muted);">Form 16 / TIS</div>
+          <div class="upload-box-sub">Coming soon</div>
+        </div>
+
+      </div>
+
+      <div class="ob-row">
+        <div class="ob-group">
+          <label class="ob-label">Opening Balance (Last Year Closing) — ₹</label>
+          <input type="number" name="opening_balance" id="opening_balance" class="ob-input" placeholder="0.00" step="0.01" min="0">
+        </div>
+        <button type="submit" class="submit-btn" id="submitBtn">
+          ⚡ Consolidate &amp; Analyse
+        </button>
+      </div>
+
+      {% if session.get('file_hash') %}
+      <div class="alert alert-ok" style="margin-bottom:16px; font-size:0.78rem;">
+        <span class="alert-title">⚡ Bank Statement Auto-Loaded</span>
+        "{{ session.get('file_name','') }}" will be used if you don't upload a new one.
+      </div>
+      {% endif %}
+
+      <div class="alert alert-blue" style="font-size:0.78rem;">
+        <span class="alert-title">📋 How to download 26AS &amp; AIS</span>
+        <strong>26AS:</strong> TRACES portal (tdscpc.gov.in) → Login → Form 26AS → Download PDF &nbsp;|&nbsp;
+        <strong>AIS:</strong> incometax.gov.in → Login → AIS tile → Download PDF (password: PAN + DOB in DDMMYYYY)
+      </div>
+
+    </form>
+
+    {% if error_message %}
+    <div class="alert alert-danger" style="margin-top:20px;">
+      <span class="alert-title">Error</span>{{ error_message }}
+    </div>
+    {% endif %}
+
+    {% if data %}
+
+    <!-- SOURCES USED -->
+    <div class="sources-row" style="margin-top:28px;">
+      <div class="source-chip {% if data.sources_used.bank_statement %}active{% else %}inactive{% endif %}">
+        {% if data.sources_used.bank_statement %}✓{% else %}○{% endif %} Bank Statement
+      </div>
+      <div class="source-chip {% if data.sources_used.form_26as %}active{% else %}inactive{% endif %}">
+        {% if data.sources_used.form_26as %}✓{% else %}○{% endif %} Form 26AS
+      </div>
+      <div class="source-chip {% if data.sources_used.ais %}active{% else %}inactive{% endif %}">
+        {% if data.sources_used.ais %}✓{% else %}○{% endif %} AIS
+      </div>
+    </div>
+
+    <!-- FILING READINESS -->
+    {% set readiness = data.summary.filing_readiness %}
+    <div class="readiness">
+      <div class="readiness-icon">
+        {% if readiness == 'ready' %}✅
+        {% elif readiness == 'review_needed' %}⚠️
+        {% elif readiness == 'partial' %}📋
+        {% else %}❌{% endif %}
+      </div>
+      <div>
+        <div class="readiness-title">
+          {% if readiness == 'ready' %}Books Finalisation Ready
+          {% elif readiness == 'review_needed' %}Review Required Before Filing
+          {% elif readiness == 'partial' %}Partial Data — More Documents Needed
+          {% else %}Insufficient Data — Upload More Documents{% endif %}
+        </div>
+        <div class="readiness-sub">
+          {{ data.summary.discrepancy_count }} discrepancies found ·
+          {{ data.summary.high_discrepancies }} high priority ·
+          Total Income: ₹{{ "{:,.0f}".format(data.summary.total_income) }} ·
+          TDS Credit: ₹{{ "{:,.0f}".format(data.summary.total_tds_credit) }}
+        </div>
+      </div>
+    </div>
+
+    <!-- METRICS -->
+    <div class="metrics">
+      <div class="metric">
+        <div class="metric-value green">₹{{ "{:,.0f}".format(data.income.reconciled.total) }}</div>
+        <div class="metric-label">Total Income (Reconciled)</div>
+        <div class="metric-sub">Across all sources</div>
+      </div>
+      <div class="metric">
+        <div class="metric-value yellow">₹{{ "{:,.0f}".format(data.tds.total_tax_credit) }}</div>
+        <div class="metric-label">Total TDS Credit</div>
+        <div class="metric-sub">26AS + Advance Tax</div>
+      </div>
+      <div class="metric">
+        <div class="metric-value">₹{{ "{:,.0f}".format(data.bs_pl.bs.closing_balance) }}</div>
+        <div class="metric-label">Closing Bank Balance</div>
+        <div class="metric-sub">As per statement</div>
+      </div>
+      <div class="metric">
+        <div class="metric-value {% if data.bs_pl.bs.net_worth > 0 %}green{% else %}red{% endif %}">
+          ₹{{ "{:,.0f}".format(data.bs_pl.bs.net_worth) }}
+        </div>
+        <div class="metric-label">Net Worth (Estimated)</div>
+        <div class="metric-sub">Assets − Liabilities</div>
+      </div>
+      {% if data.tds.refund_received > 0 %}
+      <div class="metric">
+        <div class="metric-value green">₹{{ "{:,.0f}".format(data.tds.refund_received) }}</div>
+        <div class="metric-label">IT Refund Received</div>
+        <div class="metric-sub">From 26AS Part D / Bank</div>
+      </div>
+      {% endif %}
+      <div class="metric">
+        <div class="metric-value {% if data.summary.discrepancy_count == 0 %}green{% elif data.summary.high_discrepancies > 0 %}red{% else %}yellow{% endif %}">
+          {{ data.summary.discrepancy_count }}
+        </div>
+        <div class="metric-label">Discrepancies Found</div>
+        <div class="metric-sub">{{ data.summary.high_discrepancies }} high priority</div>
+      </div>
+    </div>
+
+    <!-- INCOME COMPARISON (3 sources side by side) -->
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        Income — Multi-Source Comparison
+      </div>
+      <table class="compare-table">
+        <thead>
+          <tr>
+            <th>Income Type</th>
+            <th>Bank Statement</th>
+            <th>Form 26AS</th>
+            <th>AIS</th>
+            <th>Reconciled (Best)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Salary</td>
+            <td class="td-muted">₹{{ "{:,.0f}".format(data.income.sources.bank.salary) }}</td>
+            <td class="td-muted">₹{{ "{:,.0f}".format(data.income.sources.form_26as.total_income_declared) }}</td>
+            <td class="td-muted">₹{{ "{:,.0f}".format(data.income.sources.ais.salary_total) }}</td>
+            <td class="td-green">₹{{ "{:,.0f}".format(data.income.reconciled.salary) }}</td>
+          </tr>
+          <tr>
+            <td>Interest</td>
+            <td class="td-muted">₹{{ "{:,.0f}".format(data.income.sources.bank.interest) }}</td>
+            <td class="td-muted">—</td>
+            <td class="td-muted">₹{{ "{:,.0f}".format(data.income.sources.ais.interest_total) }}</td>
+            <td class="td-green">₹{{ "{:,.0f}".format(data.income.reconciled.interest) }}</td>
+          </tr>
+          <tr>
+            <td>Dividend</td>
+            <td class="td-muted">—</td>
+            <td class="td-muted">—</td>
+            <td class="td-muted">₹{{ "{:,.0f}".format(data.income.sources.ais.dividend_total) }}</td>
+            <td class="td-green">₹{{ "{:,.0f}".format(data.income.reconciled.dividend) }}</td>
+          </tr>
+          <tr>
+            <td>Rent</td>
+            <td class="td-muted">—</td>
+            <td class="td-muted">—</td>
+            <td class="td-muted">₹{{ "{:,.0f}".format(data.income.sources.ais.rent_total) }}</td>
+            <td class="td-green">₹{{ "{:,.0f}".format(data.income.reconciled.rent) }}</td>
+          </tr>
+          <tr>
+            <td>Business / Freelance</td>
+            <td class="td-muted">₹{{ "{:,.0f}".format(data.income.sources.bank.freelance) }}</td>
+            <td class="td-muted">—</td>
+            <td class="td-muted">₹{{ "{:,.0f}".format(data.income.sources.ais.gst_turnover) }}</td>
+            <td class="td-green">₹{{ "{:,.0f}".format(data.income.reconciled.business) }}</td>
+          </tr>
+          <tr style="background:rgba(201,168,76,0.04); font-weight:500;">
+            <td style="color:var(--text);">Total</td>
+            <td style="color:var(--gold);">₹{{ "{:,.0f}".format(data.income.sources.bank.total_credits) }}</td>
+            <td style="color:var(--gold);">₹{{ "{:,.0f}".format(data.income.sources.form_26as.total_income_declared) }}</td>
+            <td style="color:var(--gold);">₹{{ "{:,.0f}".format(data.income.sources.ais.total_income) }}</td>
+            <td class="td-green" style="font-size:1rem; font-family:'Cormorant Garamond',serif; font-weight:400;">₹{{ "{:,.0f}".format(data.income.reconciled.total) }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- BS + P&L SIDE BY SIDE -->
+    <div class="grid-2">
+
+      <!-- P&L -->
+      <div class="card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+          Profit & Loss Statement
+        </div>
+        <div style="margin-bottom:16px;">
+          <div style="font-size:0.6rem; letter-spacing:0.2em; text-transform:uppercase; color:var(--gold); margin-bottom:10px;">Income</div>
+          {% for label, val in [
+            ('Salary', data.bs_pl.pl.income.salary),
+            ('Interest', data.bs_pl.pl.income.interest),
+            ('Dividend', data.bs_pl.pl.income.dividend),
+            ('Rent', data.bs_pl.pl.income.rent),
+            ('Business', data.bs_pl.pl.income.business),
+          ] %}
+          <div class="bspl-row">
+            <span class="bspl-label">{{ label }}</span>
+            <span class="bspl-val" style="color:var(--green);">₹{{ "{:,.0f}".format(val) }}</span>
+          </div>
+          {% endfor %}
+          <div class="bspl-row total">
+            <span>Total Income</span>
+            <span class="bspl-val" style="color:var(--green);">₹{{ "{:,.0f}".format(data.bs_pl.pl.income.total) }}</span>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:0.6rem; letter-spacing:0.2em; text-transform:uppercase; color:var(--red); margin-bottom:10px;">Expenses</div>
+          {% for label, val in [
+            ('EMI Repayments', data.bs_pl.pl.expenses.emi_repayment),
+            ('Personal Expenses', data.bs_pl.pl.expenses.personal),
+            ('Business Expenses', data.bs_pl.pl.expenses.business),
+          ] %}
+          <div class="bspl-row">
+            <span class="bspl-label">{{ label }}</span>
+            <span class="bspl-val" style="color:var(--red);">₹{{ "{:,.0f}".format(val) }}</span>
+          </div>
+          {% endfor %}
+          <div class="bspl-row total">
+            <span>Net Surplus</span>
+            <span class="bspl-val" style="color:{% if data.bs_pl.pl.net_surplus > 0 %}var(--green){% else %}var(--red){% endif %};">
+              ₹{{ "{:,.0f}".format(data.bs_pl.pl.net_surplus) }}
+            </span>
+          </div>
+        </div>
+        <p style="font-size:0.66rem; color:var(--muted); margin-top:14px; font-style:italic;">{{ data.bs_pl.note }}</p>
+      </div>
+
+      <!-- Balance Sheet -->
+      <div class="card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          Balance Sheet (Schedule III Indicative)
+        </div>
+        <div style="margin-bottom:16px;">
+          <div style="font-size:0.6rem; letter-spacing:0.2em; text-transform:uppercase; color:var(--gold); margin-bottom:10px;">Assets</div>
+          <div class="bspl-row">
+            <span class="bspl-label">Opening Balance</span>
+            <span class="bspl-val">₹{{ "{:,.0f}".format(data.bs_pl.bs.opening_balance) }}</span>
+          </div>
+          <div class="bspl-row">
+            <span class="bspl-label">Closing Bank Balance</span>
+            <span class="bspl-val" style="color:var(--gold);">₹{{ "{:,.0f}".format(data.bs_pl.bs.assets.bank_balance) }}</span>
+          </div>
+          <div class="bspl-row">
+            <span class="bspl-label">Investments (AIS)</span>
+            <span class="bspl-val">₹{{ "{:,.0f}".format(data.bs_pl.bs.assets.investments) }}</span>
+          </div>
+          <div class="bspl-row total">
+            <span>Total Assets</span>
+            <span class="bspl-val" style="color:var(--green);">₹{{ "{:,.0f}".format(data.bs_pl.bs.assets.total_assets) }}</span>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:0.6rem; letter-spacing:0.2em; text-transform:uppercase; color:var(--red); margin-bottom:10px;">Liabilities</div>
+          <div class="bspl-row">
+            <span class="bspl-label">Loans Outstanding (Est.)</span>
+            <span class="bspl-val" style="color:var(--red);">₹{{ "{:,.0f}".format(data.bs_pl.bs.liabilities.loans_estimated) }}</span>
+          </div>
+          <div class="bspl-row total">
+            <span>Net Worth</span>
+            <span class="bspl-val" style="color:{% if data.bs_pl.bs.net_worth > 0 %}var(--green){% else %}var(--red){% endif %};">
+              ₹{{ "{:,.0f}".format(data.bs_pl.bs.net_worth) }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- TDS DETAILS -->
+    {% if data.tds.deductors %}
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+        TDS Deductors — Form 26AS Part A
+      </div>
+      <table class="compare-table">
+        <thead>
+          <tr><th>Deductor Name</th><th>TAN</th><th>Section</th><th>Amount Paid (₹)</th><th>TDS Deducted (₹)</th><th>TDS Deposited (₹)</th></tr>
+        </thead>
+        <tbody>
+          {% for d in data.tds.deductors %}
+          <tr>
+            <td>{{ d.deductor_name[:40] }}</td>
+            <td class="td-muted" style="font-family:monospace; font-size:0.72rem;">{{ d.tan }}</td>
+            <td><span class="badge badge-gold">{{ d.section }}</span></td>
+            <td style="color:var(--gold);">₹{{ "{:,.0f}".format(d.amount_paid) }}</td>
+            <td class="td-green">₹{{ "{:,.0f}".format(d.tds_deducted) }}</td>
+            <td class="td-green">₹{{ "{:,.0f}".format(d.tds_deposited) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+
+    <!-- DISCREPANCIES -->
+    {% if data.discrepancies %}
+    <div class="card">
+      <div class="card-title" style="color:var(--yellow);">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Discrepancies Detected ({{ data.discrepancies|length }})
+      </div>
+      {% for d in data.discrepancies %}
+      <div class="disc-item {{ d.severity }}">
+        <div class="disc-icon">{% if d.severity == 'high' %}🚨{% elif d.severity == 'medium' %}⚠️{% else %}ℹ️{% endif %}</div>
+        <div>
+          <span class="disc-sev {{ d.severity }}">{{ d.severity | upper }}</span>
+          <div class="disc-msg">{{ d.message }}</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="alert alert-ok">
+      <span class="alert-title">✓ No Major Discrepancies Found</span>
+      All sources are broadly consistent. Proceed with CA review for final verification.
+    </div>
+    {% endif %}
+
+    <!-- INCOME GAPS -->
+    {% if data.income.gaps %}
+    <div class="card">
+      <div class="card-title">Income Reconciliation Gaps</div>
+      {% for g in data.income.gaps %}
+      <div class="disc-item medium">
+        <div class="disc-icon">⚠️</div>
+        <div>
+          <span class="disc-sev medium">RECONCILIATION GAP</span>
+          <div class="disc-msg">{{ g.message }} · Difference: ₹{{ "{:,.0f}".format(g.diff) }}</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="alert alert-warn" style="margin-top:8px;">
+      <span class="alert-title">⚠ Important</span>
+      These figures are indicative based on available documents. Final books finalisation requires CA verification, Tally/accounting software entries, and cross-check with all source documents.
+    </div>
+
+    {% endif %}
+  </main>
+</div>
+
+<script>
+function fileSel(inputId, boxId, selId) {
+  const input = document.getElementById(inputId);
+  const box   = document.getElementById(boxId);
+  const sel   = document.getElementById(selId);
+  if (input.files && input.files[0]) {
+    box.classList.add('has-file');
+    sel.style.display = 'block';
+    sel.textContent   = '✓ ' + input.files[0].name;
+  }
+}
+
+document.getElementById('conForm').addEventListener('submit', function() {
+  document.getElementById('submitBtn').disabled = true;
+  document.getElementById('submitBtn').textContent = 'Consolidating…';
+});
+</script>
+</body>
+</html>

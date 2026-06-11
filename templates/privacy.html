@@ -5,15 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Privacy Policy — AarogyamFin</title>
 <link rel="canonical" href="https://aarogyamfin.com/privacy" />
-<meta name="description" content="AarogyamFin never stores your bank statement data. Your PDF is deleted immediately after processing. No cookies, no tracking, no data retention." />
+<meta name="description" content="AarogyamFin Privacy Policy. Your financial documents are processed in real-time and never stored. No data sent to third-party AI services." />
 <meta property="og:title" content="Privacy Policy — AarogyamFin" />
-<meta property="og:description" content="AarogyamFin never stores your bank statement data. Your PDF is deleted immediately after processing." />
+<meta property="og:description" content="AarogyamFin Privacy Policy. Your financial documents are processed in real-time and never stored." />
 <meta property="og:url" content="https://aarogyamfin.com/privacy" />
 <meta property="og:type" content="website" />
 <meta property="og:image" content="https://aarogyamfin.com/static/og-image.png" />
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="Privacy Policy — AarogyamFin" />
-<meta name="twitter:description" content="AarogyamFin never stores your bank statement data. Your PDF is deleted immediately after processing." />
+<meta name="twitter:description" content="AarogyamFin Privacy Policy. Your financial documents are processed in real-time and never stored." />
 <meta name="twitter:image" content="https://aarogyamfin.com/static/og-image.png" />
 <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -90,47 +90,68 @@
     <li><a href="/about">About</a></li>
     <li><a href="/terms">Terms</a></li>
   </ul>
-  <a href="/#analyzer" class="nav-cta">Analyze Statement</a>
+  <a href="/dashboard" class="nav-cta">Open Dashboard</a>
 </nav>
 
 <div class="page-hero">
   <div class="hero-tag">Legal</div>
   <h1 class="hero-headline">Privacy Policy</h1>
-  <p class="hero-date">Last updated: February 2026</p>
+  <p class="hero-date">Last updated: June 2026</p>
 </div>
 
 <div class="content">
 
   <div class="section reveal">
-    <h2><span>🔒</span> No Data Storage — Ever</h2>
+    <h2><span>🔒</span> No Financial Data Storage</h2>
     <p>AarogyamFin is built on a simple principle: <strong>your financial data belongs to you, not us.</strong></p>
-    <p>When you upload a bank statement PDF, it is processed entirely in real-time and <strong>permanently deleted from our servers immediately after analysis.</strong> We do not retain, store, archive, or back up any uploaded files.</p>
+    <p>When you upload documents — bank statement PDFs, Form 26AS, AIS, invoice Excels, or GSTR-2B data — they are processed entirely in real-time and <strong>permanently deleted from our servers immediately after analysis.</strong> We do not retain, store, archive, or back up any uploaded financial documents.</p>
+    <p>Transaction data, GST computations, reconciliation results, and Balance Sheet / P&L outputs exist only during your active session and are not persisted to any database.</p>
     <div class="highlight-box">
-      <p>✓ Your PDF is deleted within seconds of processing — guaranteed by our code, not just policy.</p>
+      <p>✓ Your uploaded documents are deleted within seconds of processing — guaranteed by our code, not just policy.</p>
     </div>
   </div>
 
   <div class="section reveal">
     <h2><span>📋</span> What We Collect</h2>
-    <p>We collect <strong>absolutely no personal information.</strong> There are no user accounts, no login requirements, and no registration process.</p>
-    <p>The only data temporarily processed is the PDF you upload — which is deleted immediately. Your keyword searches and results exist only in your browser session and are never logged or stored on our servers.</p>
-    <p>We do not use cookies, trackers, analytics SDKs, or any third-party data collection tools.</p>
+    <p><strong>Account Information:</strong> When you sign in via Google, we receive your email address and display name through Firebase Authentication. This is used solely for login, session management, and associating your payment status.</p>
+    <p><strong>Payment Information:</strong> Payments are processed through Razorpay. We store your payment status and session hash in Supabase to enforce per-session access. We do not store credit card numbers, UPI IDs, or any payment credentials — Razorpay handles all sensitive payment data directly.</p>
+    <p><strong>What we do NOT collect:</strong> We do not store your bank statement data, transaction details, GST computations, 26AS/AIS contents, or any financial analysis results. These exist only in your browser session.</p>
+  </div>
+
+  <div class="section reveal">
+    <h2><span>🛡️</span> No Third-Party AI APIs</h2>
+    <p>Unlike many fintech tools, <strong>AarogyamFin does not send your financial data to any external AI service</strong> — no OpenAI, no Google AI, no third-party LLM APIs.</p>
+    <p>All document parsing, transaction categorization, GST computation, ITC reconciliation, and financial consolidation happens entirely on our own servers using our custom-built engines.</p>
+    <div class="highlight-box">
+      <p>✓ Your financial data never leaves our servers to reach any third-party AI or analytics service.</p>
+    </div>
   </div>
 
   <div class="section reveal">
     <h2><span>🚫</span> What We Never Do</h2>
     <p>We will <strong>never:</strong></p>
-    <p>— Sell, share, or transfer your data to any third party</p>
-    <p>— Use your financial data to train AI models</p>
+    <p>— Sell, share, or transfer your financial data to any third party</p>
+    <p>— Send your documents to external AI services for processing</p>
+    <p>— Use your financial data to train any AI models</p>
     <p>— Send you marketing emails or spam</p>
-    <p>— Store your transaction history anywhere</p>
+    <p>— Store your transaction history, GST data, or analysis results</p>
     <p>— Share information with advertisers or data brokers</p>
   </div>
 
   <div class="section reveal">
+    <h2><span>🔧</span> Third-Party Services</h2>
+    <p>AarogyamFin uses the following third-party services, each with their own privacy policies:</p>
+    <p><strong>Firebase Authentication (Google):</strong> For user login via Google Sign-In. Google receives your authentication data per their privacy policy.</p>
+    <p><strong>Supabase:</strong> For storing user account status and payment session data. No financial document content is stored in Supabase.</p>
+    <p><strong>Razorpay:</strong> For processing payments. Razorpay handles all payment credentials per RBI guidelines and their privacy policy.</p>
+    <p><strong>Railway:</strong> For server hosting. Our application runs on Railway's secure cloud infrastructure.</p>
+    <p><strong>Cloudflare:</strong> For DNS and CDN services.</p>
+  </div>
+
+  <div class="section reveal">
     <h2><span>🔐</span> Security</h2>
-    <p>All data transmitted between your browser and our servers is protected by <strong>256-bit SSL encryption.</strong> Our servers are hosted on Railway's secure cloud infrastructure.</p>
-    <p>File uploads are limited to 10MB and only PDF files are accepted. Rate limiting is enforced to prevent abuse.</p>
+    <p>All data transmitted between your browser and our servers is protected by <strong>SSL/TLS encryption.</strong> Our servers are hosted on Railway's secure cloud infrastructure with Cloudflare CDN.</p>
+    <p>File uploads are limited to PDF and Excel formats. Rate limiting is enforced to prevent abuse.</p>
   </div>
 
   <div class="section reveal">
@@ -147,7 +168,7 @@
 
   <div class="section reveal">
     <h2><span>📬</span> Contact</h2>
-    <p>Questions about this Privacy Policy? Reach us at <strong><a href="mailto:aarogyamfin@gmail.com" style="color:var(--gold);">aarogyamfin@gmail.com</a></strong> — we're committed to transparency and will respond promptly.</p>    
+    <p>Questions about this Privacy Policy? Reach us at <strong><a href="mailto:aarogyamfin@gmail.com" style="color:var(--gold);">aarogyamfin@gmail.com</a></strong> — we're committed to transparency and will respond promptly.</p>
   </div>
 
 </div>
