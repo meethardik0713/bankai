@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ product }} — Coming Soon | AarogyamFin</title>
+<link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #c9a84c;
+    --gold-light: #e8cc7a;
+    --bg: #060810;
+    --border: rgba(201,168,76,0.15);
+    --text: #e8e4d9;
+    --muted: rgba(232,228,217,0.45);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; font-weight: 300; min-height: 100vh; display: flex; flex-direction: column; }
+
+  nav { padding: 28px 60px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); }
+  .nav-logo { font-family: 'Cormorant Garamond', serif; font-size: 1.4rem; font-weight: 500; letter-spacing: 0.12em; color: var(--text); text-decoration: none; }
+  .nav-logo span { color: var(--gold); }
+  .nav-cta { font-size: 0.75rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold); border: 1px solid var(--border); padding: 10px 24px; text-decoration: none; transition: all 0.3s; background: rgba(201,168,76,0.04); }
+  .nav-cta:hover { background: rgba(201,168,76,0.1); }
+
+  main { flex: 1; display: flex; align-items: center; justify-content: center; padding: 80px 40px; }
+  .container { text-align: center; max-width: 560px; }
+
+  .tag { display: inline-block; font-size: 0.65rem; letter-spacing: 0.28em; text-transform: uppercase; color: var(--gold); border: 1px solid var(--border); padding: 7px 18px; margin-bottom: 40px; background: rgba(201,168,76,0.04); }
+  h1 { font-family: 'Cormorant Garamond', serif; font-size: clamp(2.4rem, 5vw, 4rem); font-weight: 300; line-height: 1.1; margin-bottom: 24px; }
+  h1 em { font-style: italic; color: var(--gold-light); }
+  p { font-size: 0.92rem; line-height: 1.85; color: var(--muted); margin-bottom: 48px; }
+
+  .actions { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+  .btn-primary { display: inline-flex; align-items: center; gap: 8px; background: var(--gold); color: #060810; font-family: 'DM Sans', sans-serif; font-size: 0.78rem; font-weight: 500; letter-spacing: 0.16em; text-transform: uppercase; padding: 14px 32px; text-decoration: none; transition: opacity 0.3s; }
+  .btn-primary:hover { opacity: 0.85; }
+  .btn-secondary { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 0.78rem; letter-spacing: 0.14em; text-transform: uppercase; text-decoration: none; transition: color 0.3s; padding: 14px 24px; border: 1px solid var(--border); }
+  .btn-secondary:hover { color: var(--text); border-color: rgba(201,168,76,0.3); }
+
+  .divider { width: 1px; height: 80px; background: linear-gradient(to bottom, transparent, var(--gold), transparent); margin: 56px auto; opacity: 0.4; }
+
+  .other-products { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; text-align: left; }
+  .product-card { background: rgba(255,255,255,0.02); border: 1px solid var(--border); padding: 24px 20px; text-decoration: none; transition: border-color 0.3s; }
+  .product-card:hover { border-color: rgba(201,168,76,0.35); }
+  .product-card-tag { font-size: 0.58rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold); margin-bottom: 10px; display: block; }
+  .product-card-name { font-family: 'Cormorant Garamond', serif; font-size: 1.05rem; font-weight: 400; color: var(--text); }
+
+  footer { padding: 24px 60px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  .footer-copy { font-size: 0.72rem; color: var(--muted); }
+  .footer-links { display: flex; gap: 24px; list-style: none; }
+  .footer-links a { font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); text-decoration: none; }
+  .footer-links a:hover { color: var(--gold); }
+
+  @media (max-width: 768px) {
+    nav { padding: 16px 20px; }
+    .other-products { grid-template-columns: 1fr; }
+    footer { flex-direction: column; gap: 16px; padding: 20px; text-align: center; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="nav-logo">Aarogyam<span>Fin</span></a>
+  {% if is_logged_in %}
+  <a href="/logout" class="nav-cta">Logout</a>
+  {% else %}
+  <a href="/login" class="nav-cta">Sign In</a>
+  {% endif %}
+</nav>
+
+<main>
+  <div class="container">
+    <div class="tag">Under Development</div>
+    <h1><em>{{ product }}</em><br>is Coming Soon</h1>
+    <p>We're actively building and testing this module. It'll be live shortly — in the meantime, explore our other tools below.</p>
+    <div class="actions">
+      <a href="/" class="btn-primary">← Back to Home</a>
+      <a href="/dashboard" class="btn-secondary">Open Dashboard</a>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="other-products">
+      <a href="/" class="product-card">
+        <span class="product-card-tag">Live</span>
+        <div class="product-card-name">Bank Statement Analyzer</div>
+      </a>
+      <a href="/dashboard" class="product-card">
+        <span class="product-card-tag">Live</span>
+        <div class="product-card-name">Financial Dashboard</div>
+      </a>
+      <a href="/consolidator" class="product-card">
+        <span class="product-card-tag">Live</span>
+        <div class="product-card-name">Financial Consolidator</div>
+      </a>
+      <a href="/gst-calendar" class="product-card">
+        <span class="product-card-tag">Free</span>
+        <div class="product-card-name">GST Calendar</div>
+      </a>
+      <a href="/gstr1" class="product-card">
+        <span class="product-card-tag">Coming Soon</span>
+        <div class="product-card-name">GSTR-1 Auto-Fill</div>
+      </a>
+      <a href="/gstr3b" class="product-card">
+        <span class="product-card-tag">Coming Soon</span>
+        <div class="product-card-name">GSTR-3B Computation</div>
+      </a>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <p class="footer-copy">© 2026 AarogyamFin Financial Services Pvt. Ltd.</p>
+  <ul class="footer-links">
+    <li><a href="/privacy">Privacy</a></li>
+    <li><a href="/terms">Terms</a></li>
+    <li><a href="/about">About</a></li>
+  </ul>
+</footer>
+
+</body>
+</html>

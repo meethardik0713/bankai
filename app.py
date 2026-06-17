@@ -1384,15 +1384,13 @@ def dashboard_export():
 #  GSTR-2B RECONCILIATION ROUTE
 # ═══════════════════════════════════════════════════════════
 
-@app.route('/gstr2b', methods=['GET'])
+@app.route('/gstr2b', methods=['GET', 'POST'])
 def gstr2b_page():
     is_logged_in, user_email, user_id = _get_current_user()
-    if not is_logged_in:
-        return redirect('/login')
-    return render_template('gstr2b.html', data=None, is_logged_in=is_logged_in, user_email=user_email)
+    return render_template('coming_soon.html', is_logged_in=is_logged_in, user_email=user_email, product='GSTR-2B Reconciliation')
 
 
-@app.route('/gstr2b', methods=['POST'])
+@app.route('/gstr2b_disabled', methods=['POST'])
 def gstr2b_analyze():
     ip = request.remote_addr
     if is_rate_limited(ip):
@@ -1460,15 +1458,13 @@ def gstr2b_analyze():
 #  GSTR-3B ROUTE
 # ═══════════════════════════════════════════════════════════
 
-@app.route('/gstr3b', methods=['GET'])
+@app.route('/gstr3b', methods=['GET', 'POST'])
 def gstr3b_page():
     is_logged_in, user_email, user_id = _get_current_user()
-    if not is_logged_in:
-        return redirect('/login')
-    return render_template('gstr3b.html', data=None, is_logged_in=is_logged_in, user_email=user_email)
+    return render_template('coming_soon.html', is_logged_in=is_logged_in, user_email=user_email, product='GSTR-3B Computation')
 
 
-@app.route('/gstr3b', methods=['POST'])
+@app.route('/gstr3b_disabled', methods=['POST'])
 def gstr3b_analyze():
     ip = request.remote_addr
     if is_rate_limited(ip):
@@ -1580,15 +1576,13 @@ def gst_calendar():
 #  GSTR-1 ROUTE
 # ═══════════════════════════════════════════════════════════
 
-@app.route('/gstr1', methods=['GET'])
+@app.route('/gstr1', methods=['GET', 'POST'])
 def gstr1_page():
     is_logged_in, user_email, user_id = _get_current_user()
-    if not is_logged_in:
-        return redirect('/login')
-    return render_template('gstr1.html', data=None, is_logged_in=is_logged_in, user_email=user_email)
+    return render_template('coming_soon.html', is_logged_in=is_logged_in, user_email=user_email, product='GSTR-1 Auto-Fill')
 
 
-@app.route('/gstr1', methods=['POST'])
+@app.route('/gstr1_disabled', methods=['POST'])
 def gstr1_analyze():
     ip = request.remote_addr
     if is_rate_limited(ip):
