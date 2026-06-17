@@ -279,13 +279,21 @@
   .feature h3 { font-family: 'Cormorant Garamond', serif; font-size: 1.25rem; font-weight: 400; margin-bottom: 12px; }
   .feature p { font-size: 0.85rem; line-height: 1.8; color: var(--muted); }
 
-  footer { padding: 48px 60px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
-  .footer-logo { font-family: 'Cormorant Garamond', serif; font-size: 1.2rem; font-weight: 500; letter-spacing: 0.1em; }
+  footer { border-top: 1px solid var(--border); background: rgba(255,255,255,0.01); }
+  .footer-top { max-width: 1200px; margin: 0 auto; padding: 64px 60px 48px; display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr; gap: 48px; }
+  .footer-brand p { font-size: 0.82rem; line-height: 1.8; color: var(--muted); margin-top: 16px; max-width: 260px; }
+  .footer-tagline { font-size: 0.7rem; letter-spacing: 0.1em; color: rgba(201,168,76,0.6); margin-top: 8px; }
+  .footer-bottom { border-top: 1px solid var(--border); padding: 24px 60px; max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
+  .footer-logo { font-family: 'Cormorant Garamond', serif; font-size: 1.3rem; font-weight: 500; letter-spacing: 0.1em; }
   .footer-logo span { color: var(--gold); }
-  .footer-copy { font-size: 0.75rem; color: var(--muted); letter-spacing: 0.05em; }
-  .footer-links { display: flex; gap: 32px; list-style: none; }
-  .footer-links a { font-size: 0.72rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); text-decoration: none; transition: color 0.3s; }
-  .footer-links a:hover { color: var(--gold); }
+  .footer-copy { font-size: 0.72rem; color: var(--muted); letter-spacing: 0.05em; }
+  .footer-col h5 { font-size: 0.65rem; letter-spacing: 0.28em; text-transform: uppercase; color: var(--gold); margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+  .footer-col ul { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+  .footer-col ul li a { font-size: 0.8rem; color: var(--muted); text-decoration: none; transition: color 0.3s; letter-spacing: 0.03em; }
+  .footer-col ul li a:hover { color: var(--gold); }
+  .footer-legal { display: flex; gap: 24px; list-style: none; }
+  .footer-legal a { font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); text-decoration: none; transition: color 0.3s; }
+  .footer-legal a:hover { color: var(--gold); }
 
   @keyframes fadeUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
   @keyframes scrollPulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
@@ -362,8 +370,9 @@
     table { min-width: 540px; }
     th, td { padding: 10px 12px; font-size: 0.72rem; }
     .desc-col { max-width: 160px; }
-    footer { flex-direction: column; gap: 24px; text-align: center; }
-    .footer-links { flex-wrap: wrap; justify-content: center; }
+    .footer-top { grid-template-columns: 1fr 1fr; gap: 32px; padding: 40px 20px 32px; }
+    .footer-bottom { flex-direction: column; gap: 16px; text-align: center; padding: 20px; }
+    .footer-legal { flex-wrap: wrap; justify-content: center; }
     body { cursor: auto; }
     .cursor, .cursor-ring { display: none; }
     .dash-card { padding: 14px 16px; }
@@ -776,15 +785,50 @@
 </section>
 
 <footer>
-  <div class="footer-logo">Aarogyam<span>Fin</span></div>
-  <p class="footer-copy">© 2026 AarogyamFin. All rights reserved.</p>
-  <ul class="footer-links">
-    <li><a href="/privacy">Privacy</a></li>
-    <li><a href="/terms">Terms</a></li>
-    <li><a href="#trust">Security</a></li>
-    <li><a href="/about">About</a></li>
-    <li><a href="#analyzer">Analyze</a></li>
-  </ul>
+  <div class="footer-top">
+    <div class="footer-brand">
+      <div class="footer-logo">Aarogyam<span>Fin</span></div>
+      <div class="footer-tagline">AI-Powered CA Workflow Platform</div>
+      <p>Automating GST, ITR, audit, and books finalisation for Chartered Accountants and their clients across India.</p>
+    </div>
+    <div class="footer-col">
+      <h5>Products</h5>
+      <ul>
+        <li><a href="/#analyzer">Bank Statement Analyzer</a></li>
+        <li><a href="/dashboard">Financial Dashboard</a></li>
+        <li><a href="/gstr1">GSTR-1 Auto-Fill</a></li>
+        <li><a href="/gstr3b">GSTR-3B Computation</a></li>
+        <li><a href="/gstr2b">GSTR-2B Reconciliation</a></li>
+        <li><a href="/consolidator">Financial Consolidator</a></li>
+        <li><a href="/gst-calendar">GST Calendar</a></li>
+      </ul>
+    </div>
+    <div class="footer-col">
+      <h5>Company</h5>
+      <ul>
+        <li><a href="/about">About Us</a></li>
+        <li><a href="/accuracy">Accuracy Test</a></li>
+        <li><a href="/pay">Pricing</a></li>
+        <li><a href="mailto:aarogyamfin@gmail.com">Contact</a></li>
+      </ul>
+    </div>
+    <div class="footer-col">
+      <h5>Legal</h5>
+      <ul>
+        <li><a href="/privacy">Privacy Policy</a></li>
+        <li><a href="/terms">Terms of Service</a></li>
+        <li><a href="#trust">Data Security</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <p class="footer-copy">© 2026 AarogyamFin Financial Services Pvt. Ltd. · New Delhi, India</p>
+    <ul class="footer-legal">
+      <li><a href="/privacy">Privacy</a></li>
+      <li><a href="/terms">Terms</a></li>
+      <li><a href="#trust">Security</a></li>
+    </ul>
+  </div>
 </footer>
 
 <script>
