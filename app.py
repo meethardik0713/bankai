@@ -702,6 +702,8 @@ def sitemap():
         ('https://aarogyamfin.com/privacy', '2026-04-08'),
         ('https://aarogyamfin.com/terms',   '2026-04-08'),
         ('https://aarogyamfin.com/contact', '2026-04-08'),
+('https://aarogyamfin.com/blog', '2026-06-19'),
+('https://aarogyamfin.com/blog/how-to-analyze-bank-statement-for-itr', '2026-06-19'),
     ]
     xml = ['<?xml version="1.0" encoding="UTF-8"?>',
            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
