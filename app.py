@@ -47,7 +47,7 @@ Talisman(app,
     session_cookie_secure=is_prod,
     content_security_policy={
         'default-src': "'self'",
-        'script-src': ["'self'", "'unsafe-inline'", 'https://cdnjs.cloudflare.com', 'https://challenges.cloudflare.com', 'https://checkout.razorpay.com', 'https://cdn.razorpay.com'],
+        'script-src': ["'self'", "'unsafe-inline'", 'https://cdnjs.cloudflare.com', 'https://challenges.cloudflare.com', 'https://checkout.razorpay.com', 'https://checkout.razorpay.com', 'https://cdn.razorpay.com', 'https://www.googletagmanager.com', 'https://www.google-analytics.com'],
         'frame-src': ["'self'", 'https://api.razorpay.com', 'https://checkout.razorpay.com', 'https://cdn.razorpay.com'],
         'connect-src': ["'self'", 'https://api.razorpay.com', 'https://checkout.razorpay.com', 'https://lumberjack.razorpay.com', 'https://cdn.razorpay.com'],
         'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
@@ -56,6 +56,20 @@ Talisman(app,
         'object-src': "'none'",
     }
 )
+
+@app.after_request
+def inject_ga(response):
+    if response.content_type.startswith('text/html'):
+        ga_script = b"""
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-E9STGNFHT4"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-E9STGNFHT4');
+</script>"""
+        response.data = response.data.replace(b'</head>', ga_script + b'</head>')
+    return response
 
 UPLOAD_FOLDER = 'uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
