@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Blog — AarogyamFin | Financial Insights for CAs & Businesses</title>
+<link rel="canonical" href="https://aarogyamfin.com/blog" />
+<meta name="description" content="Financial insights, CA guides, GST updates, bank statement analysis tips, and ITR filing advice from AarogyamFin." />
+<meta property="og:title" content="Blog — AarogyamFin | Financial Insights for CAs & Businesses" />
+<meta property="og:description" content="Financial insights, CA guides, GST updates, and ITR filing advice from AarogyamFin." />
+<meta property="og:url" content="https://aarogyamfin.com/blog" />
+<meta property="og:type" content="website" />
+<meta property="og:image" content="https://aarogyamfin.com/static/og-image.png" />
+<link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #c9a84c;
+    --gold-light: #e8cc7a;
+    --bg: #060810;
+    --surface: rgba(255,255,255,0.03);
+    --border: rgba(201,168,76,0.15);
+    --text: #e8e4d9;
+    --muted: rgba(232,228,217,0.45);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; font-weight: 300; overflow-x: hidden; cursor: none; }
+  .cursor { position: fixed; width: 8px; height: 8px; background: var(--gold); border-radius: 50%; pointer-events: none; z-index: 9999; mix-blend-mode: difference; }
+  .cursor-ring { position: fixed; width: 36px; height: 36px; border: 1px solid rgba(201,168,76,0.4); border-radius: 50%; pointer-events: none; z-index: 9998; }
+
+  nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; padding: 28px 60px; display: flex; justify-content: space-between; align-items: center; background: linear-gradient(to bottom, rgba(6,8,16,0.95), transparent); }
+  .nav-logo { font-family: 'Cormorant Garamond', serif; font-size: 1.4rem; font-weight: 500; letter-spacing: 0.12em; color: var(--text); text-decoration: none; }
+  .nav-logo span { color: var(--gold); }
+  .nav-links { display: flex; gap: 40px; list-style: none; }
+  .nav-links a { font-size: 0.78rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); text-decoration: none; transition: color 0.3s; }
+  .nav-links a:hover, .nav-links a.active { color: var(--gold); }
+  .nav-cta { font-size: 0.75rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold); border: 1px solid var(--border); padding: 10px 24px; text-decoration: none; transition: all 0.3s; background: rgba(201,168,76,0.04); }
+  .nav-cta:hover { background: rgba(201,168,76,0.1); }
+
+  .page-hero { padding: 160px 60px 60px; max-width: 1200px; margin: 0 auto; }
+  .hero-tag { display: inline-block; font-size: 0.68rem; letter-spacing: 0.28em; text-transform: uppercase; color: var(--gold); border: 1px solid var(--border); padding: 7px 18px; margin-bottom: 32px; background: rgba(201,168,76,0.04); opacity: 0; animation: fadeUp 1s 0.3s forwards; }
+  .hero-headline { font-family: 'Cormorant Garamond', serif; font-size: clamp(2.5rem, 5vw, 4rem); font-weight: 300; line-height: 1.1; margin-bottom: 16px; opacity: 0; animation: fadeUp 1s 0.5s forwards; }
+  .hero-headline em { font-style: italic; color: var(--gold-light); }
+  .hero-sub { font-size: 0.95rem; line-height: 1.8; color: var(--muted); max-width: 520px; opacity: 0; animation: fadeUp 1s 0.7s forwards; }
+
+  .blog-grid { max-width: 1200px; margin: 0 auto; padding: 40px 60px 120px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; }
+
+  .blog-card { background: rgba(255,255,255,0.02); border: 1px solid var(--border); padding: 40px 32px; text-decoration: none; color: inherit; display: block; position: relative; overflow: hidden; transition: border-color 0.4s; }
+  .blog-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, var(--gold), transparent); opacity: 0; transition: opacity 0.4s; }
+  .blog-card:hover { border-color: rgba(201,168,76,0.35); }
+  .blog-card:hover::before { opacity: 1; }
+
+  .card-tag { font-size: 0.62rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold); margin-bottom: 20px; display: block; }
+  .card-title { font-family: 'Cormorant Garamond', serif; font-size: 1.4rem; font-weight: 400; line-height: 1.3; margin-bottom: 16px; color: var(--text); transition: color 0.3s; }
+  .blog-card:hover .card-title { color: var(--gold-light); }
+  .card-excerpt { font-size: 0.85rem; line-height: 1.8; color: var(--muted); margin-bottom: 28px; }
+  .card-read-more { font-size: 0.68rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold); display: flex; align-items: center; gap: 8px; }
+  .card-read-more svg { transition: transform 0.3s; }
+  .blog-card:hover .card-read-more svg { transform: translateX(4px); }
+
+  .empty-state { grid-column: 1 / -1; text-align: center; padding: 80px 40px; }
+  .empty-state h3 { font-family: 'Cormorant Garamond', serif; font-size: 2rem; font-weight: 300; color: var(--muted); margin-bottom: 16px; }
+  .empty-state p { font-size: 0.88rem; color: var(--muted); }
+
+  footer { padding: 48px 60px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  .footer-logo { font-family: 'Cormorant Garamond', serif; font-size: 1.2rem; font-weight: 500; letter-spacing: 0.1em; }
+  .footer-logo span { color: var(--gold); }
+  .footer-copy { font-size: 0.75rem; color: var(--muted); }
+  .footer-links { display: flex; gap: 32px; list-style: none; }
+  .footer-links a { font-size: 0.72rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); text-decoration: none; transition: color 0.3s; }
+  .footer-links a:hover { color: var(--gold); }
+
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+  .reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.7s ease, transform 0.7s ease; }
+  .reveal.visible { opacity: 1; transform: translateY(0); }
+
+  @media (max-width: 768px) {
+    nav { padding: 20px 24px; } .nav-links { display: none; }
+    .page-hero { padding: 120px 24px 40px; }
+    .blog-grid { grid-template-columns: 1fr; padding: 24px 24px 80px; }
+    footer { flex-direction: column; gap: 24px; text-align: center; padding: 40px 24px; }
+    body { cursor: auto; } .cursor, .cursor-ring { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<nav>
+  <a href="/" class="nav-logo">Aarogyam<span>Fin</span></a>
+  <ul class="nav-links">
+    <li><a href="/#analyzer">Analyze</a></li>
+    <li><a href="/about">About</a></li>
+    <li><a href="/blog" class="active">Blog</a></li>
+  </ul>
+  {% if is_logged_in %}
+  <a href="/logout" class="nav-cta">Logout</a>
+  {% else %}
+  <a href="/login" class="nav-cta">Sign In</a>
+  {% endif %}
+</nav>
+
+<div class="page-hero">
+  <div class="hero-tag">Insights & Guides</div>
+  <h1 class="hero-headline">Financial clarity,<br><em>simplified.</em></h1>
+  <p class="hero-sub">CA guides, GST updates, bank statement tips, ITR filing advice — everything you need to navigate Indian finance with confidence.</p>
+</div>
+
+<div class="blog-grid">
+  {% if posts %}
+    {% for post in posts %}
+    <a href="/blog/{{ post.slug }}" class="blog-card reveal">
+      <span class="card-tag">Article</span>
+      <h2 class="card-title">{{ post.title }}</h2>
+      <p class="card-excerpt">{{ post.excerpt }}</p>
+      <span class="card-read-more">
+        Read Article
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+      </span>
+    </a>
+    {% endfor %}
+  {% else %}
+    <div class="empty-state">
+      <h3>Coming soon.</h3>
+      <p>Our first articles are being prepared. Check back shortly.</p>
+    </div>
+  {% endif %}
+</div>
+
+<footer>
+  <div class="footer-logo">Aarogyam<span>Fin</span></div>
+  <p class="footer-copy">© 2026 AarogyamFin Financial Services Pvt. Ltd.</p>
+  <ul class="footer-links">
+    <li><a href="/">Home</a></li>
+    <li><a href="/privacy">Privacy</a></li>
+    <li><a href="/about">About</a></li>
+  </ul>
+</footer>
+
+<script>
+const cursor = document.getElementById('cursor');
+const ring = document.getElementById('cursorRing');
+let mx = 0, my = 0, rx = 0, ry = 0;
+document.addEventListener('mousemove', e => {
+  mx = e.clientX; my = e.clientY;
+  cursor.style.left = mx - 4 + 'px'; cursor.style.top = my - 4 + 'px';
+});
+function animateRing() {
+  rx += (mx - rx) * 0.12; ry += (my - ry) * 0.12;
+  ring.style.left = rx - 18 + 'px'; ring.style.top = ry - 18 + 'px';
+  requestAnimationFrame(animateRing);
+}
+animateRing();
+const revealEls = document.querySelectorAll('.reveal');
+const observer = new IntersectionObserver(entries => {
+  entries.forEach((entry, i) => {
+    if (entry.isIntersecting) setTimeout(() => entry.target.classList.add('visible'), i * 80);
+  });
+}, { threshold: 0.1 });
+revealEls.forEach(el => observer.observe(el));
+</script>
+</body>
+</html>

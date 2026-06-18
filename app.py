@@ -2176,6 +2176,38 @@ def consolidator_analyze():
     )
 
 # ═══════════════════════════════════════════════════════════
+#  BLOG ROUTES
+# ═══════════════════════════════════════════════════════════
+
+import markdown
+from pathlib import Path
+
+BLOGS_DIR = Path('blogs')
+
+@app.route('/blog')
+def blog_index():
+    posts = []
+    for f in sorted(BLOGS_DIR.glob('*.md'), reverse=True):
+        content = f.read_text(encoding='utf-8')
+        lines = content.strip().split('\n')
+        title = lines[0].replace('# ', '')
+        excerpt = next((l for l in lines[1:] if l.strip() and not l.startswith('#')), '')[:160]
+        posts.append({'slug': f.stem, 'title': title, 'excerpt': excerpt})
+    is_logged_in, user_email, _ = _get_current_user()
+    return render_template('blog_index.html', posts=posts, is_logged_in=is_logged_in, user_email=user_email)
+
+@app.route('/blog/<slug>')
+def blog_post(slug):
+    filepath = BLOGS_DIR / f'{slug}.md'
+    if not filepath.exists():
+        abort(404)
+    content = filepath.read_text(encoding='utf-8')
+    title = content.strip().split('\n')[0].replace('# ', '')
+    html_content = markdown.markdown(content, extensions=['tables', 'fenced_code'])
+    is_logged_in, user_email, _ = _get_current_user()
+    return render_template('blog_post.html', title=title, content=html_content, slug=slug, is_logged_in=is_logged_in, user_email=user_email)
+
+# ═══════════════════════════════════════════════════════════
 #  ERROR HANDLERS
 # ═══════════════════════════════════════════════════════════
 
