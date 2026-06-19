@@ -26,6 +26,12 @@ def parse_transactions(pdf_path: str) -> list:
         if transactions and transactions[0].get('opening_balance') is not None:
             print(f"[pipeline] Opening balance: ₹{transactions[0]['opening_balance']:,.2f}")
 
+        # OCR fallback for image-based PDFs (BOB, PNB Print-to-PDF style)
+        if not transactions:
+            print(f"[pipeline] 0 transactions, trying OCR fallback...")
+            from parsers.ocr_fallback import ocr_parse
+            transactions = ocr_parse(pdf_path)
+
         # Post-parse: fill missing balances via running calculation
         ob = transactions[0].get('opening_balance') if transactions else None
         _fill_missing_balances(transactions, ob)

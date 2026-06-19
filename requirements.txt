@@ -11,3 +11,5 @@ razorpay
 anthropic
 pandas
 markdown
+pytesseract
+pdf2image
