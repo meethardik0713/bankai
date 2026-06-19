@@ -419,14 +419,6 @@ def _infer_type(desc, amt_cr, amt_dr, words) -> str:
 
 def _import_ocr_libs():
     try:
-        import subprocess
-        subprocess.run(
-            ["apt-get", "install", "-y", "tesseract-ocr"],
-            capture_output=True
-        )
-    except Exception:
-        pass
-    try:
         import pytesseract
         from pytesseract import Output
         from pdf2image import convert_from_path
