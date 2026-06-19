@@ -308,20 +308,39 @@ def _parse_page(df, cols: dict, page_num: int) -> tuple[list[dict], Optional[flo
 # ═══════════════════════════════════════════════════════════
 
 def _fill_amounts_from_delta(transactions: list[dict], opening_balance: Optional[float]) -> None:
-    """Fill None amounts from balance delta. Also fixes type from delta direction."""
+    """Fill None amounts from balance delta. Handles both chronological and reverse order."""
+    if len(transactions) < 2:
+        return
+
+    # Detect reverse chronological order (newest first — common in PNB, BOB)
+    from datetime import datetime
+    reverse_order = False
+    try:
+        first = datetime.strptime(transactions[0]['date'], '%d-%m-%Y')
+        last  = datetime.strptime(transactions[-1]['date'], '%d-%m-%Y')
+        if first > last:
+            reverse_order = True
+    except Exception:
+        pass
+
+    if reverse_order:
+        transactions.reverse()
+
     prev_bal = opening_balance
     for txn in transactions:
         bal = txn.get('balance')
         if txn.get('amount') is None and bal is not None and prev_bal is not None:
             delta = round(bal - prev_bal, 2)
             txn['amount'] = abs(delta)
-            # Only override type if it's still the default and delta is unambiguous
-            if delta < 0 and txn['type'] == 'CR':
+            if delta < 0:
                 txn['type'] = 'DR'
-            elif delta > 0 and txn['type'] == 'DR':
+            elif delta > 0:
                 txn['type'] = 'CR'
         if bal is not None:
             prev_bal = bal
+
+    if reverse_order:
+        transactions.reverse()
 
 
 # ═══════════════════════════════════════════════════════════
