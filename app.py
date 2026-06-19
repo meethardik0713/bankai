@@ -1,4 +1,6 @@
 import os
+import subprocess
+subprocess.run(["apt-get", "install", "-y", "tesseract-ocr"], capture_output=True)
 from dotenv import load_dotenv
 load_dotenv()
 import logging
