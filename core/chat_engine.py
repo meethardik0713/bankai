@@ -170,14 +170,17 @@ def chat(session_id: str, user_message: str, history: list) -> dict:
             )
             final_reply = final_response.content[0].text
 
-        total_tokens = response.usage.input_tokens + response.usage.output_tokens
+        input_tokens = response.usage.input_tokens
+        output_tokens = response.usage.output_tokens
         if 'final_response' in dir():
-            total_tokens += final_response.usage.input_tokens + final_response.usage.output_tokens
+            input_tokens += final_response.usage.input_tokens
+            output_tokens += final_response.usage.output_tokens
 
         return {
             'reply': final_reply,
             'sql_used': sql_used,
-            'tokens_used': total_tokens
+            'tokens_used': input_tokens,
+            'output_tokens': output_tokens,
         }
 
     except Exception as e:

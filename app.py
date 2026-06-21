@@ -500,7 +500,9 @@ def chat_message():
 
     try:
         supabase.table('chat_sessions').update({
-            'messages_used': active_session['messages_used'] + 1
+            'messages_used': active_session['messages_used'] + 1,
+            'input_tokens_used': active_session.get('input_tokens_used', 0) + result.get('tokens_used', 0),
+            'output_tokens_used': active_session.get('output_tokens_used', 0) + result.get('output_tokens', 0),
         }).eq('id', active_session['id']).execute()
     except Exception as e:
         logger.exception("Failed to update message count: %s", e)
@@ -2024,7 +2026,7 @@ def api_chat_message():
 
             supabase.table('chat_sessions').update({
                 'input_tokens_used':  s.get('input_tokens_used', 0) + tokens_used,
-                'output_tokens_used': s.get('output_tokens_used', 0),
+                'output_tokens_used': s.get('output_tokens_used', 0) + result.get('output_tokens', 0),
                 'messages':           existing_messages,
             }).eq('id', session_id).execute()
     except Exception as e:
