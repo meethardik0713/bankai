@@ -13,3 +13,4 @@ pandas
 markdown
 pytesseract
 pdf2image
+posthog

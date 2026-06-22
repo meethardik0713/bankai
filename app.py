@@ -30,6 +30,11 @@ RAZORPAY_KEY_ID     = os.environ.get('RAZORPAY_KEY_ID')
 RAZORPAY_KEY_SECRET = os.environ.get('RAZORPAY_KEY_SECRET')
 rzp_client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
 
+from posthog import Posthog
+POSTHOG_API_KEY = os.environ.get('POSTHOG_API_KEY', '')
+POSTHOG_HOST    = os.environ.get('POSTHOG_HOST', 'https://us.i.posthog.com')
+ph = Posthog(project_api_key=POSTHOG_API_KEY, host=POSTHOG_HOST)
+
 # ── Logging ───────────────────────────────────────────────
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
 logger = logging.getLogger(__name__)
@@ -47,14 +52,36 @@ Talisman(app,
     session_cookie_secure=is_prod,
     content_security_policy={
         'default-src': "'self'",
-        'script-src': ["'self'", "'unsafe-inline'", 'https://cdnjs.cloudflare.com', 'https://challenges.cloudflare.com', 'https://checkout.razorpay.com', 'https://checkout.razorpay.com', 'https://cdn.razorpay.com', 'https://www.googletagmanager.com', 'https://www.google-analytics.com'],
+        'script-src': ["'self'", "'unsafe-inline'", 'https://cdnjs.cloudflare.com', 'https://challenges.cloudflare.com', 'https://checkout.razorpay.com', 'https://checkout.razorpay.com', 'https://cdn.razorpay.com', 'https://www.googletagmanager.com', 'https://www.google-analytics.com', 'https://us-assets.i.posthog.com'],
         'frame-src': ["'self'", 'https://api.razorpay.com', 'https://checkout.razorpay.com', 'https://cdn.razorpay.com'],
-        'connect-src': ["'self'", 'https://api.razorpay.com', 'https://checkout.razorpay.com', 'https://lumberjack.razorpay.com', 'https://cdn.razorpay.com'],
+        'connect-src': ["'self'", 'https://api.razorpay.com', 'https://checkout.razorpay.com', 'https://lumberjack.razorpay.com', 'https://cdn.razorpay.com', 'https://us.i.posthog.com'],
         'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
         'font-src': ["'self'", 'https://fonts.gstatic.com'],
         'img-src': ["'self'", 'data:', 'https:'],
         'object-src': "'none'",
     }
+)
+
+_POSTHOG_JS = (
+    b'<script>'
+    b'!function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){'
+    b'function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){'
+    b't.push([e].concat(Array.prototype.slice.call(arguments,0)))}}'
+    b'(p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,'
+    b'p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",'
+    b'(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;'
+    b'for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){'
+    b'var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},'
+    b'u.people.toString=function(){return u.toString(1)+" (stub)"},'
+    b'o="capture identify alias people.set people.set_once set_config register register_once '
+    b'unregister opt_out_capturing has_opted_out_capturing opt_in_capturing reset isFeatureEnabled '
+    b'onFeatureFlags getFeatureFlag getFeatureFlagPayload reloadFeatureFlags group '
+    b'updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures getActiveMatchingSurveys getSurveys '
+    b'onSessionId setPersonPropertiesForFlags".split(" "),n=0;n<o.length;n++)g(u,o[n]);'
+    b'e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||(window.posthog=[]));'
+    b'posthog.init("' + POSTHOG_API_KEY.encode() + b'",'
+    b'{"api_host":"' + POSTHOG_HOST.encode() + b'","person_profiles":"identified_only"});'
+    b'</script>'
 )
 
 @app.after_request
@@ -68,7 +95,7 @@ def inject_ga(response):
   gtag('js', new Date());
   gtag('config', 'G-E9STGNFHT4');
 </script>"""
-        response.data = response.data.replace(b'</head>', ga_script + b'</head>')
+        response.data = response.data.replace(b'</head>', ga_script + _POSTHOG_JS + b'</head>')
     return response
 
 UPLOAD_FOLDER = 'uploads'
@@ -252,6 +279,8 @@ def auth_callback():
                     'email': result.user.email,
                 }).execute()
 
+                ph.identify(result.user.id, {'email': result.user.email})
+                ph.capture(result.user.id, 'user_signed_in', {'provider': 'google'})
                 logger.info("Login success: %s", result.user.email)
         except Exception as e:
             logger.exception("Auth callback error: %s", e)
@@ -308,6 +337,7 @@ def create_order():
             'razorpay_order_id': order['id'],
         }).execute()
 
+        ph.capture(user_id, 'payment_order_created', {'order_id': order['id'], 'amount_inr': 49})
         logger.info("Order created: %s for %s", order['id'], user_email)
         return jsonify({
             'order_id': order['id'],
@@ -377,6 +407,7 @@ def verify_payment():
         session.pop('file_hash', None)
         session.pop('file_name', None)
 
+        ph.capture(user_id, 'payment_completed', {'amount_inr': 49, 'payment_id': razorpay_payment_id})
         logger.info("Payment verified + session created for %s", user_email)
         return jsonify({'success': True, 'redirect': '/chat'})
 
@@ -441,6 +472,7 @@ def chat_page():
                                 supabase.table('chat_sessions').update({
                                     'statements_used': 1
                                 }).eq('id', active_session['id']).execute()
+                                ph.capture(user_id, 'pdf_uploaded', {'context': 'chat', 'transaction_count': row_count})
                                 logger.info("Chat DB built: %d rows for session %s", row_count, session_id)
                         else:
                             upload_error = 'No transactions found in PDF.'
@@ -506,6 +538,12 @@ def chat_message():
         }).eq('id', active_session['id']).execute()
     except Exception as e:
         logger.exception("Failed to update message count: %s", e)
+
+    ph.capture(user_id, 'chat_message_sent', {
+        'messages_used': active_session['messages_used'] + 1,
+        'input_tokens': result.get('tokens_used', 0),
+        'output_tokens': result.get('output_tokens', 0),
+    })
 
     return jsonify({
         'reply':         result['reply'],
@@ -595,6 +633,12 @@ def home():
                             session['file_name'] = safe_name
                             if has_active and not locked_hash:
                                 _set_locked_hash(user_id, fhash)
+                            distinct = user_id or request.remote_addr
+                            ph.capture(distinct, 'pdf_uploaded', {
+                                'context': 'home',
+                                'transaction_count': len(all_transactions),
+                                'parse_time_seconds': parse_time,
+                            })
                             logger.info("Parsed %s → %d txns in %.1fs",
                                         safe_name, len(all_transactions), parse_time)
                         except Exception as e:
