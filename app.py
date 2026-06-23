@@ -749,6 +749,15 @@ def sitemap():
         ('https://aarogyamfin.com/terms',   '2026-04-08'),
         ('https://aarogyamfin.com/contact', '2026-04-08'),
 ('https://aarogyamfin.com/blog', '2026-06-19'),
+('https://aarogyamfin.com/bank-statement-analyzer', '2026-06-23'),
+('https://aarogyamfin.com/bank-statement-analyzer-for-ca', '2026-06-23'),
+('https://aarogyamfin.com/bank-statement-analyzer-for-dsa', '2026-06-23'),
+('https://aarogyamfin.com/bank-statement-analyzer-for-nbfc', '2026-06-23'),
+('https://aarogyamfin.com/sbi-bank-statement-analyzer', '2026-06-23'),
+('https://aarogyamfin.com/hdfc-bank-statement-analyzer', '2026-06-23'),
+('https://aarogyamfin.com/icici-bank-statement-analyzer', '2026-06-23'),
+('https://aarogyamfin.com/axis-bank-statement-analyzer', '2026-06-23'),
+('https://aarogyamfin.com/kotak-bank-statement-analyzer', '2026-06-23'),
 ('https://aarogyamfin.com/blog/how-to-analyze-bank-statement-for-itr', '2026-06-19'),
     ]
     xml = ['<?xml version="1.0" encoding="UTF-8"?>',
@@ -829,6 +838,89 @@ Sitemap: https://aarogyamfin.com/sitemap.xml
 @app.route('/about')
 def about():
     return render_template('about.html')
+
+
+# ═══════════════════════════════════════════════════════════
+#  SEO LANDING PAGES
+# ═══════════════════════════════════════════════════════════
+
+@app.route('/bank-statement-analyzer')
+def bank_statement_analyzer():
+    is_logged_in, user_email, user_id = _get_current_user()
+    return render_template('bank_statement_analyzer.html',
+        is_logged_in=is_logged_in, user_email=user_email)
+
+@app.route('/bank-statement-analyzer-for-ca')
+def bsa_for_ca():
+    is_logged_in, user_email, user_id = _get_current_user()
+    return render_template('bank_statement_analyzer.html',
+        is_logged_in=is_logged_in, user_email=user_email)
+
+@app.route('/sbi-bank-statement-analyzer')
+def sbi_bsa():
+    is_logged_in, user_email, user_id = _get_current_user()
+    return render_template('bank_statement_analyzer.html',
+        is_logged_in=is_logged_in, user_email=user_email)
+
+@app.route('/hdfc-bank-statement-analyzer')
+def hdfc_bsa():
+    is_logged_in, user_email, user_id = _get_current_user()
+    return render_template('bank_statement_analyzer.html',
+        is_logged_in=is_logged_in, user_email=user_email)
+
+@app.route('/icici-bank-statement-analyzer')
+def icici_bsa():
+    is_logged_in, user_email, user_id = _get_current_user()
+    return render_template('bank_statement_analyzer.html',
+        is_logged_in=is_logged_in, user_email=user_email)
+
+@app.route('/axis-bank-statement-analyzer')
+def axis_bsa():
+    is_logged_in, user_email, user_id = _get_current_user()
+    return render_template('bank_statement_analyzer.html',
+        is_logged_in=is_logged_in, user_email=user_email)
+
+@app.route('/kotak-bank-statement-analyzer')
+def kotak_bsa():
+    is_logged_in, user_email, user_id = _get_current_user()
+    return render_template('bank_statement_analyzer.html',
+        is_logged_in=is_logged_in, user_email=user_email)
+
+@app.route('/pnb-bank-statement-analyzer')
+def pnb_bsa():
+    is_logged_in, user_email, user_id = _get_current_user()
+    return render_template('bank_statement_analyzer.html',
+        is_logged_in=is_logged_in, user_email=user_email)
+
+@app.route('/bob-bank-statement-analyzer')
+def bob_bsa():
+    is_logged_in, user_email, user_id = _get_current_user()
+    return render_template('bank_statement_analyzer.html',
+        is_logged_in=is_logged_in, user_email=user_email)
+
+@app.route('/canara-bank-statement-analyzer')
+def canara_bsa():
+    is_logged_in, user_email, user_id = _get_current_user()
+    return render_template('bank_statement_analyzer.html',
+        is_logged_in=is_logged_in, user_email=user_email)
+
+@app.route('/union-bank-statement-analyzer')
+def union_bsa():
+    is_logged_in, user_email, user_id = _get_current_user()
+    return render_template('bank_statement_analyzer.html',
+        is_logged_in=is_logged_in, user_email=user_email)
+
+@app.route('/bank-statement-analyzer-for-dsa')
+def bsa_for_dsa():
+    is_logged_in, user_email, user_id = _get_current_user()
+    return render_template('bank_statement_analyzer.html',
+        is_logged_in=is_logged_in, user_email=user_email)
+
+@app.route('/bank-statement-analyzer-for-nbfc')
+def bsa_for_nbfc():
+    is_logged_in, user_email, user_id = _get_current_user()
+    return render_template('bank_statement_analyzer.html',
+        is_logged_in=is_logged_in, user_email=user_email)
 
 
 @app.route('/privacy')
