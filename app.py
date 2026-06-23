@@ -753,6 +753,7 @@ def sitemap():
 ('https://aarogyamfin.com/bank-statement-analyzer-for-ca', '2026-06-23'),
 ('https://aarogyamfin.com/bank-statement-analyzer-for-dsa', '2026-06-23'),
 ('https://aarogyamfin.com/bank-statement-analyzer-for-nbfc', '2026-06-23'),
+('https://aarogyamfin.com/bank-statement-to-excel', '2026-06-23'),
 ('https://aarogyamfin.com/sbi-bank-statement-analyzer', '2026-06-23'),
 ('https://aarogyamfin.com/hdfc-bank-statement-analyzer', '2026-06-23'),
 ('https://aarogyamfin.com/icici-bank-statement-analyzer', '2026-06-23'),
@@ -931,6 +932,12 @@ def privacy():
 @app.route('/terms')
 def terms():
     return render_template('terms.html')
+
+@app.route('/bank-statement-to-excel')
+def bank_statement_to_excel():
+    is_logged_in, user_email, user_id = _get_current_user()
+    return render_template('bank_statement_to_excel.html',
+        is_logged_in=is_logged_in, user_email=user_email)
 
 
 # ═══════════════════════════════════════════════════════════
