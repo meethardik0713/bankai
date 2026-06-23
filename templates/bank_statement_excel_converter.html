@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bank Statement Excel Converter India | AarogyamFin</title>
+<link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+<link rel="canonical" href="https://aarogyamfin.com/bank-statement-excel-converter" />
+<meta name="description" content="AI-powered bank statement analyzer for Indian CAs, DSAs & NBFCs. Upload any bank PDF — get instant transactions, Excel export, loan eligibility & ITR data. Supports SBI, HDFC, ICICI & 30+ banks." />
+<meta property="og:title" content="AI Bank Statement Analyzer India | AarogyamFin" />
+<meta property="og:description" content="Upload any Indian bank statement PDF. Get instant AI analysis — transactions, Excel export, loan eligibility, ITR data. Trusted by CAs, DSAs & NBFCs." />
+<meta property="og:url" content="https://aarogyamfin.com/bank-statement-excel-converter" />
+<meta property="og:type" content="website" />
+<meta property="og:image" content="https://aarogyamfin.com/static/og-image.png" />
+<meta name="twitter:card" content="summary_large_image" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "AarogyamFin Bank Statement Analyzer",
+  "applicationCategory": "FinanceApplication",
+  "operatingSystem": "Web, Android",
+  "url": "https://aarogyamfin.com",
+  "description": "AI-powered bank statement analyzer for Indian CAs, DSAs and NBFCs. Supports SBI, HDFC, ICICI, Axis, Kotak and 30+ Indian banks.",
+  "offers": { "@type": "Offer", "price": "49", "priceCurrency": "INR" }
+}
+</script>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    { "@type": "Question", "name": "Which banks are supported?", "acceptedAnswer": { "@type": "Answer", "text": "30+ Indian banks including SBI, HDFC, ICICI, Axis, Kotak, PNB, Bank of Baroda, Canara, Union Bank, IDFC First, Yes Bank, Federal Bank, IndusInd and more." } },
+    { "@type": "Question", "name": "How does the bank statement analyzer work?", "acceptedAnswer": { "@type": "Answer", "text": "Upload your bank statement PDF. AarogyamFin auto-detects the bank, extracts all transactions using AI + OCR, and provides instant analysis including Excel export, loan eligibility, ITR data, and AI chat." } },
+    { "@type": "Question", "name": "Is my data secure?", "acceptedAnswer": { "@type": "Answer", "text": "Files are processed in-memory and never stored permanently. All connections are HTTPS encrypted. AarogyamFin is DPIIT-recognized (DIPP265941)." } },
+    { "@type": "Question", "name": "What is the price?", "acceptedAnswer": { "@type": "Answer", "text": "Rs 49 per parse. No subscription, no hidden fees. Pay only when you analyze." } },
+    { "@type": "Question", "name": "Can CAs use this for multiple clients?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. CAs can analyze statements for multiple clients, export to Excel, and generate ITR-ready summaries." } }
+  ]
+}
+</script>
+
+<style>
+  :root {
+    --gold: #c9a84c;
+    --gold-light: #e8cc7a;
+    --bg: #060810;
+    --surface: rgba(255,255,255,0.03);
+    --border: rgba(201,168,76,0.15);
+    --text: #e8e4d9;
+    --muted: rgba(232,228,217,0.45);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; font-weight: 300; overflow-x: hidden; cursor: none; }
+  .cursor { position: fixed; width: 8px; height: 8px; background: var(--gold); border-radius: 50%; pointer-events: none; z-index: 9999; mix-blend-mode: difference; }
+  .cursor-ring { position: fixed; width: 36px; height: 36px; border: 1px solid rgba(201,168,76,0.4); border-radius: 50%; pointer-events: none; z-index: 9998; }
+
+  nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; padding: 28px 60px; display: flex; justify-content: space-between; align-items: center; background: linear-gradient(to bottom, rgba(6,8,16,0.95), transparent); }
+  .nav-logo { font-family: 'Cormorant Garamond', serif; font-size: 1.4rem; font-weight: 500; letter-spacing: 0.12em; color: var(--text); text-decoration: none; }
+  .nav-logo span { color: var(--gold); }
+  .nav-links { display: flex; gap: 40px; list-style: none; }
+  .nav-links a { font-size: 0.78rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); text-decoration: none; transition: color 0.3s; }
+  .nav-links a:hover, .nav-links a.active { color: var(--gold); }
+  .nav-cta { font-size: 0.75rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold); border: 1px solid var(--border); padding: 10px 24px; text-decoration: none; transition: all 0.3s; background: rgba(201,168,76,0.04); }
+  .nav-cta:hover { background: rgba(201,168,76,0.1); border-color: rgba(201,168,76,0.4); }
+
+  .seo-hero { padding: 160px 60px 100px; max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: center; }
+  .hero-tag { display: inline-block; font-size: 0.68rem; letter-spacing: 0.28em; text-transform: uppercase; color: var(--gold); border: 1px solid var(--border); padding: 7px 18px; margin-bottom: 32px; background: rgba(201,168,76,0.04); }
+  .hero-headline { font-family: 'Cormorant Garamond', serif; font-size: clamp(2.4rem, 4vw, 4rem); font-weight: 300; line-height: 1.1; margin-bottom: 24px; }
+  .hero-headline em { font-style: italic; color: var(--gold-light); }
+  .hero-sub { font-size: 0.95rem; line-height: 1.9; color: var(--muted); margin-bottom: 40px; }
+  .hero-actions { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+  .btn-primary { display: inline-flex; align-items: center; gap: 10px; background: var(--gold); color: #060810; font-family: 'DM Sans', sans-serif; font-size: 0.78rem; font-weight: 500; letter-spacing: 0.16em; text-transform: uppercase; padding: 16px 36px; text-decoration: none; transition: opacity 0.3s; }
+  .btn-primary:hover { opacity: 0.85; }
+  .btn-secondary { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 0.78rem; letter-spacing: 0.14em; text-transform: uppercase; text-decoration: none; transition: color 0.3s; padding: 16px 0; }
+  .btn-secondary:hover { color: var(--text); }
+  .hero-note { font-size: 0.72rem; color: var(--muted); margin-top: 16px; letter-spacing: 0.05em; }
+
+  .hero-card { background: rgba(255,255,255,0.02); border: 1px solid var(--border); padding: 32px; }
+  .hero-card-header { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+  .hero-card-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gold); }
+  .hero-card-title { font-size: 0.72rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); }
+  .hero-stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+  .hero-stat { background: rgba(255,255,255,0.02); border: 1px solid var(--border); padding: 16px; text-align: center; }
+  .hero-stat-val { font-family: 'Cormorant Garamond', serif; font-size: 1.8rem; font-weight: 300; color: var(--gold); }
+  .hero-stat-label { font-size: 0.62rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); margin-top: 4px; }
+  .hero-bank-list { display: flex; flex-wrap: wrap; gap: 6px; }
+  .hero-bank-tag { font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--border); padding: 4px 10px; }
+
+  .section-tag { font-size: 0.68rem; letter-spacing: 0.28em; text-transform: uppercase; color: var(--gold); margin-bottom: 20px; display: block; }
+  .section-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(1.8rem, 3vw, 3rem); font-weight: 300; line-height: 1.15; margin-bottom: 48px; }
+
+  .banks-strip { border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); background: rgba(201,168,76,0.02); padding: 32px 60px; }
+  .banks-inner { max-width: 1200px; margin: 0 auto; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .banks-label { font-size: 0.65rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted); margin-right: 16px; white-space: nowrap; }
+  .bank-chip { font-size: 0.7rem; letter-spacing: 0.1em; color: var(--text); border: 1px solid var(--border); padding: 6px 14px; background: var(--surface); transition: border-color 0.3s; text-decoration: none; }
+  .bank-chip:hover { border-color: rgba(201,168,76,0.4); color: var(--gold); }
+  .bank-chip.more { color: var(--gold); border-color: rgba(201,168,76,0.3); }
+
+  #how-it-works { padding: 100px 60px; max-width: 1200px; margin: 0 auto; }
+  .steps-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; }
+  .step { padding: 48px 40px; background: var(--surface); border: 1px solid var(--border); position: relative; overflow: hidden; transition: border-color 0.4s; }
+  .step::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, var(--gold), transparent); opacity: 0; transition: opacity 0.4s; }
+  .step:hover { border-color: rgba(201,168,76,0.3); }
+  .step:hover::before { opacity: 1; }
+  .step-num { font-family: 'Cormorant Garamond', serif; font-size: 4rem; font-weight: 300; color: rgba(201,168,76,0.12); line-height: 1; margin-bottom: 28px; }
+  .step h3 { font-family: 'Cormorant Garamond', serif; font-size: 1.4rem; font-weight: 400; margin-bottom: 12px; }
+  .step p { font-size: 0.88rem; line-height: 1.8; color: var(--muted); }
+
+  #features { padding: 100px 60px; background: rgba(201,168,76,0.02); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+  .features-inner { max-width: 1200px; margin: 0 auto; }
+  .features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--border); }
+  .feature { background: var(--bg); padding: 48px 36px; transition: background 0.3s; }
+  .feature:hover { background: rgba(201,168,76,0.03); }
+  .feature-icon { font-size: 1.6rem; margin-bottom: 20px; }
+  .feature h3 { font-family: 'Cormorant Garamond', serif; font-size: 1.25rem; font-weight: 400; margin-bottom: 12px; }
+  .feature p { font-size: 0.85rem; line-height: 1.8; color: var(--muted); }
+
+  #who { padding: 100px 60px; max-width: 1200px; margin: 0 auto; }
+  .who-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; }
+  .who-card { padding: 48px 36px; border: 1px solid var(--border); background: var(--surface); transition: border-color 0.3s; }
+  .who-card:hover { border-color: rgba(201,168,76,0.3); }
+  .who-icon { font-size: 2rem; margin-bottom: 20px; }
+  .who-card h3 { font-family: 'Cormorant Garamond', serif; font-size: 1.3rem; font-weight: 400; margin-bottom: 12px; }
+  .who-card p { font-size: 0.85rem; line-height: 1.8; color: var(--muted); margin-bottom: 20px; }
+  .who-link { font-size: 0.72rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold); text-decoration: none; }
+  .who-link:hover { opacity: 0.7; }
+
+  #pricing { padding: 100px 60px; background: rgba(201,168,76,0.02); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+  .pricing-inner { max-width: 900px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: center; }
+  .pricing-card { border: 1px solid rgba(201,168,76,0.3); padding: 48px 40px; background: rgba(201,168,76,0.03); }
+  .price-amount { font-family: 'Cormorant Garamond', serif; font-size: 5rem; font-weight: 300; color: var(--gold); line-height: 1; }
+  .price-unit { font-size: 0.8rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); margin-top: 8px; margin-bottom: 32px; }
+  .price-features { list-style: none; display: flex; flex-direction: column; gap: 12px; margin-bottom: 36px; }
+  .price-features li { font-size: 0.85rem; color: var(--text); display: flex; align-items: center; gap: 12px; }
+  .price-features li::before { content: '✦'; color: var(--gold); font-size: 0.6rem; }
+  .price-text h3 { font-family: 'Cormorant Garamond', serif; font-size: 2rem; font-weight: 300; margin-bottom: 20px; }
+  .price-text p { font-size: 0.88rem; line-height: 1.9; color: var(--muted); }
+
+  #faq { padding: 100px 60px; max-width: 860px; margin: 0 auto; }
+  .faq-item { border-bottom: 1px solid var(--border); padding: 28px 0; }
+  .faq-item:first-of-type { border-top: 1px solid var(--border); }
+  .faq-q { font-family: 'Cormorant Garamond', serif; font-size: 1.2rem; font-weight: 400; margin-bottom: 14px; }
+  .faq-a { font-size: 0.88rem; line-height: 1.9; color: var(--muted); }
+  .faq-a a { color: var(--gold); }
+
+  #trust { padding: 80px 60px; background: rgba(201,168,76,0.02); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+  .trust-inner { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; }
+  .trust-badge { padding: 40px 28px; border: 1px solid var(--border); background: var(--bg); }
+  .trust-badge-icon { font-size: 1.6rem; margin-bottom: 16px; }
+  .trust-badge h4 { font-family: 'Cormorant Garamond', serif; font-size: 1.1rem; font-weight: 400; margin-bottom: 8px; }
+  .trust-badge p { font-size: 0.8rem; color: var(--muted); line-height: 1.7; }
+
+  .final-cta { padding: 120px 60px; text-align: center; max-width: 720px; margin: 0 auto; }
+  .final-cta h2 { font-family: 'Cormorant Garamond', serif; font-size: clamp(2rem, 4vw, 3.5rem); font-weight: 300; line-height: 1.15; margin-bottom: 24px; }
+  .final-cta h2 em { font-style: italic; color: var(--gold-light); }
+  .final-cta p { font-size: 0.95rem; line-height: 1.8; color: var(--muted); margin-bottom: 40px; }
+
+  footer { border-top: 1px solid var(--border); background: rgba(255,255,255,0.01); }
+  .footer-top { max-width: 1200px; margin: 0 auto; padding: 64px 60px 48px; display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr; gap: 48px; }
+  .footer-brand p { font-size: 0.82rem; line-height: 1.8; color: var(--muted); margin-top: 16px; max-width: 260px; }
+  .footer-tagline { font-size: 0.7rem; letter-spacing: 0.1em; color: rgba(201,168,76,0.6); margin-top: 8px; }
+  .footer-bottom { border-top: 1px solid var(--border); padding: 24px 60px; max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; }
+  .footer-logo { font-family: 'Cormorant Garamond', serif; font-size: 1.3rem; font-weight: 500; letter-spacing: 0.1em; }
+  .footer-logo span { color: var(--gold); }
+  .footer-copy { font-size: 0.72rem; color: var(--muted); letter-spacing: 0.05em; }
+  .footer-col h5 { font-size: 0.65rem; letter-spacing: 0.28em; text-transform: uppercase; color: var(--gold); margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+  .footer-col ul { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+  .footer-col ul li a { font-size: 0.8rem; color: var(--muted); text-decoration: none; transition: color 0.3s; }
+  .footer-col ul li a:hover { color: var(--gold); }
+  .footer-legal { display: flex; gap: 24px; list-style: none; }
+  .footer-legal a { font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); text-decoration: none; transition: color 0.3s; }
+  .footer-legal a:hover { color: var(--gold); }
+
+  .reveal { opacity: 0; transform: translateY(32px); transition: opacity 0.8s ease, transform 0.8s ease; }
+  .reveal.visible { opacity: 1; transform: translateY(0); }
+
+  @media (max-width: 768px) {
+    nav { padding: 14px 16px; }
+    .nav-links { display: none; }
+    .nav-cta { display: none; }
+    .seo-hero { grid-template-columns: 1fr; padding: 120px 20px 60px; gap: 40px; }
+    .banks-strip { padding: 24px 20px; }
+    #how-it-works, #who, #faq, .final-cta { padding: 60px 20px; }
+    #features, #pricing, #trust { padding: 60px 20px; }
+    .steps-grid, .features-grid, .who-grid { grid-template-columns: 1fr; }
+    .trust-inner { grid-template-columns: 1fr 1fr; }
+    .pricing-inner { grid-template-columns: 1fr; gap: 40px; }
+    .footer-top { grid-template-columns: 1fr 1fr; gap: 32px; padding: 40px 20px; }
+    .footer-bottom { flex-direction: column; gap: 12px; padding: 20px; text-align: center; }
+    .footer-legal { flex-wrap: wrap; justify-content: center; }
+    body { cursor: auto; }
+    .cursor, .cursor-ring { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<nav>
+  <a href="/" class="nav-logo">Aarogyam<span>Fin</span></a>
+  <ul class="nav-links">
+    <li><a href="/#analyzer">Analyze</a></li>
+    <li><a href="/bank-statement-analyzer" class="active">Bank Analyzer</a></li>
+    <li><a href="/accuracy">Accuracy</a></li>
+    <li><a href="/dashboard">Dashboard</a></li>
+    <li><a href="/pay">AI Chat</a></li>
+  </ul>
+  {% if is_logged_in %}
+  <span style="font-size:0.75rem; color:var(--muted); margin-right:8px;">{{ user_email }}</span>
+  <a href="/logout" class="nav-cta">Logout</a>
+  {% else %}
+  <a href="/login" class="nav-cta">Sign In</a>
+  {% endif %}
+</nav>
+
+<!-- HERO -->
+<div style="background: linear-gradient(180deg, rgba(201,168,76,0.04) 0%, transparent 100%); border-bottom: 1px solid var(--border);">
+  <div class="seo-hero">
+    <div>
+      <div class="hero-tag">DPIIT Recognised · DIPP265941 · Made in India</div>
+      <h1 class="hero-headline">
+        Bank Statement<br>
+        to<br>
+        <em>Excel Converter</em>
+      </h1>
+      <p class="hero-sub">Upload any Indian bank statement PDF — get instant transaction extraction, Excel export, loan eligibility, ITR data, and AI-powered insights. Built for CAs, DSAs & NBFCs.</p>
+      <div class="hero-actions">
+        <a href="/" class="btn-primary">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Analyze Statement
+        </a>
+        <a href="/accuracy" class="btn-secondary">View Accuracy →</a>
+      </div>
+      <p class="hero-note">Rs 49 · Tally-ready Excel · 30+ banks</p>
+    </div>
+    <div class="reveal">
+      <div class="hero-card">
+        <div class="hero-card-header">
+          <div class="hero-card-dot"></div>
+          <span class="hero-card-title">Live Analysis Preview</span>
+        </div>
+        <div class="hero-stat-grid">
+          <div class="hero-stat"><div class="hero-stat-val">847</div><div class="hero-stat-label">Transactions</div></div>
+          <div class="hero-stat"><div class="hero-stat-val">Rs 4.2L</div><div class="hero-stat-label">Avg Monthly</div></div>
+          <div class="hero-stat"><div class="hero-stat-val">23s</div><div class="hero-stat-label">Parse Time</div></div>
+          <div class="hero-stat"><div class="hero-stat-val">98%</div><div class="hero-stat-label">Accuracy</div></div>
+        </div>
+        <div style="margin-bottom: 12px;"><span style="font-size: 0.62rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted);">Supported Banks</span></div>
+        <div class="hero-bank-list">
+          <span class="hero-bank-tag">SBI</span>
+          <span class="hero-bank-tag">HDFC</span>
+          <span class="hero-bank-tag">ICICI</span>
+          <span class="hero-bank-tag">Axis</span>
+          <span class="hero-bank-tag">Kotak</span>
+          <span class="hero-bank-tag">PNB</span>
+          <span class="hero-bank-tag">BOB</span>
+          <span class="hero-bank-tag">Canara</span>
+          <span class="hero-bank-tag">+22 more</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- BANKS STRIP -->
+<div class="banks-strip">
+  <div class="banks-inner">
+    <span class="banks-label">Bank-specific pages</span>
+    <a href="/sbi-bank-statement-analyzer" class="bank-chip">SBI</a>
+    <a href="/hdfc-bank-statement-analyzer" class="bank-chip">HDFC</a>
+    <a href="/icici-bank-statement-analyzer" class="bank-chip">ICICI</a>
+    <a href="/axis-bank-statement-analyzer" class="bank-chip">Axis</a>
+    <a href="/kotak-bank-statement-analyzer" class="bank-chip">Kotak</a>
+    <a href="/pnb-bank-statement-analyzer" class="bank-chip">PNB</a>
+    <a href="/bob-bank-statement-analyzer" class="bank-chip">Bank of Baroda</a>
+    <a href="/canara-bank-statement-analyzer" class="bank-chip">Canara</a>
+    <a href="/union-bank-statement-analyzer" class="bank-chip">Union Bank</a>
+    <span class="bank-chip more">+21 more</span>
+  </div>
+</div>
+
+<!-- HOW IT WORKS -->
+<section id="how-it-works">
+  <span class="section-tag reveal">Process</span>
+  <h2 class="section-title reveal">Three steps to complete financial clarity</h2>
+  <div class="steps-grid">
+    <div class="step reveal">
+      <div class="step-num">01</div>
+      <h3>Upload Your PDF</h3>
+      <p>Upload any Indian bank statement PDF — any format, any bank, password-protected statements supported. No manual data entry needed.</p>
+    </div>
+    <div class="step reveal">
+      <div class="step-num">02</div>
+      <h3>AI Auto-Analyses</h3>
+      <p>Our AI + OCR engine auto-detects the bank format and extracts every transaction with category, type, and balance — in under 30 seconds.</p>
+    </div>
+    <div class="step reveal">
+      <div class="step-num">03</div>
+      <h3>Export & Decide</h3>
+      <p>Download Excel, view loan eligibility report, ITR summary, compliance flags — or chat with AI directly about the statement data.</p>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section id="features">
+  <div class="features-inner">
+    <span class="section-tag reveal">Capabilities</span>
+    <h2 class="section-title reveal">Everything you get after analysis</h2>
+    <div class="features-grid">
+      <div class="feature reveal"><div class="feature-icon">📊</div><h3>Excel Export</h3><p>All transactions in structured Excel — date, narration, debit, credit, running balance. Ready for Tally import or client handoff.</p></div>
+      <div class="feature reveal"><div class="feature-icon">🏦</div><h3>Loan Eligibility</h3><p>Auto-calculated EMI capacity, FOIR, net monthly income from 3–12 months of data. Instant underwriting for DSAs and NBFCs.</p></div>
+      <div class="feature reveal"><div class="feature-icon">📋</div><h3>ITR Summary</h3><p>Income classification — salary, freelance, interest. Deductible expenses under 80C, 80D. ITR form suggestion included.</p></div>
+      <div class="feature reveal"><div class="feature-icon">🤖</div><h3>AI Chat on Statement</h3><p>Ask natural questions — "show all UPI credits above Rs 10,000" or "what is the average salary received?" — and get instant answers.</p></div>
+      <div class="feature reveal"><div class="feature-icon">🔍</div><h3>Transaction Search</h3><p>Filter by keyword, amount range, date range, credit/debit type. Find any transaction in seconds across months of data.</p></div>
+      <div class="feature reveal"><div class="feature-icon">🛡️</div><h3>Compliance Flags</h3><p>High-value transaction alerts, STR candidates, structuring suspects, Form 61A requirement check — all auto-detected.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- WHO -->
+<section id="who">
+  <span class="section-tag reveal">Audience</span>
+  <h2 class="section-title reveal">Built for financial professionals</h2>
+  <div class="who-grid">
+    <div class="who-card reveal">
+      <div class="who-icon">🧾</div>
+      <h3>Chartered Accountants</h3>
+      <p>Analyze client bank statements 10x faster. Auto-generate ITR summaries, audit reports, and compliance checks — for every client, every quarter.</p>
+      <a href="/bank-statement-analyzer-for-ca" class="who-link">CA Use Cases →</a>
+    </div>
+    <div class="who-card reveal">
+      <div class="who-icon">🤝</div>
+      <h3>DSAs & Loan Agents</h3>
+      <p>Verify income, calculate FOIR, assess loan eligibility in seconds before submitting to lenders. Reduce rejection rates significantly.</p>
+      <a href="/bank-statement-analyzer-for-dsa" class="who-link">DSA Use Cases →</a>
+    </div>
+    <div class="who-card reveal">
+      <div class="who-icon">🏢</div>
+      <h3>NBFCs & Lenders</h3>
+      <p>Automated underwriting — extract 12-month income trends, EMI obligations, risk flags, and credit profile without manual review.</p>
+      <a href="/bank-statement-analyzer-for-nbfc" class="who-link">NBFC Use Cases →</a>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section id="pricing">
+  <div class="pricing-inner">
+    <div class="pricing-card reveal">
+      <div class="price-amount">Rs 49</div>
+      <div class="price-unit">Per bank statement parse</div>
+      <ul class="price-features">
+        <li>Full transaction extraction</li>
+        <li>Excel download</li>
+        <li>Loan eligibility report</li>
+        <li>ITR summary</li>
+        <li>AI chat on your data</li>
+        <li>All 30+ banks included</li>
+        <li>Compliance flags</li>
+      </ul>
+      <a href="/" class="btn-primary" style="width: 100%; justify-content: center;">Start Analyzing</a>
+    </div>
+    <div class="price-text reveal">
+      <span class="section-tag">Pricing</span>
+      <h3>Simple,<br><em>honest pricing</em></h3>
+      <p>No monthly subscriptions. No seat licenses. No hidden charges. Pay only when you analyze — ideal for CAs with varying monthly client volumes and DSAs who need occasional assessments.</p>
+    </div>
+  </div>
+</section>
+
+<!-- TRUST -->
+<section id="trust">
+  <div class="trust-inner">
+    <div class="trust-badge reveal"><div class="trust-badge-icon">🔒</div><h4>No Data Storage</h4><p>PDFs are processed and immediately discarded. Zero permanent retention.</p></div>
+    <div class="trust-badge reveal"><div class="trust-badge-icon">🛡️</div><h4>HTTPS Encrypted</h4><p>All connections secured. Data never leaves our servers unencrypted.</p></div>
+    <div class="trust-badge reveal"><div class="trust-badge-icon">🇮🇳</div><h4>DPIIT Recognised</h4><p>DIPP265941 · StartInUP certified · Incorporated under MCA India.</p></div>
+    <div class="trust-badge reveal"><div class="trust-badge-icon">⚡</div><h4>Under 30 Seconds</h4><p>Results in under 30 seconds. No waiting, no delays, no manual steps.</p></div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section id="faq">
+  <span class="section-tag reveal">FAQ</span>
+  <h2 class="section-title reveal">Frequently asked questions</h2>
+  <div class="faq-item reveal"><div class="faq-q">Which Indian banks are supported?</div><div class="faq-a">AarogyamFin supports 30+ Indian banks — SBI, HDFC, ICICI, Axis, Kotak, PNB, Bank of Baroda, Canara, Union Bank, IDFC First, Yes Bank, Federal Bank, IndusInd, UCO, Indian Bank, Karnataka Bank, RBL, AU Small Finance, Bandhan, and more. A universal parser handles all other banks automatically.</div></div>
+  <div class="faq-item reveal"><div class="faq-q">How accurate is the transaction extraction?</div><div class="faq-a">AarogyamFin achieves 95–99% accuracy on major bank formats. You can test any statement on the <a href="/accuracy">accuracy test page</a> before purchasing.</div></div>
+  <div class="faq-item reveal"><div class="faq-q">Can I analyze password-protected PDFs?</div><div class="faq-a">Yes. Enter the PDF password during upload and AarogyamFin handles decryption and parsing automatically.</div></div>
+  <div class="faq-item reveal"><div class="faq-q">How does the loan eligibility calculation work?</div><div class="faq-a">The system analyzes 3–12 months of transaction data, calculates average monthly income, detects existing EMI outflows, and computes FOIR. Based on this, it estimates loan eligibility and remaining EMI capacity.</div></div>
+  <div class="faq-item reveal"><div class="faq-q">What does AI chat on bank statement do?</div><div class="faq-a">After uploading, ask natural language questions — "total UPI credit in March", "transactions above Rs 50,000", "how many EMIs were paid" — and get instant, accurate answers from your data.</div></div>
+  <div class="faq-item reveal"><div class="faq-q">Is there a free trial?</div><div class="faq-a">Yes — upload any bank statement PDF on the homepage and view basic transaction data for free. The Rs 49 session unlocks AI chat, full loan eligibility, ITR summary, and compliance analysis.</div></div>
+</section>
+
+<!-- FINAL CTA -->
+<div style="border-top: 1px solid var(--border); background: rgba(201,168,76,0.02);">
+  <div class="final-cta">
+    <span class="section-tag">Get Started</span>
+    <h2 class="reveal">Ready to analyze your<br><em>first statement?</em></h2>
+    <p class="reveal">Join CAs, DSAs and NBFCs saving hours every week with AarogyamFin. Upload your first bank statement and get results in under 30 seconds.</p>
+    <div class="reveal" style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
+      <a href="/" class="btn-primary">Analyze Now — Free <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></a>
+      <a href="/accuracy" class="btn-secondary">Test Accuracy First →</a>
+    </div>
+    <p class="hero-note" style="margin-top: 24px;">Rs 49/parse · DPIIT Recognised · No subscription</p>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-top">
+    <div class="footer-brand">
+      <div class="footer-logo">Aarogyam<span>Fin</span></div>
+      <div class="footer-tagline">AI Bank Statement Analyzer · India</div>
+      <p>AI-powered bank statement analysis for Indian CAs, DSAs and NBFCs. 30+ banks supported.</p>
+    </div>
+    <div class="footer-col">
+      <h5>Analyzer</h5>
+      <ul>
+        <li><a href="/bank-statement-analyzer">Bank Statement Analyzer</a></li>
+        <li><a href="/bank-statement-analyzer-for-ca">For CAs</a></li>
+        <li><a href="/bank-statement-analyzer-for-dsa">For DSAs</a></li>
+        <li><a href="/bank-statement-analyzer-for-nbfc">For NBFCs</a></li>
+        <li><a href="/sbi-bank-statement-analyzer">SBI Analyzer</a></li>
+        <li><a href="/hdfc-bank-statement-analyzer">HDFC Analyzer</a></li>
+      </ul>
+    </div>
+    <div class="footer-col">
+      <h5>Product</h5>
+      <ul>
+        <li><a href="/#analyzer">Upload & Analyze</a></li>
+        <li><a href="/dashboard">Dashboard</a></li>
+        <li><a href="/accuracy">Accuracy Test</a></li>
+        <li><a href="/pay">AI Chat</a></li>
+        <li><a href="/blog">Blog</a></li>
+      </ul>
+    </div>
+    <div class="footer-col">
+      <h5>Company</h5>
+      <ul>
+        <li><a href="/about">About</a></li>
+        <li><a href="/privacy">Privacy Policy</a></li>
+        <li><a href="/terms">Terms of Service</a></li>
+        <li><a href="mailto:contact@aarogyamfin.com">Contact</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <p class="footer-copy">© 2026 AarogyamFin Financial Services Pvt. Ltd. · Ghaziabad, UP, India</p>
+    <ul class="footer-legal">
+      <li><a href="/privacy">Privacy</a></li>
+      <li><a href="/terms">Terms</a></li>
+      <li><a href="/accuracy">Accuracy</a></li>
+    </ul>
+  </div>
+</footer>
+
+<script>
+const cursor = document.getElementById('cursor');
+const ring = document.getElementById('cursorRing');
+let mx = 0, my = 0, rx = 0, ry = 0;
+document.addEventListener('mousemove', e => {
+  mx = e.clientX; my = e.clientY;
+  cursor.style.left = mx - 4 + 'px';
+  cursor.style.top = my - 4 + 'px';
+});
+function animateRing() {
+  rx += (mx - rx) * 0.12; ry += (my - ry) * 0.12;
+  ring.style.left = rx - 18 + 'px'; ring.style.top = ry - 18 + 'px';
+  requestAnimationFrame(animateRing);
+}
+animateRing();
+
+const revealEls = document.querySelectorAll('.reveal');
+const observer = new IntersectionObserver(entries => {
+  entries.forEach((entry, i) => {
+    if (entry.isIntersecting) setTimeout(() => entry.target.classList.add('visible'), i * 80);
+  });
+}, { threshold: 0.1 });
+revealEls.forEach(el => observer.observe(el));
+</script>
+</body>
+</html>

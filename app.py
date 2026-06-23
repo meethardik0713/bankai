@@ -755,6 +755,21 @@ def sitemap():
 ('https://aarogyamfin.com/bank-statement-analyzer-for-nbfc', '2026-06-23'),
 ('https://aarogyamfin.com/bank-statement-to-excel', '2026-06-23'),
 ('https://aarogyamfin.com/ai-bank-statement-analyzer', '2026-06-23'),
+('https://aarogyamfin.com/pdf-to-excel-bank-statement', '2026-06-23'),
+('https://aarogyamfin.com/bank-statement-analysis', '2026-06-23'),
+('https://aarogyamfin.com/bank-statement-analysis-software', '2026-06-23'),
+('https://aarogyamfin.com/bank-statement-ocr', '2026-06-23'),
+('https://aarogyamfin.com/bank-statement-converter', '2026-06-23'),
+('https://aarogyamfin.com/bank-pdf-to-excel', '2026-06-23'),
+('https://aarogyamfin.com/bank-statement-excel-converter', '2026-06-23'),
+('https://aarogyamfin.com/financial-statement-analyzer', '2026-06-23'),
+('https://aarogyamfin.com/statement-parser', '2026-06-23'),
+('https://aarogyamfin.com/statement-analysis-software', '2026-06-23'),
+('https://aarogyamfin.com/bank-data-extraction', '2026-06-23'),
+('https://aarogyamfin.com/automatic-bank-statement-analysis', '2026-06-23'),
+('https://aarogyamfin.com/ai-bank-statement-parser', '2026-06-23'),
+('https://aarogyamfin.com/bank-statement-analysis-tool', '2026-06-23'),
+('https://aarogyamfin.com/pdf-bank-parser', '2026-06-23'),
 ('https://aarogyamfin.com/bank-statement-parser', '2026-06-23'),
 ('https://aarogyamfin.com/online-bank-statement-analyzer', '2026-06-23'),
 ('https://aarogyamfin.com/sbi-bank-statement-analyzer', '2026-06-23'),
@@ -958,6 +973,96 @@ def bank_statement_parser():
 def online_bank_statement_analyzer():
     is_logged_in, user_email, user_id = _get_current_user()
     return render_template('online_bank_statement_analyzer.html',
+        is_logged_in=is_logged_in, user_email=user_email)
+
+@app.route('/pdf-to-excel-bank-statement')
+def pdf_to_excel_bank_statement():
+    is_logged_in, user_email, user_id = _get_current_user()
+    return render_template('pdf_to_excel_bank_statement.html',
+        is_logged_in=is_logged_in, user_email=user_email)
+
+@app.route('/bank-statement-analysis')
+def bank_statement_analysis():
+    is_logged_in, user_email, user_id = _get_current_user()
+    return render_template('bank_statement_analysis.html',
+        is_logged_in=is_logged_in, user_email=user_email)
+
+@app.route('/bank-statement-analysis-software')
+def bank_statement_analysis_software():
+    is_logged_in, user_email, user_id = _get_current_user()
+    return render_template('bank_statement_analysis_software.html',
+        is_logged_in=is_logged_in, user_email=user_email)
+
+@app.route('/bank-statement-ocr')
+def bank_statement_ocr():
+    is_logged_in, user_email, user_id = _get_current_user()
+    return render_template('bank_statement_ocr.html',
+        is_logged_in=is_logged_in, user_email=user_email)
+
+@app.route('/bank-statement-converter')
+def bank_statement_converter():
+    is_logged_in, user_email, user_id = _get_current_user()
+    return render_template('bank_statement_converter.html',
+        is_logged_in=is_logged_in, user_email=user_email)
+
+@app.route('/bank-pdf-to-excel')
+def bank_pdf_to_excel():
+    is_logged_in, user_email, user_id = _get_current_user()
+    return render_template('bank_pdf_to_excel.html',
+        is_logged_in=is_logged_in, user_email=user_email)
+
+@app.route('/bank-statement-excel-converter')
+def bank_statement_excel_converter():
+    is_logged_in, user_email, user_id = _get_current_user()
+    return render_template('bank_statement_excel_converter.html',
+        is_logged_in=is_logged_in, user_email=user_email)
+
+@app.route('/financial-statement-analyzer')
+def financial_statement_analyzer():
+    is_logged_in, user_email, user_id = _get_current_user()
+    return render_template('financial_statement_analyzer.html',
+        is_logged_in=is_logged_in, user_email=user_email)
+
+@app.route('/statement-parser')
+def statement_parser():
+    is_logged_in, user_email, user_id = _get_current_user()
+    return render_template('statement_parser.html',
+        is_logged_in=is_logged_in, user_email=user_email)
+
+@app.route('/statement-analysis-software')
+def statement_analysis_software():
+    is_logged_in, user_email, user_id = _get_current_user()
+    return render_template('statement_analysis_software.html',
+        is_logged_in=is_logged_in, user_email=user_email)
+
+@app.route('/bank-data-extraction')
+def bank_data_extraction():
+    is_logged_in, user_email, user_id = _get_current_user()
+    return render_template('bank_data_extraction.html',
+        is_logged_in=is_logged_in, user_email=user_email)
+
+@app.route('/automatic-bank-statement-analysis')
+def automatic_bank_statement_analysis():
+    is_logged_in, user_email, user_id = _get_current_user()
+    return render_template('automatic_bank_statement_analysis.html',
+        is_logged_in=is_logged_in, user_email=user_email)
+
+@app.route('/ai-bank-statement-parser')
+def ai_bank_statement_parser():
+    is_logged_in, user_email, user_id = _get_current_user()
+    return render_template('ai_bank_statement_parser.html',
+        is_logged_in=is_logged_in, user_email=user_email)
+
+@app.route('/bank-statement-analysis-tool')
+def bank_statement_analysis_tool():
+    is_logged_in, user_email, user_id = _get_current_user()
+    return render_template('bank_statement_analysis_tool.html',
+        is_logged_in=is_logged_in, user_email=user_email)
+
+@app.route('/pdf-bank-parser')
+def pdf_bank_parser():
+    is_logged_in, user_email, user_id = _get_current_user()
+    return render_template('pdf_bank_parser.html',
         is_logged_in=is_logged_in, user_email=user_email)
 
 
