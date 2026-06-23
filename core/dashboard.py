@@ -134,6 +134,20 @@ EMI_KEYWORDS = [
 # Cheque / bounce keywords
 CHEQUE_KEYWORDS = ['chq', 'cheque', 'clearing', 'cts', 'micr']
 BOUNCE_KEYWORDS = ['return', 'bounce', 'dishonour', 'failed', 'reject', 'insufficient']
+ 
+_DIVIDEND_KW = ['dividend', 'div cr', 'div paid', 'div ', 'divident']
+_CASH_DEP_KW = ['cash deposit', 'cash dep', 'cashdep', 'cdm', 'cash cr']
+_BUSINESS_CREDIT_KW = [
+    'invoice', 'payment received', 'consulting', 'professional fee',
+    'project', 'client', 'service charge', 'razorpay', 'cashfree',
+    'instamojo', 'payu', 'ccavenue',
+]
+_RE_EMPLOYER_NEFT = re.compile(
+    r'(?:neft(?:inw|cr)?[- /]*|imps[- /]*)([A-Z][A-Z0-9 &.\-]{2,40}?)(?:/|\s{2,}|$)',
+    re.IGNORECASE
+)
+_RE_EMPLOYER_MB = re.compile(r'mb:received from\s+(.+)', re.IGNORECASE)
+_RE_EMPLOYER_SLASH = re.compile(r'/([A-Z][A-Z0-9 &.\-]{2,30})/', re.IGNORECASE)
 
 # Compliance
 CASH_KEYWORDS = ['cash deposit', 'cash withdrawal', 'atm', 'cwdr', 'cash wdl', 'cdm']
@@ -197,6 +211,222 @@ def _classify_credit(desc: str, amt: float) -> str:
     return 'other_credits'
 
 
+def _extract_employer_name(desc: str) -> str:
+    """Try to extract employer/sender name from a salary transaction description."""
+    if not desc:
+        return ''
+    m = _RE_EMPLOYER_MB.search(desc)
+    if m:
+        return m.group(1).strip()[:50].title()
+    m = _RE_EMPLOYER_NEFT.search(desc)
+    if m:
+        name = m.group(1).strip(' /-')
+        if len(name) > 2:
+            return name[:50].title()
+    m = _RE_EMPLOYER_SLASH.search(desc)
+    if m:
+        name = m.group(1).strip()
+        if len(name) > 2:
+            return name[:50].title()
+    lower = desc.lower()
+    for kw in ['salary', 'payroll', 'sal cr', 'wages']:
+        idx = lower.find(kw)
+        if idx != -1:
+            after = desc[idx + len(kw):].strip(' -:/').split()
+            if after:
+                return ' '.join(after[:4]).title()
+    return ''
+ 
+ 
+def analyze_income(transactions: list) -> dict:
+    """
+    6-in-1 Income Analysis:
+    1. Salary credit detection + employer name extract
+    2. Business income tagging + irregular months flag
+    3. Other income: rent / dividend / interest
+    4. Cash deposit flagging (>=10L total, >=2L single)
+    5. GST turnover match (business credits vs 20L threshold)
+    6. Top 10 credit sources by amount + frequency
+    """
+    salary_txns    = []
+    business_txns  = []
+    rent_txns      = []
+    dividend_txns  = []
+    interest_txns  = []
+    cash_dep_txns  = []
+ 
+    monthly_salary   = defaultdict(float)
+    monthly_business = defaultdict(float)
+    monthly_cash_dep = defaultdict(float)
+    monthly_income   = defaultdict(float)
+ 
+    sender_amount  = defaultdict(float)
+    sender_count   = defaultdict(int)
+    employer_names = set()
+ 
+    for t in transactions:
+        if t.get('type') != 'CR' or not t.get('amount'):
+            continue
+ 
+        desc  = (t.get('desc') or '')
+        lower = desc.lower()
+        amt   = t['amount']
+        date  = t.get('date', '')
+        month = date[:7] if date else 'Unknown'
+ 
+        if is_loan_disbursal(lower) or is_family_transfer(lower) or is_self_transfer(lower):
+            continue
+ 
+        # Feature 6: Track all senders
+        sender = _extract_employer_name(desc)
+        if not sender:
+            tokens = [w for w in desc.split() if len(w) > 2 and not w.isdigit()]
+            sender = tokens[0].title() if tokens else 'Unknown'
+        sender_amount[sender] += amt
+        sender_count[sender]  += 1
+ 
+        # Feature 4: Cash deposits
+        if any(k in lower for k in _CASH_DEP_KW):
+            cash_dep_txns.append(t)
+            monthly_cash_dep[month] += amt
+            continue
+ 
+        # Feature 1: Salary
+        if any(k in lower for k in SALARY_KEYWORDS):
+            emp = _extract_employer_name(desc)
+            if emp:
+                employer_names.add(emp)
+            salary_txns.append({**t, 'employer': emp})
+            monthly_salary[month] += amt
+            monthly_income[month] += amt
+            continue
+ 
+        # Feature 3a: Dividend
+        if any(k in lower for k in _DIVIDEND_KW):
+            dividend_txns.append(t)
+            monthly_income[month] += amt
+            continue
+ 
+        # Feature 3b: Rental
+        if any(k in lower for k in RENTAL_KEYWORDS):
+            rent_txns.append(t)
+            monthly_income[month] += amt
+            continue
+ 
+        # Feature 3c: Interest
+        if any(k in lower for k in INTEREST_KEYWORDS):
+            interest_txns.append(t)
+            monthly_income[month] += amt
+            continue
+ 
+        # Feature 2: Business/freelance/marketplace income
+        if (
+            any(k in lower for k in FREELANCE_KEYWORDS) or
+            any(k in lower for k in MARKETPLACE_KEYWORDS) or
+            any(k in lower for k in _BUSINESS_CREDIT_KW)
+        ):
+            business_txns.append(t)
+            monthly_business[month] += amt
+            monthly_income[month]   += amt
+ 
+    # Feature 2: Flag irregular business income months (>50% deviation)
+    avg_biz = (sum(monthly_business.values()) / len(monthly_business)
+               if monthly_business else 0)
+    irregular_months = []
+    for m, val in sorted(monthly_business.items()):
+        if avg_biz > 0:
+            dev = abs(val - avg_biz) / avg_biz * 100
+            if dev > 50:
+                irregular_months.append({
+                    'month':     m,
+                    'amount':    round(val, 2),
+                    'avg':       round(avg_biz, 2),
+                    'deviation': round(dev, 1),
+                    'flag':      'Spike' if val > avg_biz else 'Drop',
+                })
+ 
+    # Feature 1 extra: Missing salary months
+    all_months = sorted(monthly_income.keys())
+    missing_salary_months = []
+    if salary_txns and len(all_months) > 1:
+        for m in all_months:
+            if monthly_salary.get(m, 0) == 0:
+                missing_salary_months.append(m)
+ 
+    # Feature 4: Cash deposit flags
+    total_cash_dep   = sum(t['amount'] for t in cash_dep_txns)
+    cash_flag_10L    = total_cash_dep >= 1_000_000
+    high_single_cash = [t for t in cash_dep_txns if t['amount'] >= 200_000]
+ 
+    # Feature 5: GST turnover match
+    gst_applicable        = sum(t['amount'] for t in business_txns)
+    estimated_gst         = round(gst_applicable * 0.18, 2)
+    gst_threshold_crossed = gst_applicable >= 2_000_000
+ 
+    all_real_credits = round(
+        sum(t['amount'] for t in salary_txns) +
+        sum(t['amount'] for t in business_txns) +
+        sum(t['amount'] for t in rent_txns) +
+        sum(t['amount'] for t in dividend_txns) +
+        sum(t['amount'] for t in interest_txns), 2
+    )
+ 
+    # Feature 6: Top 10 credit sources
+    top_10_sources = sorted(
+        [{'sender': s, 'total_amt': round(a, 2),
+          'count': sender_count[s], 'avg_amt': round(a / sender_count[s], 2)}
+         for s, a in sender_amount.items()],
+        key=lambda x: x['total_amt'], reverse=True
+    )[:10]
+ 
+    salary_total   = round(sum(t['amount'] for t in salary_txns), 2)
+    business_total = round(sum(t['amount'] for t in business_txns), 2)
+    rent_total     = round(sum(t['amount'] for t in rent_txns), 2)
+    dividend_total = round(sum(t['amount'] for t in dividend_txns), 2)
+    interest_total = round(sum(t['amount'] for t in interest_txns), 2)
+ 
+    return {
+        'salary_txns':           salary_txns,
+        'salary_total':          salary_total,
+        'employer_names':        sorted(employer_names),
+        'monthly_salary':        dict(sorted(monthly_salary.items())),
+        'missing_salary_months': missing_salary_months,
+        'salary_count':          len(salary_txns),
+        'business_txns':         business_txns,
+        'business_total':        business_total,
+        'monthly_business':      dict(sorted(monthly_business.items())),
+        'irregular_months':      irregular_months,
+        'business_count':        len(business_txns),
+        'rent_txns':             rent_txns,
+        'rent_total':            rent_total,
+        'dividend_txns':         dividend_txns,
+        'dividend_total':        dividend_total,
+        'interest_txns':         interest_txns,
+        'interest_total':        interest_total,
+        'cash_dep_txns':         cash_dep_txns,
+        'cash_dep_total':        round(total_cash_dep, 2),
+        'monthly_cash_dep':      dict(sorted(monthly_cash_dep.items())),
+        'cash_flag_10L':         cash_flag_10L,
+        'high_single_cash':      high_single_cash,
+        'cash_dep_count':        len(cash_dep_txns),
+        'all_real_credits':      all_real_credits,
+        'gst_applicable':        round(gst_applicable, 2),
+        'estimated_gst':         estimated_gst,
+        'gst_threshold_crossed': gst_threshold_crossed,
+        'top_10_sources':        top_10_sources,
+        'real_income_total':     round(salary_total + business_total + rent_total
+                                       + dividend_total + interest_total, 2),
+        'monthly_income':        dict(sorted(monthly_income.items())),
+        'income_breakdown': {
+            'Salary':   salary_total,
+            'Business': business_total,
+            'Rent':     rent_total,
+            'Dividend': dividend_total,
+            'Interest': interest_total,
+        },
+    }
+ 
+ 
 # ═══════════════════════════════════════════════════════════
 #  1. EXPENSE CATEGORIZATION
 # ═══════════════════════════════════════════════════════════
@@ -773,4 +1003,6 @@ def run_dashboard(transactions: list) -> dict:
         'loan_disbursal_total': itr_data.get('loan_disbursal_total', 0),
         'family_transfer_total':itr_data.get('family_transfer_total', 0),
         'gstr1':                analyze_gstr1(transactions),
+        'income':               analyze_income(transactions),
     }
+    
