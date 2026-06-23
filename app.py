@@ -754,6 +754,9 @@ def sitemap():
 ('https://aarogyamfin.com/bank-statement-analyzer-for-dsa', '2026-06-23'),
 ('https://aarogyamfin.com/bank-statement-analyzer-for-nbfc', '2026-06-23'),
 ('https://aarogyamfin.com/bank-statement-to-excel', '2026-06-23'),
+('https://aarogyamfin.com/ai-bank-statement-analyzer', '2026-06-23'),
+('https://aarogyamfin.com/bank-statement-parser', '2026-06-23'),
+('https://aarogyamfin.com/online-bank-statement-analyzer', '2026-06-23'),
 ('https://aarogyamfin.com/sbi-bank-statement-analyzer', '2026-06-23'),
 ('https://aarogyamfin.com/hdfc-bank-statement-analyzer', '2026-06-23'),
 ('https://aarogyamfin.com/icici-bank-statement-analyzer', '2026-06-23'),
@@ -937,6 +940,24 @@ def terms():
 def bank_statement_to_excel():
     is_logged_in, user_email, user_id = _get_current_user()
     return render_template('bank_statement_to_excel.html',
+        is_logged_in=is_logged_in, user_email=user_email)
+
+@app.route('/ai-bank-statement-analyzer')
+def ai_bank_statement_analyzer():
+    is_logged_in, user_email, user_id = _get_current_user()
+    return render_template('ai_bank_statement_analyzer.html',
+        is_logged_in=is_logged_in, user_email=user_email)
+
+@app.route('/bank-statement-parser')
+def bank_statement_parser():
+    is_logged_in, user_email, user_id = _get_current_user()
+    return render_template('bank_statement_parser.html',
+        is_logged_in=is_logged_in, user_email=user_email)
+
+@app.route('/online-bank-statement-analyzer')
+def online_bank_statement_analyzer():
+    is_logged_in, user_email, user_id = _get_current_user()
+    return render_template('online_bank_statement_analyzer.html',
         is_logged_in=is_logged_in, user_email=user_email)
 
 
