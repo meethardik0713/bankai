@@ -14,3 +14,4 @@ markdown
 pytesseract
 pdf2image
 posthog
+reportlab
