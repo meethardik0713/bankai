@@ -523,9 +523,21 @@ tr:hover td { background: rgba(201,168,76,0.02); }
         Income
         <span class="nav-badge {% if data.income.cash_flag_10L %}red{% elif data.income.gst_threshold_crossed %}yellow{% endif %}">₹{{ "{:,.0f}".format(data.income.real_income_total / 100000) }}L</span>
       </div>
-      
-      
-      
+      <div class="nav-item" onclick="showPanel('obligations', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/></svg>
+        Obligations
+        <span class="nav-badge {% if data.obligations.bounce_count > 0 or data.obligations.ecs_count > 0 %}red{% elif data.obligations.emi_count > 0 %}yellow{% endif %}">{{ data.obligations.emi_count }} EMI</span>
+      </div>
+      <div class="nav-item" onclick="showPanel('cashflow', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Cash Flow
+        <span class="nav-badge {% if data.cashflow.deficit_months > data.cashflow.surplus_months %}red{% elif data.cashflow.avg_net_flow > 0 %}{% endif %}">{{ data.cashflow.trend_direction.split(' ')[0] }}</span>
+      </div>
+      <div class="nav-item" onclick="showPanel('redflags', this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Red Flags
+        <span class="nav-badge {% if data.red_flags.flag_level == 'High' %}red{% elif data.red_flags.flag_level == 'Medium' %}yellow{% endif %}">{{ data.red_flags.total_flags }}</span>
+      </div>
     </div>
   </aside>
 
@@ -969,8 +981,8 @@ tr:hover td { background: rgba(201,168,76,0.02); }
     <!-- ═══ GSTR-1 AUTO-FILL ═══ -->
     <div class="panel" id="panel-gstr1">
       <div class="panel-header">
-        <span class="panel-tag">Module 06 — GST</span>
-         <h2 class="panel-title">GSTR-1 Auto-Fill</h2>
+        <span class="panel-tag">Module 06</span>
+        <h2 class="panel-title">GSTR-1 Auto-Fill</h2>
         <p class="panel-sub">Sales classification from bank credits — B2B, B2C, export supplies identified for GSTR-1 preparation.</p>
       </div>
 
@@ -1204,242 +1216,211 @@ tr:hover td { background: rgba(201,168,76,0.02); }
       {% endif %}
     </div>
 
-   <!-- ═══ INCOME ANALYSIS ═══ -->
+    <!-- ═══ INCOME ANALYSIS ═══ -->
     <div class="panel" id="panel-income">
       <div class="panel-header">
         <span class="panel-tag">Module 06</span>
         <h2 class="panel-title">Income Analysis</h2>
         <p class="panel-sub">Salary detection, employer extraction, business income flags, GST turnover match, top credit sources.</p>
       </div>
- 
       {% if data.income %}
- 
       <div class="metrics">
-        <div class="metric">
-          <div class="metric-value green">₹{{ "{:,.0f}".format(data.income.real_income_total) }}</div>
-          <div class="metric-label">Real Income Total</div>
-          <div class="metric-sub">Excl. loans &amp; family transfers</div>
-        </div>
-        <div class="metric">
-          <div class="metric-value">₹{{ "{:,.0f}".format(data.income.salary_total) }}</div>
-          <div class="metric-label">Salary Income</div>
-          <div class="metric-sub">{{ data.income.salary_count }} credit(s) detected</div>
-        </div>
-        <div class="metric">
-          <div class="metric-value yellow">₹{{ "{:,.0f}".format(data.income.business_total) }}</div>
-          <div class="metric-label">Business Income</div>
-          <div class="metric-sub">{{ data.income.business_count }} transactions</div>
-        </div>
-        <div class="metric">
-          <div class="metric-value {% if data.income.cash_flag_10L %}red{% endif %}">₹{{ "{:,.0f}".format(data.income.cash_dep_total) }}</div>
-          <div class="metric-label">Cash Deposits</div>
-          <div class="metric-sub">{% if data.income.cash_flag_10L %}⚠ ₹10L+ threshold{% else %}{{ data.income.cash_dep_count }} transactions{% endif %}</div>
-        </div>
+        <div class="metric"><div class="metric-value green">₹{{ "{:,.0f}".format(data.income.real_income_total) }}</div><div class="metric-label">Real Income Total</div><div class="metric-sub">Excl. loans &amp; transfers</div></div>
+        <div class="metric"><div class="metric-value">₹{{ "{:,.0f}".format(data.income.salary_total) }}</div><div class="metric-label">Salary Income</div><div class="metric-sub">{{ data.income.salary_count }} credit(s)</div></div>
+        <div class="metric"><div class="metric-value yellow">₹{{ "{:,.0f}".format(data.income.business_total) }}</div><div class="metric-label">Business Income</div><div class="metric-sub">{{ data.income.business_count }} transactions</div></div>
+        <div class="metric"><div class="metric-value {% if data.income.cash_flag_10L %}red{% endif %}">₹{{ "{:,.0f}".format(data.income.cash_dep_total) }}</div><div class="metric-label">Cash Deposits</div><div class="metric-sub">{% if data.income.cash_flag_10L %}⚠ ₹10L+ threshold{% else %}{{ data.income.cash_dep_count }} txns{% endif %}</div></div>
       </div>
- 
-      <!-- Feature 1: Salary + Employer -->
       <div class="card">
-        <div class="card-title">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg>
-          Salary Credit Detection
-        </div>
-        {% if data.income.employer_names %}
-        <div style="margin-bottom:16px;">
-          <div style="font-size:0.62rem; letter-spacing:0.2em; text-transform:uppercase; color:var(--muted); margin-bottom:10px;">Employers Detected</div>
-          <div style="display:flex; flex-wrap:wrap; gap:8px;">
-            {% for emp in data.income.employer_names %}
-            <span class="badge badge-gold">{{ emp }}</span>
-            {% endfor %}
-          </div>
-        </div>
-        {% endif %}
-        {% if data.income.missing_salary_months %}
-        <div class="alert alert-warn" style="margin-bottom:16px;">
-          <span class="alert-title">⚠ Missing Salary Months</span>
-          No salary credit in: {{ data.income.missing_salary_months | join(', ') }}
-        </div>
-        {% endif %}
+        <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg>Salary Credit Detection</div>
+        {% if data.income.employer_names %}<div style="margin-bottom:16px;"><div style="font-size:0.62rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">Employers Detected</div><div style="display:flex;flex-wrap:wrap;gap:8px;">{% for emp in data.income.employer_names %}<span class="badge badge-gold">{{ emp }}</span>{% endfor %}</div></div>{% endif %}
+        {% if data.income.missing_salary_months %}<div class="alert alert-warn" style="margin-bottom:16px;"><span class="alert-title">⚠ Missing Salary Months</span>No salary in: {{ data.income.missing_salary_months | join(', ') }}</div>{% endif %}
         {% if data.income.salary_txns %}
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>Date</th><th>Description</th><th>Employer</th><th>Amount (₹)</th></tr></thead>
-            <tbody>
-              {% for t in data.income.salary_txns[:15] %}
-              <tr>
-                <td class="td-muted">{{ t.date }}</td>
-                <td style="font-size:0.78rem;">{{ t.desc[:55] }}{% if t.desc|length > 55 %}…{% endif %}</td>
-                <td><span class="badge badge-gold">{{ t.employer if t.employer else '—' }}</span></td>
-                <td style="color:var(--green)">₹{{ "{:,.0f}".format(t.amount) }}</td>
-              </tr>
-              {% endfor %}
-              {% if data.income.salary_txns|length > 15 %}
-              <tr><td colspan="4" style="text-align:center; color:var(--muted); font-size:0.72rem;">+{{ data.income.salary_txns|length - 15 }} more</td></tr>
-              {% endif %}
-            </tbody>
-          </table>
-        </div>
-        {% else %}
-        <div class="empty"><p>No salary credits detected</p></div>
-        {% endif %}
+        <div class="table-wrap"><table><thead><tr><th>Date</th><th>Description</th><th>Employer</th><th>Amount (₹)</th></tr></thead><tbody>
+          {% for t in data.income.salary_txns[:15] %}<tr><td class="td-muted">{{ t.date }}</td><td style="font-size:0.78rem;">{{ t.desc[:55] }}{% if t.desc|length > 55 %}…{% endif %}</td><td><span class="badge badge-gold">{{ t.employer if t.employer else '—' }}</span></td><td style="color:var(--green)">₹{{ "{:,.0f}".format(t.amount) }}</td></tr>{% endfor %}
+          {% if data.income.salary_txns|length > 15 %}<tr><td colspan="4" style="text-align:center;color:var(--muted);font-size:0.72rem;">+{{ data.income.salary_txns|length - 15 }} more</td></tr>{% endif %}
+        </tbody></table></div>
+        {% else %}<div class="empty"><p>No salary credits detected</p></div>{% endif %}
       </div>
- 
-      <!-- Feature 2: Business Income + Irregular Flag -->
       <div class="card">
-        <div class="card-title">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-          Business Income — Monthly Trend
-        </div>
-        {% if data.income.irregular_months %}
-        <div style="margin-bottom:16px;">
-          {% for m in data.income.irregular_months %}
-          <div class="alert {% if m.flag == 'Spike' %}alert-warn{% else %}alert-danger{% endif %}">
-            <span class="alert-title">{{ m.flag }} — {{ m.month }}</span>
-            ₹{{ "{:,.0f}".format(m.amount) }} vs avg ₹{{ "{:,.0f}".format(m.avg) }} ({{ m.deviation }}% deviation)
-          </div>
-          {% endfor %}
-        </div>
-        {% endif %}
-        {% if data.income.monthly_business %}
-        <div style="margin-top:8px;">
-          {% for month, amt in data.income.monthly_business.items() %}
-          {% set max_amt = data.income.monthly_business.values() | max %}
-          {% set pct = (amt / max_amt * 100) | round(1) if max_amt else 0 %}
-          <div class="progress-row">
-            <span class="progress-label" style="width:80px;">{{ month }}</span>
-            <div class="progress-track"><div class="progress-fill yellow" style="width:{{ pct }}%"></div></div>
-            <span class="progress-val">₹{{ "{:,.0f}".format(amt) }}</span>
-          </div>
-          {% endfor %}
-        </div>
-        {% else %}
-        <div class="empty"><p>No business income detected</p></div>
-        {% endif %}
+        <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Business Income — Monthly Trend</div>
+        {% if data.income.irregular_months %}<div style="margin-bottom:16px;">{% for m in data.income.irregular_months %}<div class="alert {% if m.flag == 'Spike' %}alert-warn{% else %}alert-danger{% endif %}"><span class="alert-title">{{ m.flag }} — {{ m.month }}</span>₹{{ "{:,.0f}".format(m.amount) }} vs avg ₹{{ "{:,.0f}".format(m.avg) }} ({{ m.deviation }}% deviation)</div>{% endfor %}</div>{% endif %}
+        {% if data.income.monthly_business %}<div style="margin-top:8px;">{% for month, amt in data.income.monthly_business.items() %}{% set max_amt = data.income.monthly_business.values() | max %}{% set pct = (amt / max_amt * 100) | round(1) if max_amt else 0 %}<div class="progress-row"><span class="progress-label" style="width:80px;">{{ month }}</span><div class="progress-track"><div class="progress-fill yellow" style="width:{{ pct }}%"></div></div><span class="progress-val">₹{{ "{:,.0f}".format(amt) }}</span></div>{% endfor %}</div>
+        {% else %}<div class="empty"><p>No business income detected</p></div>{% endif %}
       </div>
- 
-      <!-- Feature 3: Other Income -->
       <div class="grid-3">
-        <div class="metric">
-          <div class="metric-value">₹{{ "{:,.0f}".format(data.income.rent_total) }}</div>
-          <div class="metric-label">Rental Income</div>
-          <div class="metric-sub">{{ data.income.rent_txns|length }} transactions</div>
-        </div>
-        <div class="metric">
-          <div class="metric-value">₹{{ "{:,.0f}".format(data.income.dividend_total) }}</div>
-          <div class="metric-label">Dividend Income</div>
-          <div class="metric-sub">{{ data.income.dividend_txns|length }} transactions</div>
-        </div>
-        <div class="metric">
-          <div class="metric-value">₹{{ "{:,.0f}".format(data.income.interest_total) }}</div>
-          <div class="metric-label">Interest Income</div>
-          <div class="metric-sub">{{ data.income.interest_txns|length }} transactions</div>
-        </div>
+        <div class="metric"><div class="metric-value">₹{{ "{:,.0f}".format(data.income.rent_total) }}</div><div class="metric-label">Rental Income</div><div class="metric-sub">{{ data.income.rent_txns|length }} txns</div></div>
+        <div class="metric"><div class="metric-value">₹{{ "{:,.0f}".format(data.income.dividend_total) }}</div><div class="metric-label">Dividend Income</div><div class="metric-sub">{{ data.income.dividend_txns|length }} txns</div></div>
+        <div class="metric"><div class="metric-value">₹{{ "{:,.0f}".format(data.income.interest_total) }}</div><div class="metric-label">Interest Income</div><div class="metric-sub">{{ data.income.interest_txns|length }} txns</div></div>
       </div>
- 
-      <!-- Feature 4: Cash Deposits -->
       <div class="card">
-        <div class="card-title">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M12 12m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/></svg>
-          Cash Deposit Flagging
-          {% if data.income.cash_flag_10L %}<span class="badge badge-dr" style="margin-left:8px;">⚠ ₹10L+ Flag</span>{% endif %}
-        </div>
-        {% if data.income.cash_flag_10L %}
-        <div class="alert alert-danger" style="margin-bottom:16px;">
-          <span class="alert-title">High Cash Deposit Alert</span>
-          Total ₹{{ "{:,.0f}".format(data.income.cash_dep_total) }} — may attract IT scrutiny under Sec 114B/285BA.
-        </div>
-        {% endif %}
-        {% if data.income.high_single_cash %}
-        <div class="alert alert-warn" style="margin-bottom:16px;">
-          <span class="alert-title">Single Cash Deposits ≥ ₹2 Lakh ({{ data.income.high_single_cash|length }})</span>
-          {% for t in data.income.high_single_cash[:3] %}{{ t.date }} — ₹{{ "{:,.0f}".format(t.amount) }}<br>{% endfor %}
-        </div>
-        {% endif %}
-        {% if data.income.monthly_cash_dep %}
-        <div style="margin-top:8px;">
-          {% for month, amt in data.income.monthly_cash_dep.items() %}
-          {% set max_amt = data.income.monthly_cash_dep.values() | max %}
-          {% set pct = (amt / max_amt * 100) | round(1) if max_amt else 0 %}
-          <div class="progress-row">
-            <span class="progress-label" style="width:80px;">{{ month }}</span>
-            <div class="progress-track"><div class="progress-fill red" style="width:{{ pct }}%"></div></div>
-            <span class="progress-val">₹{{ "{:,.0f}".format(amt) }}</span>
-          </div>
-          {% endfor %}
-        </div>
-        {% else %}
-        <div class="empty"><p>No cash deposits detected</p></div>
-        {% endif %}
+        <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M12 12m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/></svg>Cash Deposit Flagging {% if data.income.cash_flag_10L %}<span class="badge badge-dr" style="margin-left:8px;">⚠ ₹10L+ Flag</span>{% endif %}</div>
+        {% if data.income.cash_flag_10L %}<div class="alert alert-danger" style="margin-bottom:16px;"><span class="alert-title">High Cash Deposit Alert</span>Total ₹{{ "{:,.0f}".format(data.income.cash_dep_total) }} — may attract IT scrutiny.</div>{% endif %}
+        {% if data.income.monthly_cash_dep %}<div>{% for month, amt in data.income.monthly_cash_dep.items() %}{% set max_amt = data.income.monthly_cash_dep.values() | max %}{% set pct = (amt / max_amt * 100) | round(1) if max_amt else 0 %}<div class="progress-row"><span class="progress-label" style="width:80px;">{{ month }}</span><div class="progress-track"><div class="progress-fill red" style="width:{{ pct }}%"></div></div><span class="progress-val">₹{{ "{:,.0f}".format(amt) }}</span></div>{% endfor %}</div>
+        {% else %}<div class="empty"><p>No cash deposits</p></div>{% endif %}
       </div>
- 
-      <!-- Feature 5: GST Turnover Match -->
       <div class="card">
-        <div class="card-title">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 14l6-6"/><circle cx="9" cy="9" r="2"/><circle cx="15" cy="15" r="2"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
-          GST Turnover Match
-        </div>
+        <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 14l6-6"/><circle cx="9" cy="9" r="2"/><circle cx="15" cy="15" r="2"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg>GST Turnover Match</div>
         <div class="grid-2">
-          <div>
-            <div style="font-size:0.62rem; letter-spacing:0.18em; text-transform:uppercase; color:var(--muted); margin-bottom:6px;">Total Real Credits</div>
-            <div style="font-family:'Cormorant Garamond',serif; font-size:1.6rem; color:var(--text);">₹{{ "{:,.0f}".format(data.income.all_real_credits) }}</div>
-          </div>
-          <div>
-            <div style="font-size:0.62rem; letter-spacing:0.18em; text-transform:uppercase; color:var(--muted); margin-bottom:6px;">GST Applicable Credits</div>
-            <div style="font-family:'Cormorant Garamond',serif; font-size:1.6rem; color:var(--yellow);">₹{{ "{:,.0f}".format(data.income.gst_applicable) }}</div>
-          </div>
+          <div><div style="font-size:0.62rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;">Total Real Credits</div><div style="font-family:'Cormorant Garamond',serif;font-size:1.6rem;color:var(--text);">₹{{ "{:,.0f}".format(data.income.all_real_credits) }}</div></div>
+          <div><div style="font-size:0.62rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;">GST Applicable Credits</div><div style="font-family:'Cormorant Garamond',serif;font-size:1.6rem;color:var(--yellow);">₹{{ "{:,.0f}".format(data.income.gst_applicable) }}</div></div>
         </div>
-        <div style="margin:16px 0 10px; display:flex; gap:16px; flex-wrap:wrap;">
-          <div style="background:rgba(201,168,76,0.07); border:1px solid var(--border); padding:14px 20px; flex:1; min-width:140px;">
-            <div style="font-size:0.6rem; letter-spacing:0.18em; text-transform:uppercase; color:var(--muted); margin-bottom:4px;">Est. GST Liability @18%</div>
-            <div style="font-family:'Cormorant Garamond',serif; font-size:1.4rem; color:var(--gold);">₹{{ "{:,.0f}".format(data.income.estimated_gst) }}</div>
-          </div>
-          <div style="background:{% if data.income.gst_threshold_crossed %}rgba(248,113,113,0.07){% else %}rgba(74,222,128,0.07){% endif %}; border:1px solid {% if data.income.gst_threshold_crossed %}rgba(248,113,113,0.2){% else %}rgba(74,222,128,0.2){% endif %}; padding:14px 20px; flex:1; min-width:140px;">
-            <div style="font-size:0.6rem; letter-spacing:0.18em; text-transform:uppercase; color:var(--muted); margin-bottom:4px;">₹20L Threshold</div>
-            <div style="font-family:'Cormorant Garamond',serif; font-size:1.4rem; color:{% if data.income.gst_threshold_crossed %}var(--red){% else %}var(--green){% endif %};">
-              {% if data.income.gst_threshold_crossed %}Crossed ⚠{% else %}Not Crossed ✓{% endif %}
-            </div>
-          </div>
+        <div style="margin:16px 0;display:flex;gap:16px;flex-wrap:wrap;">
+          <div style="background:rgba(201,168,76,0.07);border:1px solid var(--border);padding:14px 20px;flex:1;min-width:140px;"><div style="font-size:0.6rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">Est. GST @18%</div><div style="font-family:'Cormorant Garamond',serif;font-size:1.4rem;color:var(--gold);">₹{{ "{:,.0f}".format(data.income.estimated_gst) }}</div></div>
+          <div style="background:{% if data.income.gst_threshold_crossed %}rgba(248,113,113,0.07){% else %}rgba(74,222,128,0.07){% endif %};border:1px solid {% if data.income.gst_threshold_crossed %}rgba(248,113,113,0.2){% else %}rgba(74,222,128,0.2){% endif %};padding:14px 20px;flex:1;min-width:140px;"><div style="font-size:0.6rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">₹20L Threshold</div><div style="font-family:'Cormorant Garamond',serif;font-size:1.4rem;color:{% if data.income.gst_threshold_crossed %}var(--red){% else %}var(--green){% endif %};">{% if data.income.gst_threshold_crossed %}Crossed ⚠{% else %}Not Crossed ✓{% endif %}</div></div>
         </div>
-        {% if data.income.gst_threshold_crossed %}
-        <div class="alert alert-warn">
-          <span class="alert-title">GST Registration May Be Required</span>
-          Business credits ₹{{ "{:,.0f}".format(data.income.gst_applicable) }} exceed ₹20L threshold. Verify with CA.
-        </div>
-        {% endif %}
+        {% if data.income.gst_threshold_crossed %}<div class="alert alert-warn"><span class="alert-title">GST Registration May Be Required</span>Business credits ₹{{ "{:,.0f}".format(data.income.gst_applicable) }} exceed ₹20L. Verify with CA.</div>{% endif %}
       </div>
- 
-      <!-- Feature 6: Top 10 Credit Sources -->
       <div class="card">
-        <div class="card-title">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-          Top 10 Credit Sources
-        </div>
-        {% if data.income.top_10_sources %}
-        {% set max_amt = data.income.top_10_sources[0].total_amt %}
-        {% for src in data.income.top_10_sources %}
-        {% set pct = (src.total_amt / max_amt * 100) | round(1) if max_amt else 0 %}
-        <div style="margin-bottom:16px;">
-          <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-            <span style="font-size:0.82rem; color:var(--text);">{{ loop.index }}. {{ src.sender }}</span>
-            <span style="font-size:0.75rem; color:var(--muted);">{{ src.count }} txn{{ 's' if src.count > 1 }} · avg ₹{{ "{:,.0f}".format(src.avg_amt) }}</span>
-          </div>
-          <div class="progress-track"><div class="progress-fill green" style="width:{{ pct }}%"></div></div>
-          <span style="font-size:0.78rem; color:var(--green);">₹{{ "{:,.0f}".format(src.total_amt) }}</span>
-        </div>
-        {% endfor %}
-        {% else %}
-        <div class="empty"><p>No credit sources found</p></div>
-        {% endif %}
+        <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Top 10 Credit Sources</div>
+        {% if data.income.top_10_sources %}{% set max_amt = data.income.top_10_sources[0].total_amt %}{% for src in data.income.top_10_sources %}{% set pct = (src.total_amt / max_amt * 100) | round(1) if max_amt else 0 %}
+        <div style="margin-bottom:16px;"><div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="font-size:0.82rem;color:var(--text);">{{ loop.index }}. {{ src.sender }}</span><span style="font-size:0.75rem;color:var(--muted);">{{ src.count }} txns · avg ₹{{ "{:,.0f}".format(src.avg_amt) }}</span></div><div class="progress-track"><div class="progress-fill green" style="width:{{ pct }}%"></div></div><span style="font-size:0.78rem;color:var(--green);">₹{{ "{:,.0f}".format(src.total_amt) }}</span></div>
+        {% endfor %}{% else %}<div class="empty"><p>No credit sources found</p></div>{% endif %}
       </div>
- 
-      {% else %}
-      <div class="empty">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
-        <p>Income analysis not available</p>
+      {% else %}<div class="empty"><p>Income analysis not available</p></div>{% endif %}
+    </div>
+
+    <!-- ═══ OBLIGATIONS ═══ -->
+    <div class="panel" id="panel-obligations">
+      <div class="panel-header">
+        <span class="panel-tag">Module 07</span>
+        <h2 class="panel-title">Expense & Obligations</h2>
+        <p class="panel-sub">EMI/loan detection, FOIR, cheque bounce, ECS returns, credit card payment pattern, top debit destinations.</p>
+      </div>
+      {% if data.obligations %}
+      <div class="metrics">
+        <div class="metric"><div class="metric-value red">₹{{ "{:,.0f}".format(data.obligations.total_emi_outflow) }}</div><div class="metric-label">Total EMI Outflow</div><div class="metric-sub">{{ data.obligations.emi_count }} transactions</div></div>
+        <div class="metric"><div class="metric-value yellow">₹{{ "{:,.0f}".format(data.obligations.avg_monthly_emi) }}</div><div class="metric-label">Avg Monthly EMI</div><div class="metric-sub">Recurring obligation</div></div>
+        <div class="metric"><div class="metric-value {% if data.obligations.bounce_count > 0 or data.obligations.ecs_count > 0 %}red{% else %}green{% endif %}">{{ data.obligations.bounce_count + data.obligations.ecs_count }}</div><div class="metric-label">Bounces / ECS</div><div class="metric-sub">{{ data.obligations.bounce_count }} cheque · {{ data.obligations.ecs_count }} ECS</div></div>
+        <div class="metric"><div class="metric-value">₹{{ "{:,.0f}".format(data.obligations.cc_total) }}</div><div class="metric-label">CC Payments</div><div class="metric-sub">{{ data.obligations.cc_count }} detected</div></div>
+      </div>
+      <div class="grid-2">
+        <div class="metric" style="background:var(--surface);border:1px solid var(--border);padding:24px 20px;"><div class="metric-value {% if data.loan.foir > 50 %}red{% elif data.loan.foir > 35 %}yellow{% else %}green{% endif %}">{{ data.loan.foir }}%</div><div class="metric-label">FOIR</div><div class="metric-sub">{% if data.loan.foir > 50 %}High Risk{% elif data.loan.foir > 35 %}Moderate{% else %}Healthy{% endif %} · 50% limit</div></div>
+        <div class="metric" style="background:var(--surface);border:1px solid var(--border);padding:24px 20px;"><div class="metric-value yellow">₹{{ "{:,.0f}".format(data.loan.remaining_emi_capacity) }}</div><div class="metric-label">Remaining EMI Capacity</div><div class="metric-sub">Per month at 50% FOIR</div></div>
+      </div>
+      {% if data.loan.foir > 50 %}<div class="alert alert-danger" style="margin-bottom:20px;"><span class="alert-title">⚠ High FOIR — {{ data.loan.foir }}%</span>EMI obligations exceed 50% of income. Banks prefer FOIR ≤ 40%.</div>{% endif %}
+      <div class="card">
+        <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>EMI / Loan Detection</div>
+        {% if data.obligations.lender_list %}<div style="margin-bottom:20px;"><div style="font-size:0.62rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">Lenders Detected</div><div style="display:flex;flex-wrap:wrap;gap:8px;">{% for l in data.obligations.lender_list %}<span class="badge badge-dr">{{ l.name }} — ₹{{ "{:,.0f}".format(l.total) }}</span>{% endfor %}</div></div>{% endif %}
+        {% if data.obligations.monthly_emi %}<div>{% for month, amt in data.obligations.monthly_emi.items() %}{% set max_amt = data.obligations.monthly_emi.values() | max %}{% set pct = (amt / max_amt * 100) | round(1) if max_amt else 0 %}<div class="progress-row"><span class="progress-label" style="width:80px;">{{ month }}</span><div class="progress-track"><div class="progress-fill red" style="width:{{ pct }}%"></div></div><span class="progress-val">₹{{ "{:,.0f}".format(amt) }}</span></div>{% endfor %}</div>{% endif %}
+        {% if data.obligations.emi_txns %}<div class="table-wrap" style="margin-top:16px;"><table><thead><tr><th>Date</th><th>Description</th><th>Amount (₹)</th></tr></thead><tbody>{% for t in data.obligations.emi_txns[:12] %}<tr><td class="td-muted">{{ t.date }}</td><td style="font-size:0.78rem;">{{ t.desc[:60] }}{% if t.desc|length > 60 %}…{% endif %}</td><td style="color:var(--red)">₹{{ "{:,.0f}".format(t.amount) }}</td></tr>{% endfor %}{% if data.obligations.emi_count > 12 %}<tr><td colspan="3" style="text-align:center;color:var(--muted);font-size:0.72rem;">+{{ data.obligations.emi_count - 12 }} more</td></tr>{% endif %}</tbody></table></div>
+        {% else %}<div class="empty"><p>No EMI transactions detected</p></div>{% endif %}
+      </div>
+      <div class="card">
+        <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>Cheque Bounce / ECS Returns {% if data.obligations.bounce_count > 0 or data.obligations.ecs_count > 0 %}<span class="badge badge-dr" style="margin-left:8px;">⚠ {{ data.obligations.bounce_count + data.obligations.ecs_count }} found</span>{% endif %}</div>
+        {% if data.obligations.bounce_txns or data.obligations.ecs_return_txns %}
+          {% if data.obligations.bounce_txns %}<div style="margin-bottom:16px;"><div style="font-size:0.62rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">Cheque Bounces ({{ data.obligations.bounce_count }})</div><div class="table-wrap"><table><thead><tr><th>Date</th><th>Description</th><th>Amount</th></tr></thead><tbody>{% for t in data.obligations.bounce_txns %}<tr><td class="td-muted">{{ t.date }}</td><td style="font-size:0.78rem;">{{ t.desc[:55] }}</td><td style="color:var(--red)">₹{{ "{:,.0f}".format(t.amount) }}</td></tr>{% endfor %}</tbody></table></div></div>{% endif %}
+          {% if data.obligations.ecs_return_txns %}<div><div style="font-size:0.62rem;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);margin-bottom:10px;">ECS / NACH Returns ({{ data.obligations.ecs_count }})</div><div class="table-wrap"><table><thead><tr><th>Date</th><th>Description</th><th>Amount</th></tr></thead><tbody>{% for t in data.obligations.ecs_return_txns %}<tr><td class="td-muted">{{ t.date }}</td><td style="font-size:0.78rem;">{{ t.desc[:55] }}</td><td style="color:var(--red)">₹{{ "{:,.0f}".format(t.amount) }}</td></tr>{% endfor %}</tbody></table></div></div>{% endif %}
+        {% else %}<div class="alert alert-ok"><span class="alert-title">✓ No Bounces or ECS Returns</span>Clean repayment record — positive signal for credit.</div>{% endif %}
+      </div>
+      <div class="card">
+        <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/></svg>Credit Card Payment Tracking</div>
+        {% if data.obligations.cc_pattern %}<div class="table-wrap"><table><thead><tr><th>Month</th><th>Total Paid (₹)</th><th>Payments</th><th>Pattern</th></tr></thead><tbody>{% for row in data.obligations.cc_pattern %}<tr><td class="td-muted">{{ row.month }}</td><td>₹{{ "{:,.0f}".format(row.total_paid) }}</td><td>{{ row.count }}</td><td><span class="badge {% if row.pattern == 'Multiple Payments' %}badge-warn{% else %}badge-cr{% endif %}">{{ row.pattern }}</span></td></tr>{% endfor %}</tbody></table></div>
+        {% else %}<div class="empty"><p>No credit card payments detected</p></div>{% endif %}
+      </div>
+      <div class="card">
+        <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Top 10 Debit Destinations</div>
+        {% if data.obligations.top_10_debits %}{% set max_amt = data.obligations.top_10_debits[0].total %}{% for dest in data.obligations.top_10_debits %}{% set pct = (dest.total / max_amt * 100) | round(1) if max_amt else 0 %}
+        <div style="margin-bottom:16px;"><div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="font-size:0.82rem;color:var(--text);">{{ loop.index }}. {{ dest.dest }}</span><span style="font-size:0.75rem;color:var(--muted);">{{ dest.count }} txns · avg ₹{{ "{:,.0f}".format(dest.avg) }}</span></div><div class="progress-track"><div class="progress-fill red" style="width:{{ pct }}%"></div></div><span style="font-size:0.78rem;color:var(--red);">₹{{ "{:,.0f}".format(dest.total) }}</span></div>
+        {% endfor %}{% else %}<div class="empty"><p>No debit destinations found</p></div>{% endif %}
+      </div>
+      {% else %}<div class="empty"><p>Obligations data not available</p></div>{% endif %}
+    </div>
+
+    <!-- ═══ BALANCE & CASH FLOW ═══ -->
+    <div class="panel" id="panel-cashflow">
+      <div class="panel-header">
+        <span class="panel-tag">Module 08</span>
+        <h2 class="panel-title">Balance & Cash Flow</h2>
+        <p class="panel-sub">Average Bank Balance (3/6/12 month), month-end trend, net cash flow, seasonality detection.</p>
+      </div>
+      {% if data.cashflow %}
+      <div class="metrics">
+        <div class="metric"><div class="metric-value gold" style="color:var(--gold);">₹{{ "{:,.0f}".format(data.cashflow.abb_3m) }}</div><div class="metric-label">ABB — 3 Month</div><div class="metric-sub">Average Bank Balance</div></div>
+        <div class="metric"><div class="metric-value">₹{{ "{:,.0f}".format(data.cashflow.abb_6m) }}</div><div class="metric-label">ABB — 6 Month</div><div class="metric-sub">Average Bank Balance</div></div>
+        <div class="metric"><div class="metric-value">₹{{ "{:,.0f}".format(data.cashflow.abb_12m) }}</div><div class="metric-label">ABB — 12 Month</div><div class="metric-sub">Average Bank Balance</div></div>
+        <div class="metric"><div class="metric-value {% if data.cashflow.avg_net_flow > 0 %}green{% else %}red{% endif %}">₹{{ "{:,.0f}".format(data.cashflow.avg_net_flow) }}</div><div class="metric-label">Avg Net Flow</div><div class="metric-sub">{{ data.cashflow.surplus_months }} surplus · {{ data.cashflow.deficit_months }} deficit months</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Month-End Balance Trend — {{ data.cashflow.trend_direction }}</div>
+        {% if data.cashflow.eom_trend %}
+        <div style="margin-top:8px;">{% for item in data.cashflow.eom_trend %}{% set max_bal = data.cashflow.eom_trend | map(attribute='balance') | max %}{% set pct = (item.balance / max_bal * 100) | round(1) if max_bal else 0 %}<div class="progress-row"><span class="progress-label" style="width:80px;">{{ item.month }}</span><div class="progress-track"><div class="progress-fill" style="width:{{ pct }}%;background:var(--gold);"></div></div><span class="progress-val">₹{{ "{:,.0f}".format(item.balance) }}</span></div>{% endfor %}
+        </div>{% endif %}
+      </div>
+      <div class="card">
+        <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Net Cash Flow Per Month</div>
+        <div class="table-wrap"><table><thead><tr><th>Month</th><th>Credits (₹)</th><th>Debits (₹)</th><th>Net (₹)</th></tr></thead><tbody>
+          {% for row in data.cashflow.monthly_net %}<tr><td class="td-muted">{{ row.month }}</td><td style="color:var(--green)">₹{{ "{:,.0f}".format(row.credits) }}</td><td style="color:var(--red)">₹{{ "{:,.0f}".format(row.debits) }}</td><td style="color:{% if row.surplus %}var(--green){% else %}var(--red){% endif %};font-weight:500;">{% if row.surplus %}+{% endif %}₹{{ "{:,.0f}".format(row.net) }}</td></tr>{% endfor %}
+        </tbody></table></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>Seasonality Detection</div>
+        {% if data.cashflow.high_months %}<div class="alert alert-ok" style="margin-bottom:12px;"><span class="alert-title">📈 High Income Months</span>{{ data.cashflow.high_months | join(', ') }} — 25%+ above average</div>{% endif %}
+        {% if data.cashflow.low_months %}<div class="alert alert-warn"><span class="alert-title">📉 Low Income Months</span>{{ data.cashflow.low_months | join(', ') }} — 25%+ below average</div>{% endif %}
+        {% if not data.cashflow.high_months and not data.cashflow.low_months %}<div class="alert alert-ok"><span class="alert-title">✓ Stable Income Pattern</span>No major seasonal variation detected.</div>{% endif %}
+      </div>
+      {% else %}<div class="empty"><p>Cash flow data not available</p></div>{% endif %}
+    </div>
+
+    <!-- ═══ RED FLAGS & FRAUD ═══ -->
+    <div class="panel" id="panel-redflags">
+      <div class="panel-header">
+        <span class="panel-tag">Module 09</span>
+        <h2 class="panel-title">Red Flags & Fraud Detection</h2>
+        <p class="panel-sub">Circular transactions, window dressing, gambling/crypto, penalty charges, duplicate entries.</p>
+      </div>
+      {% if data.red_flags %}
+      <div class="risk-meter" style="margin-bottom:28px;">
+        <div class="risk-circle {{ data.red_flags.flag_color }}">
+          <span class="risk-score-num" style="color:{% if data.red_flags.flag_color == 'green' %}var(--green){% elif data.red_flags.flag_color == 'red' %}var(--red){% else %}var(--yellow){% endif %}">{{ data.red_flags.flag_score }}</span>
+          <span class="risk-score-label">Flag Score</span>
+        </div>
+        <div class="risk-details">
+          <h4 style="color:{% if data.red_flags.flag_color == 'green' %}var(--green){% elif data.red_flags.flag_color == 'red' %}var(--red){% else %}var(--yellow){% endif %}">{{ data.red_flags.flag_level }} Risk — {{ data.red_flags.total_flags }} flags found</h4>
+          <p>{{ data.red_flags.circular_count }} circular · {{ data.red_flags.window_dress_count }} window dress · {{ data.red_flags.gambling_count }} gambling/crypto · {{ data.red_flags.penalty_count }} penalty · {{ data.red_flags.duplicate_groups }} duplicate groups</p>
+        </div>
+      </div>
+      <div class="metrics">
+        <div class="metric"><div class="metric-value {% if data.red_flags.circular_count > 0 %}red{% else %}green{% endif %}">{{ data.red_flags.circular_count }}</div><div class="metric-label">Circular Txns</div><div class="metric-sub">Same amt in/out ≤7 days</div></div>
+        <div class="metric"><div class="metric-value {% if data.red_flags.window_dress_count > 0 %}yellow{% else %}green{% endif %}">{{ data.red_flags.window_dress_count }}</div><div class="metric-label">Window Dressing</div><div class="metric-sub">Month-end deposit + withdrawal</div></div>
+        <div class="metric"><div class="metric-value {% if data.red_flags.gambling_count > 0 %}red{% else %}green{% endif %}">{{ data.red_flags.gambling_count }}</div><div class="metric-label">Gambling/Crypto</div><div class="metric-sub">₹{{ "{:,.0f}".format(data.red_flags.gambling_total) }} total</div></div>
+        <div class="metric"><div class="metric-value {% if data.red_flags.duplicate_groups > 0 %}yellow{% else %}green{% endif %}">{{ data.red_flags.duplicate_groups }}</div><div class="metric-label">Duplicate Groups</div><div class="metric-sub">Same date+amt+type</div></div>
+      </div>
+      {% if data.red_flags.circular_txns %}
+      <div class="card">
+        <div class="card-title" style="color:var(--red);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.66 0 3-4.03 3-9s-1.34-9-3-9m0 18c-1.66 0-3-4.03-3-9s1.34-9 3-9"/></svg>Circular Transactions ({{ data.red_flags.circular_count }})</div>
+        <div class="table-wrap"><table><thead><tr><th>Credit Date</th><th>Credit Desc</th><th>Debit Date</th><th>Debit Desc</th><th>Amount</th><th>Gap</th></tr></thead><tbody>
+          {% for c in data.red_flags.circular_txns[:8] %}<tr><td class="td-muted">{{ c.credit_date }}</td><td style="font-size:0.75rem;">{{ c.credit_desc }}</td><td class="td-muted">{{ c.debit_date }}</td><td style="font-size:0.75rem;">{{ c.debit_desc }}</td><td style="color:var(--yellow)">₹{{ "{:,.0f}".format(c.amount) }}</td><td class="td-muted">{{ c.days_gap }}d</td></tr>{% endfor %}
+        </tbody></table></div>
       </div>
       {% endif %}
- 
-    </div><!-- /panel-income -->
- 
+      {% if data.red_flags.window_dress %}
+      <div class="card">
+        <div class="card-title" style="color:var(--yellow);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Window Dressing Alerts ({{ data.red_flags.window_dress_count }})</div>
+        {% for w in data.red_flags.window_dress %}<div class="alert alert-warn"><span class="alert-title">Month-End Deposit — {{ w.deposit_date }}</span>₹{{ "{:,.0f}".format(w.amount) }} deposited near month-end, {{ w.withdrawal_count }} matching withdrawal(s) found within 8 days.</div>{% endfor %}
+      </div>
+      {% endif %}
+      {% if data.red_flags.gambling_txns %}
+      <div class="card">
+        <div class="card-title" style="color:var(--red);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>Gambling / Crypto / Speculative ({{ data.red_flags.gambling_count }}) — ₹{{ "{:,.0f}".format(data.red_flags.gambling_total) }}</div>
+        <div class="table-wrap"><table><thead><tr><th>Date</th><th>Description</th><th>Type</th><th>Amount (₹)</th></tr></thead><tbody>
+          {% for t in data.red_flags.gambling_txns[:15] %}<tr><td class="td-muted">{{ t.date }}</td><td style="font-size:0.78rem;">{{ t.desc[:55] }}</td><td><span class="badge {% if t.type == 'DR' %}badge-dr{% else %}badge-cr{% endif %}">{{ t.type }}</span></td><td style="color:{% if t.type == 'DR' %}var(--red){% else %}var(--green){% endif %}">₹{{ "{:,.0f}".format(t.amount) }}</td></tr>{% endfor %}
+        </tbody></table></div>
+      </div>
+      {% endif %}
+      {% if data.red_flags.penalty_txns %}
+      <div class="card">
+        <div class="card-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>Penalty / Legal Charges ({{ data.red_flags.penalty_count }}) — ₹{{ "{:,.0f}".format(data.red_flags.penalty_total) }}</div>
+        <div class="table-wrap"><table><thead><tr><th>Date</th><th>Description</th><th>Amount (₹)</th></tr></thead><tbody>
+          {% for t in data.red_flags.penalty_txns[:10] %}<tr><td class="td-muted">{{ t.date }}</td><td style="font-size:0.78rem;">{{ t.desc[:60] }}</td><td style="color:var(--red)">₹{{ "{:,.0f}".format(t.amount) }}</td></tr>{% endfor %}
+        </tbody></table></div>
+      </div>
+      {% endif %}
+      {% if data.red_flags.duplicate_groups == 0 and data.red_flags.circular_count == 0 and data.red_flags.gambling_count == 0 %}
+      <div class="alert alert-ok"><span class="alert-title">✓ No Major Red Flags Detected</span>Statement appears clean. No circular transactions, gambling, or duplicates found.</div>
+      {% endif %}
+      {% else %}<div class="empty"><p>Red flag analysis not available</p></div>{% endif %}
+    </div>
+
   </main>
 </div>
 {% endif %}
