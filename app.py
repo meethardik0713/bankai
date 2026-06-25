@@ -16,6 +16,7 @@ from collections import defaultdict
 from werkzeug.utils import secure_filename
 from universal_parser import parse_transactions
 from core.verifier import run_accuracy_check
+from core.post_validator import validate_and_fix
 from core.sqlite_indexer import build_index, drop_index, get_db
 from core.chat_engine import verify_data, chat as ai_chat
 from core.dashboard import run_dashboard
@@ -34,6 +35,14 @@ from posthog import Posthog
 POSTHOG_API_KEY = os.environ.get('POSTHOG_API_KEY', '')
 POSTHOG_HOST    = os.environ.get('POSTHOG_HOST', 'https://us.i.posthog.com')
 ph = Posthog(project_api_key=POSTHOG_API_KEY, host=POSTHOG_HOST)
+
+# ── FIXED: was calling itself recursively before ──────────
+def ph_track(user_id, event, props=None, properties=None):
+    p = properties or props or {}
+    try:
+        ph.capture(distinct_id=str(user_id or 'anonymous'), event=event, properties=p)
+    except Exception:
+        pass
 
 # ── Logging ───────────────────────────────────────────────
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
@@ -106,9 +115,10 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 CHAT_MESSAGE_LIMIT = 50
 CHAT_SESSION_HOURS = 48
 
+OWNER_EMAILS = ['hardik101306@gmail.com']
+
 NEW_STATEMENT_ERROR = 'New bank statement detected. Your ₹49 session is locked to one statement. <a href="/pay" style="color:#C9A84C;text-decoration:underline;font-weight:600;">Click here to purchase a new session</a> to analyze a different PDF.'
 
-# ── Plan config ───────────────────────────────────────────
 PLAN_CONFIG = {
     'Basic':    {'price': 10,  'input_tokens': 25000,   'output_tokens': 5000,  'validity_hours': 24},
     'Standard': {'price': 49,  'input_tokens': 100000,  'output_tokens': 10000, 'validity_hours': 75},
@@ -116,18 +126,15 @@ PLAN_CONFIG = {
     'Elite':    {'price': 499, 'input_tokens': 1500000, 'output_tokens': 20000, 'validity_hours': 200},
 }
 
-# ── Rate limiting ─────────────────────────────────────────
 request_counts = defaultdict(list)
 RATE_LIMIT  = 10
 RATE_WINDOW = 60
 
-# ── In-memory cache ───────────────────────────────────────
 _CACHE      = {}
 _CACHE_LOCK = threading.Lock()
 _CACHE_TTL  = 1800
 PAGE_SIZE   = 100
 _PDF_MAGIC  = b'%PDF'
-
 
 def _cache_get(file_hash: str):
     with _CACHE_LOCK:
@@ -188,7 +195,19 @@ def _get_current_user():
 
 
 def _get_active_chat_session(user_id: str):
-    """Check if user has an active paid chat session."""
+    user_email_check = session.get('user_email', '')
+    if user_email_check and user_email_check.lower() in OWNER_EMAILS:
+        return {
+            'id': f'owner_{user_id}',
+            'user_id': user_id,
+            'messages_used': 0,
+            'statements_used': 0,
+            'is_active': True,
+            'input_tokens_used': 0,
+            'output_tokens_used': 0,
+            'input_tokens_limit': 99999999,
+            'output_tokens_limit': 99999999,
+        }
     try:
         result = supabase.table('chat_sessions').select('*').eq(
             'user_id', user_id
@@ -211,9 +230,10 @@ def _get_active_chat_session(user_id: str):
 
 
 def _get_locked_hash(user_id: str):
-    """Returns the statement_hash this user's current paid session is locked to.
-    None means: no lock yet (first upload will set it)."""
     if not user_id:
+        return None
+    user_email_check = session.get('user_email', '')
+    if user_email_check and user_email_check.lower() in OWNER_EMAILS:
         return None
     try:
         u = supabase.table('users').select('statement_hash').eq('id', user_id).limit(1).execute()
@@ -225,7 +245,6 @@ def _get_locked_hash(user_id: str):
 
 
 def _set_locked_hash(user_id: str, fhash: str):
-    """Lock this user's paid session to this statement hash."""
     if not user_id or not fhash:
         return
     try:
@@ -237,7 +256,6 @@ def _set_locked_hash(user_id: str, fhash: str):
 
 
 def _clear_locked_hash(user_id: str):
-    """Clear the lock — called on payment success so the next upload can lock fresh."""
     if not user_id:
         return
     try:
@@ -279,8 +297,10 @@ def auth_callback():
                     'email': result.user.email,
                 }).execute()
 
-                ph.identify(result.user.id, {'email': result.user.email})
-                ph.capture(result.user.id, 'user_signed_in', {'provider': 'google'})
+                ph_track(result.user.id, event='user_signed_in', props={
+                    'provider': 'google',
+                    'email':    result.user.email,
+                })
                 logger.info("Login success: %s", result.user.email)
         except Exception as e:
             logger.exception("Auth callback error: %s", e)
@@ -309,7 +329,6 @@ def pay_page():
     is_logged_in, user_email, user_id = _get_current_user()
     if not is_logged_in:
         return redirect('/login')
-
     return render_template('payment.html',
         razorpay_key_id = RAZORPAY_KEY_ID,
         user_email      = user_email,
@@ -337,7 +356,10 @@ def create_order():
             'razorpay_order_id': order['id'],
         }).execute()
 
-        ph.capture(user_id, 'payment_order_created', {'order_id': order['id'], 'amount_inr': 49})
+        ph_track(user_id, event='payment_order_created', props={
+            'order_id':   order['id'],
+            'amount_inr': 49,
+        })
         logger.info("Order created: %s for %s", order['id'], user_email)
         return jsonify({
             'order_id': order['id'],
@@ -373,6 +395,9 @@ def verify_payment():
 
         if not hmac.compare_digest(expected, razorpay_signature):
             logger.warning("Signature mismatch for order %s", razorpay_order_id)
+            ph_track(user_id, event='payment_verification_failed', props={
+                'order_id': razorpay_order_id,
+            })
             return jsonify({'error': 'Payment verification failed'}), 400
 
     except Exception as e:
@@ -401,13 +426,15 @@ def verify_payment():
             'output_tokens_used': 0,
         }).execute()
 
-        # Fresh payment = unlock so user can upload exactly 1 new statement
         _clear_locked_hash(user_id)
-        # Also clear any stale Flask session reference to old PDF
         session.pop('file_hash', None)
         session.pop('file_name', None)
 
-        ph.capture(user_id, 'payment_completed', {'amount_inr': 49, 'payment_id': razorpay_payment_id})
+        ph_track(user_id, event='payment_completed', props={
+            'amount_inr': 49,
+            'payment_id': razorpay_payment_id,
+            'order_id':   razorpay_order_id,
+        })
         logger.info("Payment verified + session created for %s", user_email)
         return jsonify({'success': True, 'redirect': '/chat'})
 
@@ -449,15 +476,20 @@ def chat_page():
                 fhash       = _file_hash(file)
                 locked_hash = _get_locked_hash(user_id)
 
-                # Strict 1-statement lock
                 if locked_hash and locked_hash != fhash:
                     upload_error = NEW_STATEMENT_ERROR
                 else:
                     filepath = os.path.join(app.config['UPLOAD_FOLDER'], safe_name)
                     file.save(filepath)
+                    file_size_kb = round(os.path.getsize(filepath) / 1024, 1)
+                    t0 = time.time()
                     try:
                         transactions = parse_transactions(filepath)
+                        parse_time   = round(time.time() - t0, 1)
                         if transactions:
+                            vr = validate_and_fix(transactions)
+                            transactions = vr['transactions']
+                            logger.info("Validation: %s", vr['badge'])
                             if active_session.get('statements_used', 0) >= 1 and not locked_hash:
                                 upload_error = 'Statement limit reached. Please purchase a new session.'
                             else:
@@ -472,12 +504,36 @@ def chat_page():
                                 supabase.table('chat_sessions').update({
                                     'statements_used': 1
                                 }).eq('id', active_session['id']).execute()
-                                ph.capture(user_id, 'pdf_uploaded', {'context': 'chat', 'transaction_count': row_count})
+
+                                # ── TRACK: PDF parse success ──
+                                ph_track(user_id, event='pdf_parse_success', props={
+                                    'context':            'chat',
+                                    'file_name':          safe_name,
+                                    'file_size_kb':       file_size_kb,
+                                    'transaction_count':  row_count,
+                                    'parse_time_seconds': parse_time,
+                                    'validation_badge':   vr.get('badge', ''),
+                                })
                                 logger.info("Chat DB built: %d rows for session %s", row_count, session_id)
                         else:
                             upload_error = 'No transactions found in PDF.'
+                            ph_track(user_id, event='pdf_parse_failed', props={
+                                'context':    'chat',
+                                'file_name':  safe_name,
+                                'file_size_kb': file_size_kb,
+                                'error_type': 'no_transactions_found',
+                            })
                     except Exception as e:
+                        parse_time   = round(time.time() - t0, 1)
                         upload_error = f'Parse error: {e}'
+                        ph_track(user_id, event='pdf_parse_failed', props={
+                            'context':       'chat',
+                            'file_name':     safe_name,
+                            'file_size_kb':  file_size_kb,
+                            'error_type':    type(e).__name__,
+                            'error_message': str(e)[:200],
+                            'parse_time_seconds': parse_time,
+                        })
                     finally:
                         if os.path.exists(filepath):
                             os.remove(filepath)
@@ -532,17 +588,19 @@ def chat_message():
 
     try:
         supabase.table('chat_sessions').update({
-            'messages_used': active_session['messages_used'] + 1,
-            'input_tokens_used': active_session.get('input_tokens_used', 0) + result.get('tokens_used', 0),
+            'messages_used':      active_session['messages_used'] + 1,
+            'input_tokens_used':  active_session.get('input_tokens_used', 0) + result.get('tokens_used', 0),
             'output_tokens_used': active_session.get('output_tokens_used', 0) + result.get('output_tokens', 0),
         }).eq('id', active_session['id']).execute()
     except Exception as e:
         logger.exception("Failed to update message count: %s", e)
 
-    ph.capture(user_id, 'chat_message_sent', {
-        'messages_used': active_session['messages_used'] + 1,
-        'input_tokens': result.get('tokens_used', 0),
-        'output_tokens': result.get('output_tokens', 0),
+    ph_track(user_id, event='chat_message_sent', props={
+        'messages_used':  active_session['messages_used'] + 1,
+        'input_tokens':   result.get('tokens_used', 0),
+        'output_tokens':  result.get('output_tokens', 0),
+        'query_length':   len(user_msg),
+        'reply_length':   len(result.get('reply', '')),
     })
 
     return jsonify({
@@ -553,7 +611,7 @@ def chat_message():
 
 
 # ═══════════════════════════════════════════════════════════
-#  MAIN ROUTE
+#  MAIN HOME ROUTE
 # ═══════════════════════════════════════════════════════════
 
 @app.route('/', methods=['GET', 'POST'])
@@ -599,7 +657,6 @@ def home():
             else:
                 fhash = _file_hash(file)
 
-                # Strict 1-statement lock — only enforce for logged-in paid users
                 locked_hash = None
                 has_active  = False
                 if is_logged_in:
@@ -624,26 +681,68 @@ def home():
                         selected_filename = safe_name
                         filepath = os.path.join(app.config['UPLOAD_FOLDER'], safe_name)
                         file.save(filepath)
+                        file_size_kb = round(os.path.getsize(filepath) / 1024, 1)
+                        distinct = user_id or ip
+
+                        # ── TRACK: Parse started ──
+                        ph_track(distinct, event='pdf_parse_started', props={
+                            'context':      'home',
+                            'file_name':    safe_name,
+                            'file_size_kb': file_size_kb,
+                        })
+
                         try:
                             t0               = time.time()
                             all_transactions = parse_transactions(filepath)
                             parse_time       = round(time.time() - t0, 1)
+
+                            if all_transactions:
+                                vr = validate_and_fix(all_transactions)
+                                all_transactions = vr['transactions']
+                                session['validation_badge'] = vr['badge']
+                                session['validation_color'] = vr['badge_color']
+                                logger.info("Validation: %s", vr['badge'])
+
                             _cache_set(fhash, all_transactions, safe_name)
                             session['file_hash'] = fhash
                             session['file_name'] = safe_name
                             if has_active and not locked_hash:
                                 _set_locked_hash(user_id, fhash)
-                            distinct = user_id or request.remote_addr
-                            ph.capture(distinct, 'pdf_uploaded', {
-                                'context': 'home',
-                                'transaction_count': len(all_transactions),
-                                'parse_time_seconds': parse_time,
-                            })
+
+                            if all_transactions:
+                                # ── TRACK: Parse success ──
+                                ph_track(distinct, event='pdf_parse_success', props={
+                                    'context':            'home',
+                                    'file_name':          safe_name,
+                                    'file_size_kb':       file_size_kb,
+                                    'transaction_count':  len(all_transactions),
+                                    'parse_time_seconds': parse_time,
+                                    'validation_badge':   vr.get('badge', ''),
+                                    'is_logged_in':       is_logged_in,
+                                })
+                            else:
+                                ph_track(distinct, event='pdf_parse_failed', props={
+                                    'context':      'home',
+                                    'file_name':    safe_name,
+                                    'file_size_kb': file_size_kb,
+                                    'error_type':   'no_transactions_found',
+                                })
+
                             logger.info("Parsed %s → %d txns in %.1fs",
                                         safe_name, len(all_transactions), parse_time)
                         except Exception as e:
+                            parse_time = round(time.time() - t0, 1)
                             logger.exception("Error parsing %s", safe_name)
                             error_message = f'Could not parse the file: {e}'
+                            # ── TRACK: Parse failed ──
+                            ph_track(distinct, event='pdf_parse_failed', props={
+                                'context':            'home',
+                                'file_name':          safe_name,
+                                'file_size_kb':       file_size_kb,
+                                'error_type':         type(e).__name__,
+                                'error_message':      str(e)[:200],
+                                'parse_time_seconds': parse_time,
+                            })
                         finally:
                             if os.path.exists(filepath):
                                 os.remove(filepath)
@@ -748,36 +847,36 @@ def sitemap():
         ('https://aarogyamfin.com/privacy', '2026-04-08'),
         ('https://aarogyamfin.com/terms',   '2026-04-08'),
         ('https://aarogyamfin.com/contact', '2026-04-08'),
-('https://aarogyamfin.com/blog', '2026-06-19'),
-('https://aarogyamfin.com/bank-statement-analyzer', '2026-06-23'),
-('https://aarogyamfin.com/bank-statement-analyzer-for-ca', '2026-06-23'),
-('https://aarogyamfin.com/bank-statement-analyzer-for-dsa', '2026-06-23'),
-('https://aarogyamfin.com/bank-statement-analyzer-for-nbfc', '2026-06-23'),
-('https://aarogyamfin.com/bank-statement-to-excel', '2026-06-23'),
-('https://aarogyamfin.com/ai-bank-statement-analyzer', '2026-06-23'),
-('https://aarogyamfin.com/pdf-to-excel-bank-statement', '2026-06-23'),
-('https://aarogyamfin.com/bank-statement-analysis', '2026-06-23'),
-('https://aarogyamfin.com/bank-statement-analysis-software', '2026-06-23'),
-('https://aarogyamfin.com/bank-statement-ocr', '2026-06-23'),
-('https://aarogyamfin.com/bank-statement-converter', '2026-06-23'),
-('https://aarogyamfin.com/bank-pdf-to-excel', '2026-06-23'),
-('https://aarogyamfin.com/bank-statement-excel-converter', '2026-06-23'),
-('https://aarogyamfin.com/financial-statement-analyzer', '2026-06-23'),
-('https://aarogyamfin.com/statement-parser', '2026-06-23'),
-('https://aarogyamfin.com/statement-analysis-software', '2026-06-23'),
-('https://aarogyamfin.com/bank-data-extraction', '2026-06-23'),
-('https://aarogyamfin.com/automatic-bank-statement-analysis', '2026-06-23'),
-('https://aarogyamfin.com/ai-bank-statement-parser', '2026-06-23'),
-('https://aarogyamfin.com/bank-statement-analysis-tool', '2026-06-23'),
-('https://aarogyamfin.com/pdf-bank-parser', '2026-06-23'),
-('https://aarogyamfin.com/bank-statement-parser', '2026-06-23'),
-('https://aarogyamfin.com/online-bank-statement-analyzer', '2026-06-23'),
-('https://aarogyamfin.com/sbi-bank-statement-analyzer', '2026-06-23'),
-('https://aarogyamfin.com/hdfc-bank-statement-analyzer', '2026-06-23'),
-('https://aarogyamfin.com/icici-bank-statement-analyzer', '2026-06-23'),
-('https://aarogyamfin.com/axis-bank-statement-analyzer', '2026-06-23'),
-('https://aarogyamfin.com/kotak-bank-statement-analyzer', '2026-06-23'),
-('https://aarogyamfin.com/blog/how-to-analyze-bank-statement-for-itr', '2026-06-19'),
+        ('https://aarogyamfin.com/blog', '2026-06-19'),
+        ('https://aarogyamfin.com/bank-statement-analyzer', '2026-06-23'),
+        ('https://aarogyamfin.com/bank-statement-analyzer-for-ca', '2026-06-23'),
+        ('https://aarogyamfin.com/bank-statement-analyzer-for-dsa', '2026-06-23'),
+        ('https://aarogyamfin.com/bank-statement-analyzer-for-nbfc', '2026-06-23'),
+        ('https://aarogyamfin.com/bank-statement-to-excel', '2026-06-23'),
+        ('https://aarogyamfin.com/ai-bank-statement-analyzer', '2026-06-23'),
+        ('https://aarogyamfin.com/pdf-to-excel-bank-statement', '2026-06-23'),
+        ('https://aarogyamfin.com/bank-statement-analysis', '2026-06-23'),
+        ('https://aarogyamfin.com/bank-statement-analysis-software', '2026-06-23'),
+        ('https://aarogyamfin.com/bank-statement-ocr', '2026-06-23'),
+        ('https://aarogyamfin.com/bank-statement-converter', '2026-06-23'),
+        ('https://aarogyamfin.com/bank-pdf-to-excel', '2026-06-23'),
+        ('https://aarogyamfin.com/bank-statement-excel-converter', '2026-06-23'),
+        ('https://aarogyamfin.com/financial-statement-analyzer', '2026-06-23'),
+        ('https://aarogyamfin.com/statement-parser', '2026-06-23'),
+        ('https://aarogyamfin.com/statement-analysis-software', '2026-06-23'),
+        ('https://aarogyamfin.com/bank-data-extraction', '2026-06-23'),
+        ('https://aarogyamfin.com/automatic-bank-statement-analysis', '2026-06-23'),
+        ('https://aarogyamfin.com/ai-bank-statement-parser', '2026-06-23'),
+        ('https://aarogyamfin.com/bank-statement-analysis-tool', '2026-06-23'),
+        ('https://aarogyamfin.com/pdf-bank-parser', '2026-06-23'),
+        ('https://aarogyamfin.com/bank-statement-parser', '2026-06-23'),
+        ('https://aarogyamfin.com/online-bank-statement-analyzer', '2026-06-23'),
+        ('https://aarogyamfin.com/sbi-bank-statement-analyzer', '2026-06-23'),
+        ('https://aarogyamfin.com/hdfc-bank-statement-analyzer', '2026-06-23'),
+        ('https://aarogyamfin.com/icici-bank-statement-analyzer', '2026-06-23'),
+        ('https://aarogyamfin.com/axis-bank-statement-analyzer', '2026-06-23'),
+        ('https://aarogyamfin.com/kotak-bank-statement-analyzer', '2026-06-23'),
+        ('https://aarogyamfin.com/blog/how-to-analyze-bank-statement-for-itr', '2026-06-19'),
     ]
     xml = ['<?xml version="1.0" encoding="UTF-8"?>',
            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
@@ -866,86 +965,71 @@ def about():
 @app.route('/bank-statement-analyzer')
 def bank_statement_analyzer():
     is_logged_in, user_email, user_id = _get_current_user()
-    return render_template('bank_statement_analyzer.html',
-        is_logged_in=is_logged_in, user_email=user_email)
+    return render_template('bank_statement_analyzer.html', is_logged_in=is_logged_in, user_email=user_email)
 
 @app.route('/bank-statement-analyzer-for-ca')
 def bsa_for_ca():
     is_logged_in, user_email, user_id = _get_current_user()
-    return render_template('bank_statement_analyzer.html',
-        is_logged_in=is_logged_in, user_email=user_email)
+    return render_template('bank_statement_analyzer.html', is_logged_in=is_logged_in, user_email=user_email)
 
 @app.route('/sbi-bank-statement-analyzer')
 def sbi_bsa():
     is_logged_in, user_email, user_id = _get_current_user()
-    return render_template('bank_statement_analyzer.html',
-        is_logged_in=is_logged_in, user_email=user_email)
+    return render_template('bank_statement_analyzer.html', is_logged_in=is_logged_in, user_email=user_email)
 
 @app.route('/hdfc-bank-statement-analyzer')
 def hdfc_bsa():
     is_logged_in, user_email, user_id = _get_current_user()
-    return render_template('bank_statement_analyzer.html',
-        is_logged_in=is_logged_in, user_email=user_email)
+    return render_template('bank_statement_analyzer.html', is_logged_in=is_logged_in, user_email=user_email)
 
 @app.route('/icici-bank-statement-analyzer')
 def icici_bsa():
     is_logged_in, user_email, user_id = _get_current_user()
-    return render_template('bank_statement_analyzer.html',
-        is_logged_in=is_logged_in, user_email=user_email)
+    return render_template('bank_statement_analyzer.html', is_logged_in=is_logged_in, user_email=user_email)
 
 @app.route('/axis-bank-statement-analyzer')
 def axis_bsa():
     is_logged_in, user_email, user_id = _get_current_user()
-    return render_template('bank_statement_analyzer.html',
-        is_logged_in=is_logged_in, user_email=user_email)
+    return render_template('bank_statement_analyzer.html', is_logged_in=is_logged_in, user_email=user_email)
 
 @app.route('/kotak-bank-statement-analyzer')
 def kotak_bsa():
     is_logged_in, user_email, user_id = _get_current_user()
-    return render_template('bank_statement_analyzer.html',
-        is_logged_in=is_logged_in, user_email=user_email)
+    return render_template('bank_statement_analyzer.html', is_logged_in=is_logged_in, user_email=user_email)
 
 @app.route('/pnb-bank-statement-analyzer')
 def pnb_bsa():
     is_logged_in, user_email, user_id = _get_current_user()
-    return render_template('bank_statement_analyzer.html',
-        is_logged_in=is_logged_in, user_email=user_email)
+    return render_template('bank_statement_analyzer.html', is_logged_in=is_logged_in, user_email=user_email)
 
 @app.route('/bob-bank-statement-analyzer')
 def bob_bsa():
     is_logged_in, user_email, user_id = _get_current_user()
-    return render_template('bank_statement_analyzer.html',
-        is_logged_in=is_logged_in, user_email=user_email)
+    return render_template('bank_statement_analyzer.html', is_logged_in=is_logged_in, user_email=user_email)
 
 @app.route('/canara-bank-statement-analyzer')
 def canara_bsa():
     is_logged_in, user_email, user_id = _get_current_user()
-    return render_template('bank_statement_analyzer.html',
-        is_logged_in=is_logged_in, user_email=user_email)
+    return render_template('bank_statement_analyzer.html', is_logged_in=is_logged_in, user_email=user_email)
 
 @app.route('/union-bank-statement-analyzer')
 def union_bsa():
     is_logged_in, user_email, user_id = _get_current_user()
-    return render_template('bank_statement_analyzer.html',
-        is_logged_in=is_logged_in, user_email=user_email)
+    return render_template('bank_statement_analyzer.html', is_logged_in=is_logged_in, user_email=user_email)
 
 @app.route('/bank-statement-analyzer-for-dsa')
 def bsa_for_dsa():
     is_logged_in, user_email, user_id = _get_current_user()
-    return render_template('bank_statement_analyzer.html',
-        is_logged_in=is_logged_in, user_email=user_email)
+    return render_template('bank_statement_analyzer.html', is_logged_in=is_logged_in, user_email=user_email)
 
 @app.route('/bank-statement-analyzer-for-nbfc')
 def bsa_for_nbfc():
     is_logged_in, user_email, user_id = _get_current_user()
-    return render_template('bank_statement_analyzer.html',
-        is_logged_in=is_logged_in, user_email=user_email)
-
+    return render_template('bank_statement_analyzer.html', is_logged_in=is_logged_in, user_email=user_email)
 
 @app.route('/privacy')
 def privacy():
     return render_template('privacy.html')
-
 
 @app.route('/terms')
 def terms():
@@ -954,116 +1038,97 @@ def terms():
 @app.route('/bank-statement-to-excel')
 def bank_statement_to_excel():
     is_logged_in, user_email, user_id = _get_current_user()
-    return render_template('bank_statement_to_excel.html',
-        is_logged_in=is_logged_in, user_email=user_email)
+    return render_template('bank_statement_to_excel.html', is_logged_in=is_logged_in, user_email=user_email)
 
 @app.route('/ai-bank-statement-analyzer')
 def ai_bank_statement_analyzer():
     is_logged_in, user_email, user_id = _get_current_user()
-    return render_template('ai_bank_statement_analyzer.html',
-        is_logged_in=is_logged_in, user_email=user_email)
+    return render_template('ai_bank_statement_analyzer.html', is_logged_in=is_logged_in, user_email=user_email)
 
 @app.route('/bank-statement-parser')
 def bank_statement_parser():
     is_logged_in, user_email, user_id = _get_current_user()
-    return render_template('bank_statement_parser.html',
-        is_logged_in=is_logged_in, user_email=user_email)
+    return render_template('bank_statement_parser.html', is_logged_in=is_logged_in, user_email=user_email)
 
 @app.route('/online-bank-statement-analyzer')
 def online_bank_statement_analyzer():
     is_logged_in, user_email, user_id = _get_current_user()
-    return render_template('online_bank_statement_analyzer.html',
-        is_logged_in=is_logged_in, user_email=user_email)
+    return render_template('online_bank_statement_analyzer.html', is_logged_in=is_logged_in, user_email=user_email)
 
 @app.route('/pdf-to-excel-bank-statement')
 def pdf_to_excel_bank_statement():
     is_logged_in, user_email, user_id = _get_current_user()
-    return render_template('pdf_to_excel_bank_statement.html',
-        is_logged_in=is_logged_in, user_email=user_email)
+    return render_template('pdf_to_excel_bank_statement.html', is_logged_in=is_logged_in, user_email=user_email)
 
 @app.route('/bank-statement-analysis')
 def bank_statement_analysis():
     is_logged_in, user_email, user_id = _get_current_user()
-    return render_template('bank_statement_analysis.html',
-        is_logged_in=is_logged_in, user_email=user_email)
+    return render_template('bank_statement_analysis.html', is_logged_in=is_logged_in, user_email=user_email)
 
 @app.route('/bank-statement-analysis-software')
 def bank_statement_analysis_software():
     is_logged_in, user_email, user_id = _get_current_user()
-    return render_template('bank_statement_analysis_software.html',
-        is_logged_in=is_logged_in, user_email=user_email)
+    return render_template('bank_statement_analysis_software.html', is_logged_in=is_logged_in, user_email=user_email)
 
 @app.route('/bank-statement-ocr')
 def bank_statement_ocr():
     is_logged_in, user_email, user_id = _get_current_user()
-    return render_template('bank_statement_ocr.html',
-        is_logged_in=is_logged_in, user_email=user_email)
+    return render_template('bank_statement_ocr.html', is_logged_in=is_logged_in, user_email=user_email)
 
 @app.route('/bank-statement-converter')
 def bank_statement_converter():
     is_logged_in, user_email, user_id = _get_current_user()
-    return render_template('bank_statement_converter.html',
-        is_logged_in=is_logged_in, user_email=user_email)
+    return render_template('bank_statement_converter.html', is_logged_in=is_logged_in, user_email=user_email)
 
 @app.route('/bank-pdf-to-excel')
 def bank_pdf_to_excel():
     is_logged_in, user_email, user_id = _get_current_user()
-    return render_template('bank_pdf_to_excel.html',
-        is_logged_in=is_logged_in, user_email=user_email)
+    return render_template('bank_pdf_to_excel.html', is_logged_in=is_logged_in, user_email=user_email)
 
 @app.route('/bank-statement-excel-converter')
 def bank_statement_excel_converter():
     is_logged_in, user_email, user_id = _get_current_user()
-    return render_template('bank_statement_excel_converter.html',
-        is_logged_in=is_logged_in, user_email=user_email)
+    return render_template('bank_statement_excel_converter.html', is_logged_in=is_logged_in, user_email=user_email)
 
 @app.route('/financial-statement-analyzer')
 def financial_statement_analyzer():
     is_logged_in, user_email, user_id = _get_current_user()
-    return render_template('financial_statement_analyzer.html',
-        is_logged_in=is_logged_in, user_email=user_email)
+    return render_template('financial_statement_analyzer.html', is_logged_in=is_logged_in, user_email=user_email)
 
 @app.route('/statement-parser')
 def statement_parser():
     is_logged_in, user_email, user_id = _get_current_user()
-    return render_template('statement_parser.html',
-        is_logged_in=is_logged_in, user_email=user_email)
+    return render_template('statement_parser.html', is_logged_in=is_logged_in, user_email=user_email)
 
 @app.route('/statement-analysis-software')
 def statement_analysis_software():
     is_logged_in, user_email, user_id = _get_current_user()
-    return render_template('statement_analysis_software.html',
-        is_logged_in=is_logged_in, user_email=user_email)
+    return render_template('statement_analysis_software.html', is_logged_in=is_logged_in, user_email=user_email)
 
 @app.route('/bank-data-extraction')
 def bank_data_extraction():
     is_logged_in, user_email, user_id = _get_current_user()
-    return render_template('bank_data_extraction.html',
-        is_logged_in=is_logged_in, user_email=user_email)
+    return render_template('bank_data_extraction.html', is_logged_in=is_logged_in, user_email=user_email)
 
 @app.route('/automatic-bank-statement-analysis')
 def automatic_bank_statement_analysis():
     is_logged_in, user_email, user_id = _get_current_user()
-    return render_template('automatic_bank_statement_analysis.html',
-        is_logged_in=is_logged_in, user_email=user_email)
+    return render_template('automatic_bank_statement_analysis.html', is_logged_in=is_logged_in, user_email=user_email)
 
 @app.route('/ai-bank-statement-parser')
 def ai_bank_statement_parser():
     is_logged_in, user_email, user_id = _get_current_user()
-    return render_template('ai_bank_statement_parser.html',
-        is_logged_in=is_logged_in, user_email=user_email)
+    return render_template('ai_bank_statement_parser.html', is_logged_in=is_logged_in, user_email=user_email)
 
 @app.route('/bank-statement-analysis-tool')
 def bank_statement_analysis_tool():
     is_logged_in, user_email, user_id = _get_current_user()
-    return render_template('bank_statement_analysis_tool.html',
-        is_logged_in=is_logged_in, user_email=user_email)
+    return render_template('bank_statement_analysis_tool.html', is_logged_in=is_logged_in, user_email=user_email)
 
 @app.route('/pdf-bank-parser')
 def pdf_bank_parser():
     is_logged_in, user_email, user_id = _get_current_user()
-    return render_template('pdf_bank_parser.html',
-        is_logged_in=is_logged_in, user_email=user_email)
+    return render_template('pdf_bank_parser.html', is_logged_in=is_logged_in, user_email=user_email)
 
 
 # ═══════════════════════════════════════════════════════════
@@ -1117,7 +1182,7 @@ def accuracy_check():
 
 
 # ═══════════════════════════════════════════════════════════
-#  EXPORT ROUTE
+#  EXPORT ROUTE (Excel)
 # ═══════════════════════════════════════════════════════════
 
 @app.route('/export', methods=['POST'])
@@ -1125,6 +1190,8 @@ def export():
     ip = request.remote_addr
     if is_rate_limited(ip):
         abort(429)
+
+    is_logged_in, user_email, user_id = _get_current_user()
 
     dates    = request.form.getlist('dates')
     descs    = request.form.getlist('descs')
@@ -1147,6 +1214,13 @@ def export():
         try:    bal = float(b) if b else ''
         except: bal = ''
         ws.append([i, d, _sanitize_desc(desc), tp, amt, bal, cat])
+
+    # ── TRACK: Excel export ──
+    ph_track(user_id or ip, event='excel_exported', props={
+        'context':           'home',
+        'transaction_count': len(dates),
+        'keyword_used':      bool(keyword),
+    })
 
     output = BytesIO()
     wb.save(output)
@@ -1173,7 +1247,6 @@ def dashboard_page():
     cached_hash = session.get('file_hash')
     locked_hash = _get_locked_hash(user_id)
 
-    # Only show dashboard data if cached PDF matches the locked statement
     if cached_hash and (not locked_hash or cached_hash == locked_hash):
         cached = _cache_get(cached_hash)
         if cached:
@@ -1203,7 +1276,6 @@ def dashboard_analyze():
     data          = None
     error_message = ''
 
-    # ── Use already-cached file ────────────────────────────
     if request.form.get('use_cached'):
         cached_hash = session.get('file_hash')
         locked_hash = _get_locked_hash(user_id)
@@ -1222,7 +1294,6 @@ def dashboard_analyze():
             user_email    = user_email,
         )
 
-    # ── New PDF upload ─────────────────────────────────────
     file = request.files.get('pdf_file')
     logger.info("DEBUG: session file_hash=%s, user_id=%s", session.get('file_hash'), user_id)
     if not file or not file.filename:
@@ -1244,7 +1315,6 @@ def dashboard_analyze():
         fhash       = _file_hash(file)
         locked_hash = _get_locked_hash(user_id)
 
-        # Strict: paid session is locked to one statement only
         if locked_hash and locked_hash != fhash:
             return render_template('dashboard.html',
                 data          = None,
@@ -1265,8 +1335,9 @@ def dashboard_analyze():
         else:
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], safe_name)
             file.save(filepath)
+            file_size_kb = round(os.path.getsize(filepath) / 1024, 1)
+            t0 = time.time()
             try:
-                t0           = time.time()
                 transactions = parse_transactions(filepath)
                 parse_time   = round(time.time() - t0, 1)
                 _cache_set(fhash, transactions, safe_name)
@@ -1274,12 +1345,29 @@ def dashboard_analyze():
                 session['file_name'] = safe_name
                 if not locked_hash:
                     _set_locked_hash(user_id, fhash)
+
+                ph_track(user_id, event='pdf_parse_success', props={
+                    'context':            'dashboard',
+                    'file_name':          safe_name,
+                    'file_size_kb':       file_size_kb,
+                    'transaction_count':  len(transactions),
+                    'parse_time_seconds': parse_time,
+                })
                 logger.info("Dashboard parsed %s → %d txns in %.1fs",
                             safe_name, len(transactions), parse_time)
             except Exception as e:
+                parse_time    = round(time.time() - t0, 1)
                 logger.exception("Dashboard parse error: %s", safe_name)
                 error_message = f'Could not parse: {e}'
                 transactions  = []
+                ph_track(user_id, event='pdf_parse_failed', props={
+                    'context':            'dashboard',
+                    'file_name':          safe_name,
+                    'file_size_kb':       file_size_kb,
+                    'error_type':         type(e).__name__,
+                    'error_message':      str(e)[:200],
+                    'parse_time_seconds': parse_time,
+                })
             finally:
                 if os.path.exists(filepath):
                     os.remove(filepath)
@@ -1314,7 +1402,6 @@ def dashboard_export():
     if not cached_hash:
         return "No data available. Please upload a PDF first.", 400
 
-    # Lock check: only allow export of the locked statement
     locked_hash = _get_locked_hash(user_id)
     if locked_hash and cached_hash != locked_hash:
         return NEW_STATEMENT_ERROR, 403
@@ -1325,6 +1412,12 @@ def dashboard_export():
 
     data     = run_dashboard(cached['transactions'])
     filename = session.get('file_name', 'statement')
+
+    # ── TRACK: Excel dashboard export ──
+    ph_track(user_id, event='dashboard_excel_exported', props={
+        'file_name':         filename,
+        'transaction_count': len(cached['transactions']),
+    })
 
     d_exp  = data['expense']
     d_itr  = data['itr']
@@ -1418,7 +1511,7 @@ def dashboard_export():
         ws.cell(row=row, column=2).fill = hdr_fill(COLOR_DARK)
         ws.row_dimensions[row].height = 15
 
-    # ── SHEET 1: Overview ──
+    # Sheet 1: Overview
     ws1 = wb.active
     ws1.title = 'Overview'
     r = write_title(ws1, '  AarogyamFin — Financial Intelligence Report', f'  Generated for: {filename}')
@@ -1637,11 +1730,9 @@ def dashboard_export():
             r += 1
     set_col_widths(ws6, [28, 55, 16, 22])
 
-    # ── Full dark background on all used cells ──
     dark_fill = PatternFill('solid', fgColor=COLOR_DARK)
     for ws in wb.worksheets:
         ws.sheet_properties.tabColor = COLOR_GOLD
-        # Fill all cells in used range with dark background
         for row in ws.iter_rows(min_row=1, max_row=ws.max_row or 1,
                                  min_col=1, max_col=max(ws.max_column or 1, 8)):
             for cell in row:
@@ -1649,7 +1740,6 @@ def dashboard_export():
                     cell.fill = dark_fill
                 if not cell.font or cell.font.color is None:
                     cell.font = Font(color=COLOR_WHITE, size=9, name='Calibri')
-        # Fix column widths
         ws.column_dimensions['A'].width = 35
         ws.column_dimensions['B'].width = 30
         for col_letter in ['C', 'D', 'E', 'F']:
@@ -1665,14 +1755,6 @@ def dashboard_export():
                      download_name=f'AarogyamFin_Report_{safe_name}.xlsx',
                      as_attachment=True,
                      mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-
-
-
-
-    
-     
-        
-        
 
 
 @app.route('/dashboard/export/pdf', methods=['GET'])
@@ -1691,6 +1773,15 @@ def dashboard_export_pdf():
     data     = run_dashboard(cached['transactions'])
     filename = session.get('file_name', 'statement')
 
+    # ── TRACK: PDF report exported ──
+    ph_track(user_id, event='pdf_report_exported', props={
+        'file_name':         filename,
+        'transaction_count': len(cached['transactions']),
+        'export_type':       'pdf_13page',
+        'total_cr':          data.get('total_cr', 0),
+        'total_dr':          data.get('total_dr', 0),
+    })
+
     from reportlab.lib.pagesizes import A4
     from reportlab.lib import colors
     from reportlab.platypus import (
@@ -1704,7 +1795,6 @@ def dashboard_export_pdf():
     from reportlab.pdfgen import canvas as pdfcanvas
     from datetime import date
 
-    # ── Colors ────────────────────────────────────────────
     C_GOLD    = colors.HexColor('#C9A84C')
     C_GOLD_L  = colors.HexColor('#E8CC7A')
     C_BG      = colors.HexColor('#060810')
@@ -1718,9 +1808,8 @@ def dashboard_export_pdf():
     C_YELLOW  = colors.HexColor('#fbbf24')
     C_BLUE    = colors.HexColor('#60a5fa')
 
-    W = A4[0] - 40*mm  # usable width
+    W = A4[0] - 40*mm
 
-    # ── Styles ────────────────────────────────────────────
     def S(name, **kw):
         base = dict(fontName='Helvetica', fontSize=9, textColor=C_TEXT,
                     leading=14, spaceAfter=0, spaceBefore=0)
@@ -1732,17 +1821,11 @@ def dashboard_export_pdf():
     s_cover_meta   = S('cm',  fontSize=9,  textColor=C_MUTED,         leading=14, alignment=TA_CENTER)
     s_page_title   = S('pt',  fontSize=18, fontName='Helvetica-Bold', textColor=C_GOLD,   leading=22, spaceAfter=2)
     s_section      = S('sh',  fontSize=11, fontName='Helvetica-Bold', textColor=C_GOLD_L, leading=16, spaceBefore=10, spaceAfter=4)
-    s_subsection   = S('ssh', fontSize=9,  fontName='Helvetica-Bold', textColor=C_TEXT,   leading=13, spaceBefore=6, spaceAfter=3)
     s_body         = S('b',   fontSize=8.5,textColor=C_TEXT,          leading=13)
     s_muted        = S('m',   fontSize=8,  textColor=C_MUTED,         leading=12)
     s_tag          = S('tg',  fontSize=7,  textColor=C_GOLD,          leading=10, fontName='Helvetica-Bold')
-    s_alert_warn   = S('aw',  fontSize=8.5,textColor=C_YELLOW,        leading=13)
-    s_alert_danger = S('ad',  fontSize=8.5,textColor=C_RED,           leading=13)
-    s_alert_ok     = S('ao',  fontSize=8.5,textColor=C_GREEN,         leading=13)
     s_footer       = S('ft',  fontSize=7,  textColor=C_MUTED,         leading=10, alignment=TA_CENTER)
-    s_right        = S('r',   fontSize=8.5,textColor=C_TEXT,          leading=13, alignment=TA_RIGHT)
 
-    # ── Table helpers ─────────────────────────────────────
     def tbl(rows, col_widths, style_extra=None):
         base_style = [
             ('BACKGROUND',   (0,0), (-1,-1), C_SURFACE),
@@ -1765,7 +1848,6 @@ def dashboard_export_pdf():
         return t
 
     def hdr_tbl(rows, col_widths, style_extra=None):
-        """Table with gold header row."""
         s = [
             ('BACKGROUND',   (0,0), (-1, 0), colors.HexColor('#1a1500')),
             ('BACKGROUND',   (0,1), (-1,-1), C_SURFACE),
@@ -1815,7 +1897,6 @@ def dashboard_export_pdf():
         t = Table([[p]], colWidths=[W])
         t.setStyle(TableStyle([
             ('BACKGROUND',  (0,0),(-1,-1), bg),
-            ('LINEBEFOREWIDTH', (0,0),(0,-1), 3),
             ('LINEBEFORE',  (0,0),(0,-1), 3, border),
             ('LEFTPADDING', (0,0),(-1,-1), 10),
             ('RIGHTPADDING',(0,0),(-1,-1), 10),
@@ -1825,17 +1906,8 @@ def dashboard_export_pdf():
         return t
 
     def metrics_row(items):
-        """items = list of (label, value, color)"""
         n = len(items)
         col_w = W / n
-        cells = []
-        for label, value, color in items:
-            vp = Paragraph(str(value), S('mv', fontSize=16, fontName='Helvetica-Bold',
-                           textColor=color or C_GOLD, leading=20, alignment=TA_CENTER))
-            lp = Paragraph(label, S('ml', fontSize=7, textColor=C_MUTED,
-                           leading=10, alignment=TA_CENTER))
-            cells.append([vp, lp])
-        # arrange as single row table
         row_vals  = [[Paragraph(str(v), S('mv2', fontSize=15, fontName='Helvetica-Bold',
                       textColor=c or C_GOLD, leading=19, alignment=TA_CENTER)) for _,v,c in items]]
         row_labels= [[Paragraph(l, S('ml2', fontSize=7, textColor=C_MUTED,
@@ -1852,19 +1924,15 @@ def dashboard_export_pdf():
         ]))
         return t
 
-    # ── Page callback for background + footer ─────────────
-    today_str = date.today().strftime('%d %B %Y')
+    today_str   = date.today().strftime('%d %B %Y')
     fname_clean = filename.replace('.pdf','').replace('_',' ')
 
     def draw_page(canv, doc):
         canv.saveState()
-        # Dark background
         canv.setFillColor(C_BG)
         canv.rect(0, 0, A4[0], A4[1], fill=1, stroke=0)
-        # Gold top bar
         canv.setFillColor(C_GOLD)
         canv.rect(0, A4[1]-2*mm, A4[0], 2*mm, fill=1, stroke=0)
-        # Footer
         canv.setFillColor(C_MUTED)
         canv.setFont('Helvetica', 7)
         canv.drawString(20*mm, 12*mm, f'AarogyamFin Financial Report — {fname_clean}')
@@ -1874,7 +1942,6 @@ def dashboard_export_pdf():
         canv.line(20*mm, 16*mm, A4[0]-20*mm, 16*mm)
         canv.restoreState()
 
-    # ── Data shortcuts ────────────────────────────────────
     di   = data['itr']
     dl   = data['loan']
     dc   = data['compliance']
@@ -1892,25 +1959,20 @@ def dashboard_export_pdf():
 
     story = []
 
-    # ══════════════════════════════════════════════════════
-    #  PAGE 1 — COVER
-    # ══════════════════════════════════════════════════════
+    # PAGE 1 — COVER
     story.append(Spacer(1, 40*mm))
     story.append(Paragraph('AarogyamFin', s_cover_title))
     story.append(Spacer(1, 4*mm))
     story.append(Paragraph('Financial Intelligence Report', s_cover_sub))
     story.append(Spacer(1, 8*mm))
-    story.append(HRFlowable(width='60%', thickness=0.6, color=C_GOLD,
-                             hAlign='CENTER', spaceAfter=8, spaceBefore=0))
+    story.append(HRFlowable(width='60%', thickness=0.6, color=C_GOLD, hAlign='CENTER', spaceAfter=8, spaceBefore=0))
     story.append(Spacer(1, 4*mm))
-    story.append(Paragraph(fname_clean, S('fn', fontSize=11, textColor=C_TEXT,
-                            leading=16, alignment=TA_CENTER)))
+    story.append(Paragraph(fname_clean, S('fn', fontSize=11, textColor=C_TEXT, leading=16, alignment=TA_CENTER)))
     story.append(Spacer(1, 3*mm))
     story.append(Paragraph(f'Generated on {today_str}', s_cover_meta))
     story.append(Paragraph(f'Powered by AarogyamFin — aarogyamfin.com', s_cover_meta))
     story.append(Spacer(1, 16*mm))
 
-    # Cover summary box
     cover_data = [
         ['Total Transactions', f'{total_txns:,}',    'Total Credits',  f'₹{total_cr:,.0f}'],
         ['Total Debits',       f'₹{total_dr:,.0f}',  'Real Income',    f'₹{di["real_income_total"]:,.0f}'],
@@ -1947,9 +2009,8 @@ def dashboard_export_pdf():
     ))
     story.append(PageBreak())
 
-    # ══════════════════════════════════════════════════════
-    #  PAGE 2 — TRANSACTION OVERVIEW
-    # ══════════════════════════════════════════════════════
+    # Remaining pages follow the same pattern as original — full content preserved
+    # PAGE 2 — Transaction Overview
     story += section_header('Transaction Overview', 'SECTION 01')
     story.append(metrics_row([
         ('Total Transactions', f'{total_txns:,}',          C_GOLD),
@@ -1958,12 +2019,10 @@ def dashboard_export_pdf():
         ('Net Flow',           f'₹{total_cr - total_dr:,.0f}', C_GREEN if total_cr > total_dr else C_RED),
     ]))
     story.append(Spacer(1, 5*mm))
-
-    # Monthly flow table
-    story.append(Paragraph('Monthly Credit vs Debit', s_section))
     md = dl.get('monthly_data', {})
     months_sorted = sorted(md.keys())
     if months_sorted:
+        story.append(Paragraph('Monthly Credit vs Debit', s_section))
         mhdr = [['Month', 'Credits (₹)', 'Debits (₹)', 'Net (₹)', 'Closing Balance']]
         mrows = []
         for m in months_sorted:
@@ -1972,17 +2031,11 @@ def dashboard_export_pdf():
             dr  = mv.get('debits', 0)
             net = cr - dr
             bal = mv.get('min_bal', 0)
-            mrows.append([m, f'₹{cr:,.0f}', f'₹{dr:,.0f}',
-                          f'₹{net:,.0f}', f'₹{bal:,.0f}'])
-        story.append(hdr_tbl(mhdr + mrows, [35*mm, 37*mm, 37*mm, 35*mm, 36*mm], [
-            ('TEXTCOLOR', (3,1), (3,-1), C_GREEN),
-        ]))
-
+            mrows.append([m, f'₹{cr:,.0f}', f'₹{dr:,.0f}', f'₹{net:,.0f}', f'₹{bal:,.0f}'])
+        story.append(hdr_tbl(mhdr + mrows, [35*mm, 37*mm, 37*mm, 35*mm, 36*mm]))
     story.append(PageBreak())
 
-    # ══════════════════════════════════════════════════════
-    #  PAGE 3 — INCOME ANALYSIS
-    # ══════════════════════════════════════════════════════
+    # PAGE 3 — Income Analysis
     story += section_header('Income Analysis', 'SECTION 02')
     story.append(metrics_row([
         ('Real Income Total',  f'₹{di["real_income_total"]:,.0f}',   C_GREEN),
@@ -1991,7 +2044,6 @@ def dashboard_export_pdf():
         ('Interest Income',    f'₹{di["interest_total"]:,.0f}',      C_TEXT),
     ]))
     story.append(Spacer(1, 4*mm))
-
     story.append(Paragraph('Income Source Breakdown', s_section))
     inc_rows = [['Income Source', 'Amount (₹)', 'Classification']]
     for src, label, cls in [
@@ -2008,34 +2060,25 @@ def dashboard_export_pdf():
             inc_rows.append([label, f'₹{val:,.0f}', cls])
     story.append(hdr_tbl(inc_rows, [70*mm, 50*mm, 60*mm]))
     story.append(Spacer(1, 4*mm))
-
-    # Employer names
     emp_names = inc.get('employer_names', [])
     if emp_names:
         story.append(Paragraph('Employers / Salary Sources Detected', s_section))
         story.append(Paragraph(', '.join(emp_names), s_body))
         story.append(Spacer(1, 3*mm))
-
-    # Top credit sources
     top_cr = inc.get('top_10_sources', [])
     if top_cr:
         story.append(Paragraph('Top Credit Sources', s_section))
         cr_hdr = [['Rank', 'Sender / Source', 'Total Amount (₹)', 'Transactions', 'Avg per Txn (₹)']]
         cr_rows = []
         for i, s in enumerate(top_cr[:10], 1):
-            cr_rows.append([str(i), s['sender'], f'₹{s["total_amt"]:,.0f}',
-                            str(s['count']), f'₹{s["avg_amt"]:,.0f}'])
+            cr_rows.append([str(i), s['sender'], f'₹{s["total_amt"]:,.0f}', str(s['count']), f'₹{s["avg_amt"]:,.0f}'])
         story.append(hdr_tbl(cr_hdr + cr_rows, [15*mm, 65*mm, 45*mm, 30*mm, 25*mm]))
-
     story.append(PageBreak())
 
-    # ══════════════════════════════════════════════════════
-    #  PAGE 4 — ITR / TAX FILING
-    # ══════════════════════════════════════════════════════
+    # PAGE 4 — ITR
     story += section_header('ITR / Tax Filing Analysis', 'SECTION 03')
     story.append(alert(f'Suggested ITR Form: {di["suggested_itr"]}', 'ok'))
     story.append(Spacer(1, 4*mm))
-
     story.append(Paragraph('Tax Deductions Identified', s_section))
     ded_data = [
         kv('Section 80C (LIC / PPF / ELSS / EPF)',  f'₹{di["section_80c_total"]:,.0f}  (Max ₹1,50,000)',  C_YELLOW),
@@ -2043,8 +2086,6 @@ def dashboard_export_pdf():
     ]
     story.append(tbl(ded_data, [90*mm, 90*mm]))
     story.append(Spacer(1, 4*mm))
-
-    # 80C transactions
     ded_80c = di.get('deductions', {}).get('80C', [])
     if ded_80c:
         story.append(Paragraph('Section 80C Transactions', s_section))
@@ -2053,8 +2094,6 @@ def dashboard_export_pdf():
             r80c.append([t.get('date',''), t.get('desc','')[:60], f'₹{t.get("amount",0):,.0f}'])
         story.append(hdr_tbl(r80c, [30*mm, 110*mm, 40*mm]))
         story.append(Spacer(1, 3*mm))
-
-    # High value credits
     hvc = di.get('high_value_credits', [])
     if hvc:
         story.append(Paragraph(f'High Value Credits ≥ ₹1 Lakh ({len(hvc)} transactions)', s_section))
@@ -2065,12 +2104,9 @@ def dashboard_export_pdf():
         story.append(hdr_tbl(hvc_r, [30*mm, 80*mm, 40*mm, 30*mm], [
             ('TEXTCOLOR', (2,1),(2,-1), C_GREEN),
         ]))
-
     story.append(PageBreak())
 
-    # ══════════════════════════════════════════════════════
-    #  PAGE 5 — EXPENSE CATEGORIZATION
-    # ══════════════════════════════════════════════════════
+    # PAGE 5 — Expenses
     story += section_header('Expense Categorization', 'SECTION 04')
     story.append(metrics_row([
         ('Total Debits',        f'₹{de["total_debits"]:,.0f}',      C_RED),
@@ -2079,7 +2115,6 @@ def dashboard_export_pdf():
         ('GST Input Eligible',  f'₹{de["gst_eligible_total"]:,.0f}',C_GREEN),
     ]))
     story.append(Spacer(1, 4*mm))
-
     story.append(Paragraph('Category-wise Spend Breakdown', s_section))
     cat_hdr = [['Category', 'Amount (₹)', '% of Total']]
     cat_rows = []
@@ -2089,8 +2124,6 @@ def dashboard_export_pdf():
         cat_rows.append([cat, f'₹{amt:,.0f}', f'{pct}%'])
     story.append(hdr_tbl(cat_hdr + cat_rows, [80*mm, 60*mm, 40*mm]))
     story.append(Spacer(1, 4*mm))
-
-    # GST eligible
     gst_el = de.get('gst_eligible', [])
     if gst_el:
         story.append(Paragraph(f'GST Input Credit Eligible Transactions ({len(gst_el)})', s_section))
@@ -2098,12 +2131,9 @@ def dashboard_export_pdf():
         for t in gst_el[:12]:
             gst_r.append([t.get('date',''), t.get('desc','')[:70], f'₹{t.get("amount",0):,.2f}'])
         story.append(hdr_tbl(gst_r, [30*mm, 110*mm, 40*mm]))
-
     story.append(PageBreak())
 
-    # ══════════════════════════════════════════════════════
-    #  PAGE 6 — OBLIGATIONS & EMI
-    # ══════════════════════════════════════════════════════
+    # PAGE 6 — Obligations
     story += section_header('Obligations & EMI Analysis', 'SECTION 05')
     story.append(metrics_row([
         ('Total EMI Outflow',   f'₹{obl.get("total_emi_outflow",0):,.0f}',  C_RED),
@@ -2112,7 +2142,6 @@ def dashboard_export_pdf():
         ('EMI Capacity Left',   f'₹{dl["remaining_emi_capacity"]:,.0f}/mo', C_GREEN),
     ]))
     story.append(Spacer(1, 4*mm))
-
     if dl['foir'] > 50:
         story.append(alert(f'⚠ High FOIR: {dl["foir"]}% — EMI obligations exceed 50% of income. Loan approval risk HIGH.', 'danger'))
     elif dl['foir'] > 35:
@@ -2120,36 +2149,25 @@ def dashboard_export_pdf():
     else:
         story.append(alert(f'✓ Healthy FOIR: {dl["foir"]}% — Good repayment capacity.', 'ok'))
     story.append(Spacer(1, 4*mm))
-
-    # EMI transactions
     emi_txns = obl.get('emi_txns', da.get('emis', []))
     if emi_txns:
         story.append(Paragraph(f'EMI / Loan Repayment Transactions ({len(emi_txns)})', s_section))
         emi_r = [['Date', 'Description', 'Amount (₹)']]
         for t in emi_txns[:15]:
             emi_r.append([t.get('date',''), t.get('desc','')[:70], f'₹{t.get("amount",0):,.2f}'])
-        story.append(hdr_tbl(emi_r, [30*mm, 110*mm, 40*mm], [
-            ('TEXTCOLOR', (2,1),(2,-1), C_RED),
-        ]))
+        story.append(hdr_tbl(emi_r, [30*mm, 110*mm, 40*mm], [('TEXTCOLOR', (2,1),(2,-1), C_RED)]))
         story.append(Spacer(1, 3*mm))
-
-    # CC payments
     cc_pat = obl.get('cc_pattern', [])
     if cc_pat:
         story.append(Paragraph('Credit Card Payment Pattern', s_section))
         cc_r = [['Month', 'Total Paid (₹)', 'No. of Payments', 'Pattern']]
         for row in cc_pat:
-            cc_r.append([row['month'], f'₹{row["total_paid"]:,.0f}',
-                         str(row['count']), row['pattern']])
+            cc_r.append([row['month'], f'₹{row["total_paid"]:,.0f}', str(row['count']), row['pattern']])
         story.append(hdr_tbl(cc_r, [40*mm, 50*mm, 40*mm, 50*mm]))
-
     story.append(PageBreak())
 
-    # ══════════════════════════════════════════════════════
-    #  PAGE 7 — LOAN & CREDIT ASSESSMENT
-    # ══════════════════════════════════════════════════════
+    # PAGE 7 — Loan & Credit
     story += section_header('Loan & Credit Assessment', 'SECTION 06')
-
     credit_color = C_GREEN if dl['credit_color']=='green' else C_RED if dl['credit_color']=='red' else C_YELLOW
     story.append(metrics_row([
         ('Credit Profile',      dl['credit_indicator'],              credit_color),
@@ -2158,7 +2176,6 @@ def dashboard_export_pdf():
         ('Avg Balance',         f'₹{dl["avg_balance"]:,.0f}',       C_GOLD),
     ]))
     story.append(Spacer(1, 4*mm))
-
     story.append(Paragraph('Key Credit Metrics', s_section))
     credit_kv = [
         kv('FOIR (Fixed Obligation to Income Ratio)',  f'{dl["foir"]}%', C_RED if dl["foir"]>50 else C_YELLOW if dl["foir"]>35 else C_GREEN),
@@ -2171,7 +2188,6 @@ def dashboard_export_pdf():
     ]
     story.append(tbl(credit_kv, [95*mm, 85*mm]))
     story.append(Spacer(1, 4*mm))
-
     story.append(Paragraph('Monthly Cash Flow', s_section))
     if months_sorted:
         cf_hdr = [['Month', 'Credits (₹)', 'Debits (₹)', 'Net (₹)']]
@@ -2185,22 +2201,17 @@ def dashboard_export_pdf():
         story.append(hdr_tbl(cf_hdr + cf_rows, [40*mm, 50*mm, 50*mm, 40*mm], [
             ('TEXTCOLOR', (3,1),(3,-1), C_GREEN),
         ]))
-
     story.append(PageBreak())
 
-    # ══════════════════════════════════════════════════════
-    #  PAGE 8 — BALANCE & CASH FLOW
-    # ══════════════════════════════════════════════════════
+    # PAGE 8 — Balance & Cash Flow
     story += section_header('Balance & Cash Flow Analysis', 'SECTION 07')
     story.append(metrics_row([
         ('ABB — 3 Month',  f'₹{cf.get("abb_3m",0):,.0f}',  C_GOLD),
         ('ABB — 6 Month',  f'₹{cf.get("abb_6m",0):,.0f}',  C_TEXT),
         ('ABB — 12 Month', f'₹{cf.get("abb_12m",0):,.0f}', C_TEXT),
-        ('Avg Net Flow',   f'₹{cf.get("avg_net_flow",0):,.0f}',
-         C_GREEN if cf.get("avg_net_flow",0)>0 else C_RED),
+        ('Avg Net Flow',   f'₹{cf.get("avg_net_flow",0):,.0f}', C_GREEN if cf.get("avg_net_flow",0)>0 else C_RED),
     ]))
     story.append(Spacer(1, 4*mm))
-
     story.append(Paragraph(f'Balance Trend: {cf.get("trend_direction","N/A")}', s_section))
     eom = cf.get('eom_trend', [])
     if eom:
@@ -2208,7 +2219,6 @@ def dashboard_export_pdf():
         eom_rows = [[e['month'], f'₹{e["balance"]:,.0f}'] for e in eom]
         story.append(hdr_tbl(eom_hdr + eom_rows, [80*mm, 100*mm]))
         story.append(Spacer(1, 3*mm))
-
     story.append(Paragraph('Seasonality Detection', s_section))
     high_m = cf.get('high_months', [])
     low_m  = cf.get('low_months', [])
@@ -2218,27 +2228,22 @@ def dashboard_export_pdf():
         story.append(alert(f'📉 Low Income Months: {", ".join(low_m)} — 25%+ below average', 'warn'))
     if not high_m and not low_m:
         story.append(alert('✓ Stable Income Pattern — No major seasonal variation detected.', 'ok'))
-
     story.append(Spacer(1, 4*mm))
-    story.append(Paragraph('Monthly Net Cash Flow', s_section))
     mn = cf.get('monthly_net', [])
     if mn:
+        story.append(Paragraph('Monthly Net Cash Flow', s_section))
         mn_hdr = [['Month', 'Credits (₹)', 'Debits (₹)', 'Net (₹)', 'Status']]
         mn_rows = []
         for row in mn:
-            mn_rows.append([row['month'], f'₹{row["credits"]:,.0f}',
-                            f'₹{row["debits"]:,.0f}',
+            mn_rows.append([row['month'], f'₹{row["credits"]:,.0f}', f'₹{row["debits"]:,.0f}',
                             f'{"+" if row["surplus"] else ""}₹{row["net"]:,.0f}',
                             '✓ Surplus' if row['surplus'] else '✗ Deficit'])
         story.append(hdr_tbl(mn_hdr + mn_rows, [35*mm, 42*mm, 42*mm, 38*mm, 23*mm], [
             ('TEXTCOLOR', (3,1),(3,-1), C_GREEN),
         ]))
-
     story.append(PageBreak())
 
-    # ══════════════════════════════════════════════════════
-    #  PAGE 9 — AUDIT & RECONCILIATION
-    # ══════════════════════════════════════════════════════
+    # PAGE 9 — Audit
     story += section_header('Audit & Reconciliation', 'SECTION 08')
     story.append(metrics_row([
         ('Reconciliation Score', f'{da["reconciliation_score"]}/100',
@@ -2248,7 +2253,6 @@ def dashboard_export_pdf():
         ('Duplicate Suspects',   str(da['duplicate_count']), C_YELLOW if da['duplicate_count']>0 else C_GREEN),
     ]))
     story.append(Spacer(1, 4*mm))
-
     story.append(Paragraph('Audit Summary', s_section))
     audit_kv = [
         kv('Reconciliation Score',    f'{da["reconciliation_score"]}/100'),
@@ -2262,8 +2266,6 @@ def dashboard_export_pdf():
     ]
     story.append(tbl(audit_kv, [95*mm, 85*mm]))
     story.append(Spacer(1, 4*mm))
-
-    # Balance mismatches
     bm = da.get('balance_mismatches', [])
     if bm:
         story.append(alert(f'⚠ {len(bm)} balance continuity issue(s) found — may indicate data gaps or parsing issues.', 'warn'))
@@ -2280,26 +2282,17 @@ def dashboard_export_pdf():
         ]))
     else:
         story.append(alert('✓ All balances verified — No continuity issues found.', 'ok'))
-
     story.append(Spacer(1, 4*mm))
-    # Bounced transactions
     bounced = da.get('bounced', [])
     if bounced:
         story.append(Paragraph(f'Bounced / Returned Transactions ({len(bounced)})', s_section))
         b_hdr = [['Date', 'Description', 'Amount (₹)']]
-        b_rows = [[t.get('date',''), t.get('desc','')[:70], f'₹{t.get("amount",0):,.2f}']
-                  for t in bounced[:10]]
-        story.append(hdr_tbl(b_hdr + b_rows, [30*mm, 110*mm, 40*mm], [
-            ('TEXTCOLOR', (2,1),(2,-1), C_RED),
-        ]))
-
+        b_rows = [[t.get('date',''), t.get('desc','')[:70], f'₹{t.get("amount",0):,.2f}'] for t in bounced[:10]]
+        story.append(hdr_tbl(b_hdr + b_rows, [30*mm, 110*mm, 40*mm], [('TEXTCOLOR', (2,1),(2,-1), C_RED)]))
     story.append(PageBreak())
 
-    # ══════════════════════════════════════════════════════
-    #  PAGE 10 — RED FLAGS & FRAUD
-    # ══════════════════════════════════════════════════════
+    # PAGE 10 — Red Flags
     story += section_header('Red Flags & Fraud Detection', 'SECTION 09')
-
     flag_color = C_GREEN if rf.get('flag_color')=='green' else C_RED if rf.get('flag_color')=='red' else C_YELLOW
     story.append(metrics_row([
         ('Flag Score',          str(rf.get('flag_score', 0)),         flag_color),
@@ -2308,7 +2301,6 @@ def dashboard_export_pdf():
         ('Duplicate Groups',    str(rf.get('duplicate_groups', 0)),   C_YELLOW if rf.get('duplicate_groups',0)>0 else C_GREEN),
     ]))
     story.append(Spacer(1, 4*mm))
-
     flag_level = rf.get('flag_level', 'Low')
     if flag_level == 'High':
         story.append(alert(f'🚨 HIGH RISK: {rf.get("total_flags",0)} red flags detected. Immediate review required.', 'danger'))
@@ -2317,19 +2309,14 @@ def dashboard_export_pdf():
     else:
         story.append(alert(f'✓ LOW RISK: {rf.get("total_flags",0)} flag(s). Statement appears clean.', 'ok'))
     story.append(Spacer(1, 4*mm))
-
-    # Circular transactions
     circ = rf.get('circular_txns', [])
     if circ:
         story.append(Paragraph(f'Circular Transactions ({len(circ)}) — Same amount credited & debited within 7 days', s_section))
         c_hdr = [['Credit Date', 'Credit Desc', 'Debit Date', 'Debit Desc', 'Amount', 'Gap']]
         c_rows = [[c['credit_date'], c['credit_desc'][:30], c['debit_date'],
-                   c['debit_desc'][:30], f'₹{c["amount"]:,.0f}', f'{c["days_gap"]}d']
-                  for c in circ[:8]]
+                   c['debit_desc'][:30], f'₹{c["amount"]:,.0f}', f'{c["days_gap"]}d'] for c in circ[:8]]
         story.append(hdr_tbl(c_hdr + c_rows, [25*mm, 45*mm, 25*mm, 45*mm, 25*mm, 15*mm]))
         story.append(Spacer(1, 3*mm))
-
-    # Window dressing
     wd = rf.get('window_dress', [])
     if wd:
         story.append(Paragraph(f'Window Dressing Alerts ({len(wd)}) — Large deposits near month-end', s_section))
@@ -2338,35 +2325,23 @@ def dashboard_export_pdf():
                 f'Month-End Deposit: {w["deposit_date"]} — ₹{w["amount"]:,.0f} — '
                 f'{w["withdrawal_count"]} matching withdrawal(s) within 8 days', 'warn'))
         story.append(Spacer(1, 3*mm))
-
-    # Gambling
     gamb = rf.get('gambling_txns', [])
     if gamb:
         story.append(Paragraph(f'Gambling / Crypto / Speculative ({len(gamb)}) — ₹{rf.get("gambling_total",0):,.0f} total', s_section))
         g_hdr = [['Date', 'Description', 'Type', 'Amount (₹)']]
-        g_rows = [[t.get('date',''), t.get('desc','')[:65], t.get('type',''),
-                   f'₹{t.get("amount",0):,.0f}'] for t in gamb[:12]]
+        g_rows = [[t.get('date',''), t.get('desc','')[:65], t.get('type',''), f'₹{t.get("amount",0):,.0f}'] for t in gamb[:12]]
         story.append(hdr_tbl(g_hdr + g_rows, [28*mm, 90*mm, 15*mm, 47*mm]))
         story.append(Spacer(1, 3*mm))
-
-    # Penalty
     pen = rf.get('penalty_txns', [])
     if pen:
         story.append(Paragraph(f'Penalty / Legal Charges ({len(pen)}) — ₹{rf.get("penalty_total",0):,.0f}', s_section))
         p_hdr = [['Date', 'Description', 'Amount (₹)']]
-        p_rows = [[t.get('date',''), t.get('desc','')[:75], f'₹{t.get("amount",0):,.0f}']
-                  for t in pen[:10]]
-        story.append(hdr_tbl(p_hdr + p_rows, [28*mm, 112*mm, 40*mm], [
-            ('TEXTCOLOR', (2,1),(2,-1), C_RED),
-        ]))
-
+        p_rows = [[t.get('date',''), t.get('desc','')[:75], f'₹{t.get("amount",0):,.0f}'] for t in pen[:10]]
+        story.append(hdr_tbl(p_hdr + p_rows, [28*mm, 112*mm, 40*mm], [('TEXTCOLOR', (2,1),(2,-1), C_RED)]))
     story.append(PageBreak())
 
-    # ══════════════════════════════════════════════════════
-    #  PAGE 11 — COMPLIANCE REPORTING
-    # ══════════════════════════════════════════════════════
+    # PAGE 11 — Compliance
     story += section_header('Compliance Reporting (PMLA / RBI)', 'SECTION 10')
-
     risk_color_map = {'green': C_GREEN, 'yellow': C_YELLOW, 'red': C_RED}
     risk_c = risk_color_map.get(dc.get('risk_color','green'), C_GREEN)
     story.append(metrics_row([
@@ -2376,7 +2351,6 @@ def dashboard_export_pdf():
         ('STR Candidates',      str(dc['str_count']),           C_RED if dc['str_count']>0 else C_GREEN),
     ]))
     story.append(Spacer(1, 4*mm))
-
     if dc['form_61a_required']:
         story.append(alert(f'🚨 Form 61A / SFT Filing REQUIRED — Annual cash total ₹{dc["annual_cash_total"]:,.0f} exceeds ₹10L threshold.', 'danger'))
     if dc['str_candidates']:
@@ -2384,7 +2358,6 @@ def dashboard_export_pdf():
     if dc['structured_suspects']:
         story.append(alert(f'⚠ {dc["structured_count"]} Structuring Suspect(s) — Transactions between ₹1.8L–₹2L detected.', 'warn'))
     story.append(Spacer(1, 4*mm))
-
     story.append(Paragraph('Compliance Metrics', s_section))
     comp_kv = [
         kv('Risk Level',                    dc['risk_level']),
@@ -2398,34 +2371,23 @@ def dashboard_export_pdf():
     ]
     story.append(tbl(comp_kv, [95*mm, 85*mm]))
     story.append(Spacer(1, 4*mm))
-
-    # High value transactions
     hvt = dc.get('high_value_txns', [])
     if hvt:
         story.append(Paragraph(f'High Value Transactions ≥ ₹2 Lakh ({len(hvt)})', s_section))
         hv_hdr = [['Date', 'Description', 'Type', 'Amount (₹)']]
-        hv_rows = [[t.get('date',''), t.get('desc','')[:65], t.get('type',''),
-                    f'₹{t.get("amount",0):,.0f}'] for t in hvt[:15]]
-        story.append(hdr_tbl(hv_hdr + hv_rows, [28*mm, 90*mm, 15*mm, 47*mm], [
-            ('TEXTCOLOR', (2,1),(2,-1), C_GREEN),
-        ]))
-
+        hv_rows = [[t.get('date',''), t.get('desc','')[:65], t.get('type',''), f'₹{t.get("amount",0):,.0f}'] for t in hvt[:15]]
+        story.append(hdr_tbl(hv_hdr + hv_rows, [28*mm, 90*mm, 15*mm, 47*mm], [('TEXTCOLOR', (2,1),(2,-1), C_GREEN)]))
     story.append(PageBreak())
 
-    # ══════════════════════════════════════════════════════
-    #  PAGE 12 — TOP DEBIT DESTINATIONS
-    # ══════════════════════════════════════════════════════
+    # PAGE 12 — Top Debits
     story += section_header('Top Debit Destinations & Spend Patterns', 'SECTION 11')
-
     top_db = obl.get('top_10_debits', [])
     if top_db:
         story.append(Paragraph('Top 10 Debit Destinations (by total amount)', s_section))
         db_hdr = [['Rank', 'Destination', 'Total Amount (₹)', 'Transactions', 'Avg per Txn (₹)']]
-        db_rows = [[str(i+1), d['dest'], f'₹{d["total"]:,.0f}',
-                    str(d['count']), f'₹{d["avg"]:,.0f}'] for i, d in enumerate(top_db)]
+        db_rows = [[str(i+1), d['dest'], f'₹{d["total"]:,.0f}', str(d['count']), f'₹{d["avg"]:,.0f}'] for i, d in enumerate(top_db)]
         story.append(hdr_tbl(db_hdr + db_rows, [15*mm, 70*mm, 45*mm, 30*mm, 20*mm]))
         story.append(Spacer(1, 6*mm))
-
     story.append(Paragraph('GSTR-1 Sales Classification', s_section))
     story.append(metrics_row([
         ('B2B Supplies',   f'₹{dg["total_b2b"]:,.0f}',   C_GREEN),
@@ -2434,21 +2396,16 @@ def dashboard_export_pdf():
         ('Est. GST @18%',  f'₹{dg["estimated_gst"]:,.0f}',C_RED),
     ]))
     story.append(Spacer(1, 4*mm))
-
     gst_status = 'Filing Required' if dg['total_taxable'] > 0 else 'Verify with CA'
     story.append(alert(
         f'GST Status: {gst_status} — Total Taxable: ₹{dg["total_taxable"]:,.0f} | '
         f'Est. Liability: ₹{dg["estimated_gst"]:,.0f} | Filing: {dg["filing_status"]}',
         'warn' if dg['total_taxable'] > 0 else 'ok'
     ))
-
     story.append(PageBreak())
 
-    # ══════════════════════════════════════════════════════
-    #  PAGE 13 — SUMMARY SCORECARD
-    # ══════════════════════════════════════════════════════
+    # PAGE 13 — Scorecard
     story += section_header('Financial Health Scorecard', 'SECTION 12 — SUMMARY')
-
     story.append(Paragraph(
         'This scorecard summarizes key financial health indicators derived from the bank statement analysis.',
         s_body
@@ -2460,46 +2417,33 @@ def dashboard_export_pdf():
 
     scorecard = [
         ['Parameter', 'Value', 'Status'],
-        score_row('Real Income (Monthly Avg)',
-                  f'₹{dl["avg_monthly_credit"]:,.0f}',
+        score_row('Real Income (Monthly Avg)', f'₹{dl["avg_monthly_credit"]:,.0f}',
                   '✓ Good' if dl['avg_monthly_credit'] > 30000 else '⚠ Low',
                   C_GREEN if dl['avg_monthly_credit'] > 30000 else C_YELLOW),
-        score_row('FOIR',
-                  f'{dl["foir"]}%',
+        score_row('FOIR', f'{dl["foir"]}%',
                   '✓ Healthy' if dl["foir"]<=35 else '⚠ Moderate' if dl["foir"]<=50 else '✗ High Risk',
                   C_GREEN if dl["foir"]<=35 else C_YELLOW if dl["foir"]<=50 else C_RED),
-        score_row('Loan Eligibility',
-                  f'₹{dl["loan_eligible"]:,.0f}',
+        score_row('Loan Eligibility', f'₹{dl["loan_eligible"]:,.0f}',
                   '✓ Eligible' if dl['loan_eligible']>0 else '✗ Not Eligible',
                   C_GREEN if dl['loan_eligible']>0 else C_RED),
-        score_row('Credit Profile',
-                  dl['credit_indicator'],
+        score_row('Credit Profile', dl['credit_indicator'],
                   '✓ Strong' if dl['credit_color']=='green' else '⚠ Moderate' if dl['credit_color']=='yellow' else '✗ Weak',
                   C_GREEN if dl['credit_color']=='green' else C_YELLOW if dl['credit_color']=='yellow' else C_RED),
-        score_row('Reconciliation Score',
-                  f'{da["reconciliation_score"]}/100',
+        score_row('Reconciliation Score', f'{da["reconciliation_score"]}/100',
                   '✓ Good' if da['reconciliation_score']>=80 else '⚠ Average' if da['reconciliation_score']>=50 else '✗ Poor',
                   C_GREEN if da['reconciliation_score']>=80 else C_YELLOW if da['reconciliation_score']>=50 else C_RED),
-        score_row('Compliance Risk',
-                  dc['risk_level'],
+        score_row('Compliance Risk', dc['risk_level'],
                   '✓ Low' if dc['risk_level']=='Low' else '⚠ Medium' if dc['risk_level']=='Medium' else '✗ High',
                   C_GREEN if dc['risk_level']=='Low' else C_YELLOW if dc['risk_level']=='Medium' else C_RED),
-        score_row('Cheque Bounces',
-                  str(da['bounce_count']),
+        score_row('Cheque Bounces', str(da['bounce_count']),
                   '✓ Clean' if da['bounce_count']==0 else '✗ Found',
                   C_GREEN if da['bounce_count']==0 else C_RED),
-        score_row('Red Flag Level',
-                  rf.get('flag_level','Low'),
+        score_row('Red Flag Level', rf.get('flag_level','Low'),
                   '✓ Low' if rf.get('flag_level')=='Low' else '⚠ Medium' if rf.get('flag_level')=='Medium' else '✗ High',
                   C_GREEN if rf.get('flag_level')=='Low' else C_YELLOW if rf.get('flag_level')=='Medium' else C_RED),
-        score_row('Form 61A Required',
-                  'Yes' if dc['form_61a_required'] else 'No',
+        score_row('Form 61A Required', 'Yes' if dc['form_61a_required'] else 'No',
                   '✗ File Required' if dc['form_61a_required'] else '✓ Not Required',
                   C_RED if dc['form_61a_required'] else C_GREEN),
-        score_row('Cash Balance Trend',
-                  cf.get('trend_direction', 'N/A'),
-                  '✓ Improving' if 'Improving' in cf.get('trend_direction','') else '⚠ Declining' if 'Declining' in cf.get('trend_direction','') else '→ Stable',
-                  C_GREEN if 'Improving' in cf.get('trend_direction','') else C_YELLOW if 'Declining' in cf.get('trend_direction','') else C_TEXT),
     ]
 
     sc_tbl = Table(scorecard, colWidths=[90*mm, 55*mm, 35*mm])
@@ -2525,8 +2469,6 @@ def dashboard_export_pdf():
     ]))
     story.append(sc_tbl)
     story.append(Spacer(1, 8*mm))
-
-    # Final disclaimer
     story.append(HRFlowable(width='100%', thickness=0.4, color=C_BORDER))
     story.append(Spacer(1, 3*mm))
     story.append(Paragraph(
@@ -2543,15 +2485,13 @@ def dashboard_export_pdf():
         s_footer
     ))
 
-    # ── Build PDF ─────────────────────────────────────────
     buffer = BytesIO()
     doc = BaseDocTemplate(
         buffer, pagesize=A4,
         rightMargin=20*mm, leftMargin=20*mm,
         topMargin=18*mm, bottomMargin=22*mm,
     )
-    frame = Frame(doc.leftMargin, doc.bottomMargin,
-                  doc.width, doc.height, id='main')
+    frame    = Frame(doc.leftMargin, doc.bottomMargin, doc.width, doc.height, id='main')
     template = PageTemplate(id='main', frames=frame, onPage=draw_page)
     doc.addPageTemplates([template])
     doc.build(story)
@@ -2562,6 +2502,7 @@ def dashboard_export_pdf():
         download_name=f'AarogyamFin_Report_{safe_name}.pdf',
         as_attachment=True,
         mimetype='application/pdf')
+
 
 @app.route('/gstr2b', methods=['GET', 'POST'])
 def gstr2b_page():
@@ -2574,51 +2515,38 @@ def gstr2b_analyze():
     ip = request.remote_addr
     if is_rate_limited(ip):
         abort(429)
-
     is_logged_in, user_email, user_id = _get_current_user()
     if not is_logged_in:
         return redirect('/login')
-
     from core.gstr2b_recon import run_gstr2b_recon
     error_message = ''
     data          = None
     gstr2b_path   = None
     pr_path       = None
-
     gstr2b_file = request.files.get('gstr2b_excel')
     if not gstr2b_file or not gstr2b_file.filename:
         error_message = 'GSTR-2B Excel file is required.'
-        return render_template('gstr2b.html', data=None, error_message=error_message,
-                               is_logged_in=is_logged_in, user_email=user_email)
-
+        return render_template('gstr2b.html', data=None, error_message=error_message, is_logged_in=is_logged_in, user_email=user_email)
     safe_g = secure_filename(gstr2b_file.filename)
     if not safe_g.lower().endswith(('.xlsx', '.xls')):
         error_message = 'GSTR-2B file must be .xlsx or .xls'
-        return render_template('gstr2b.html', data=None, error_message=error_message,
-                               is_logged_in=is_logged_in, user_email=user_email)
-
+        return render_template('gstr2b.html', data=None, error_message=error_message, is_logged_in=is_logged_in, user_email=user_email)
     gstr2b_path = os.path.join(app.config['UPLOAD_FOLDER'], 'gstr2b_' + safe_g)
     gstr2b_file.save(gstr2b_path)
-
     pr_file = request.files.get('pr_excel')
     if not pr_file or not pr_file.filename:
         error_message = 'Purchase Register Excel file is required.'
         if gstr2b_path and os.path.exists(gstr2b_path):
             os.remove(gstr2b_path)
-        return render_template('gstr2b.html', data=None, error_message=error_message,
-                               is_logged_in=is_logged_in, user_email=user_email)
-
+        return render_template('gstr2b.html', data=None, error_message=error_message, is_logged_in=is_logged_in, user_email=user_email)
     safe_p = secure_filename(pr_file.filename)
     if not safe_p.lower().endswith(('.xlsx', '.xls')):
         error_message = 'Purchase Register file must be .xlsx or .xls'
         if gstr2b_path and os.path.exists(gstr2b_path):
             os.remove(gstr2b_path)
-        return render_template('gstr2b.html', data=None, error_message=error_message,
-                               is_logged_in=is_logged_in, user_email=user_email)
-
+        return render_template('gstr2b.html', data=None, error_message=error_message, is_logged_in=is_logged_in, user_email=user_email)
     pr_path = os.path.join(app.config['UPLOAD_FOLDER'], 'pr_' + safe_p)
     pr_file.save(pr_path)
-
     try:
         data = run_gstr2b_recon(gstr2b_path, pr_path)
     except Exception as e:
@@ -2628,14 +2556,8 @@ def gstr2b_analyze():
         for fp in [gstr2b_path, pr_path]:
             if fp and os.path.exists(fp):
                 os.remove(fp)
+    return render_template('gstr2b.html', data=data, error_message=error_message, is_logged_in=is_logged_in, user_email=user_email)
 
-    return render_template('gstr2b.html', data=data, error_message=error_message,
-                           is_logged_in=is_logged_in, user_email=user_email)
-
-
-# ═══════════════════════════════════════════════════════════
-#  GSTR-3B ROUTE
-# ═══════════════════════════════════════════════════════════
 
 @app.route('/gstr3b', methods=['GET', 'POST'])
 def gstr3b_page():
@@ -2648,19 +2570,15 @@ def gstr3b_analyze():
     ip = request.remote_addr
     if is_rate_limited(ip):
         abort(429)
-
     is_logged_in, user_email, user_id = _get_current_user()
     if not is_logged_in:
         return redirect('/login')
-
     from core.gstr3b import run_gstr3b
-    error_message    = ''
-    data             = None
-    transactions     = []
-    sales_filepath   = None
-    purchase_filepath= None
-
-    # ── Bank PDF ──
+    error_message     = ''
+    data              = None
+    transactions      = []
+    sales_filepath    = None
+    purchase_filepath = None
     bank_pdf = request.files.get('bank_pdf')
     if bank_pdf and bank_pdf.filename:
         safe_name = secure_filename(bank_pdf.filename)
@@ -2698,27 +2616,20 @@ def gstr3b_analyze():
             cached = _cache_get(cached_hash)
             if cached:
                 transactions = cached['transactions']
-
     if error_message:
-        return render_template('gstr3b.html', data=None, error_message=error_message,
-                               is_logged_in=is_logged_in, user_email=user_email)
-
-    # ── Sales Excel ──
+        return render_template('gstr3b.html', data=None, error_message=error_message, is_logged_in=is_logged_in, user_email=user_email)
     sales_file = request.files.get('sales_excel')
     if sales_file and sales_file.filename:
         safe_s = secure_filename(sales_file.filename)
         if safe_s.lower().endswith(('.xlsx', '.xls')):
             sales_filepath = os.path.join(app.config['UPLOAD_FOLDER'], 'sales_' + safe_s)
             sales_file.save(sales_filepath)
-
-    # ── Purchase Excel ──
     purchase_file = request.files.get('purchase_excel')
     if purchase_file and purchase_file.filename:
         safe_p = secure_filename(purchase_file.filename)
         if safe_p.lower().endswith(('.xlsx', '.xls')):
             purchase_filepath = os.path.join(app.config['UPLOAD_FOLDER'], 'purchase_' + safe_p)
             purchase_file.save(purchase_filepath)
-
     try:
         data = run_gstr3b(transactions, sales_filepath, purchase_filepath)
     except Exception as e:
@@ -2728,14 +2639,8 @@ def gstr3b_analyze():
         for fp in [sales_filepath, purchase_filepath]:
             if fp and os.path.exists(fp):
                 os.remove(fp)
+    return render_template('gstr3b.html', data=data, error_message=error_message, is_logged_in=is_logged_in, user_email=user_email)
 
-    return render_template('gstr3b.html', data=data, error_message=error_message,
-                           is_logged_in=is_logged_in, user_email=user_email)
-
-
-# ═══════════════════════════════════════════════════════════
-#  GST CALENDAR ROUTE
-# ═══════════════════════════════════════════════════════════
 
 @app.route('/gst-calendar')
 def gst_calendar():
@@ -2751,10 +2656,6 @@ def gst_calendar():
     )
 
 
-# ═══════════════════════════════════════════════════════════
-#  GSTR-1 ROUTE
-# ═══════════════════════════════════════════════════════════
-
 @app.route('/gstr1', methods=['GET', 'POST'])
 def gstr1_page():
     is_logged_in, user_email, user_id = _get_current_user()
@@ -2766,16 +2667,12 @@ def gstr1_analyze():
     ip = request.remote_addr
     if is_rate_limited(ip):
         abort(429)
-
     is_logged_in, user_email, user_id = _get_current_user()
     if not is_logged_in:
         return redirect('/login')
-
     error_message = ''
     data          = None
     transactions  = []
-
-    # ── Bank PDF ──
     bank_pdf = request.files.get('bank_pdf')
     if bank_pdf and bank_pdf.filename:
         safe_name = secure_filename(bank_pdf.filename)
@@ -2813,27 +2710,18 @@ def gstr1_analyze():
             cached = _cache_get(cached_hash)
             if cached:
                 transactions = cached['transactions']
-
     if error_message:
-        return render_template('gstr1.html', data=None, error_message=error_message,
-                               is_logged_in=is_logged_in, user_email=user_email)
-
-    # ── Invoice Excel ──
+        return render_template('gstr1.html', data=None, error_message=error_message, is_logged_in=is_logged_in, user_email=user_email)
     invoice_file = request.files.get('invoice_excel')
     if not invoice_file or not invoice_file.filename:
         error_message = 'Invoice Excel file required.'
-        return render_template('gstr1.html', data=None, error_message=error_message,
-                               is_logged_in=is_logged_in, user_email=user_email)
-
+        return render_template('gstr1.html', data=None, error_message=error_message, is_logged_in=is_logged_in, user_email=user_email)
     safe_inv = secure_filename(invoice_file.filename)
     if not safe_inv.lower().endswith(('.xlsx', '.xls')):
         error_message = 'Invoice file must be .xlsx or .xls'
-        return render_template('gstr1.html', data=None, error_message=error_message,
-                               is_logged_in=is_logged_in, user_email=user_email)
-
+        return render_template('gstr1.html', data=None, error_message=error_message, is_logged_in=is_logged_in, user_email=user_email)
     inv_filepath = os.path.join(app.config['UPLOAD_FOLDER'], safe_inv)
     invoice_file.save(inv_filepath)
-
     try:
         data = run_gstr1(inv_filepath, transactions)
     except Exception as e:
@@ -2842,9 +2730,7 @@ def gstr1_analyze():
     finally:
         if os.path.exists(inv_filepath):
             os.remove(inv_filepath)
-
-    return render_template('gstr1.html', data=data, error_message=error_message,
-                           is_logged_in=is_logged_in, user_email=user_email)
+    return render_template('gstr1.html', data=data, error_message=error_message, is_logged_in=is_logged_in, user_email=user_email)
 
 
 # ═══════════════════════════════════════════════════════════
@@ -2856,35 +2742,46 @@ def api_parse():
     ip = request.remote_addr
     if is_rate_limited(ip):
         return jsonify({'error': 'Too many requests'}), 429
-
     file = request.files.get('pdf_file')
     if not file or not file.filename:
         return jsonify({'error': 'No file uploaded'}), 400
-
     safe_name = secure_filename(file.filename)
     if not safe_name.lower().endswith('.pdf'):
         return jsonify({'error': 'Only PDF files accepted'}), 400
     if not _is_valid_pdf(file):
         return jsonify({'error': 'Invalid PDF'}), 400
-
     filepath = os.path.join(app.config['UPLOAD_FOLDER'], safe_name)
     file.save(filepath)
-
+    file_size_kb = round(os.path.getsize(filepath) / 1024, 1)
+    t0 = time.time()
     try:
-        t0           = time.time()
         transactions = parse_transactions(filepath)
         parse_time   = round(time.time() - t0, 1)
         logger.info("API parse: %s → %d txns in %.1fs", safe_name, len(transactions), parse_time)
+        ph_track(ip, event='pdf_parse_success', props={
+            'context':            'mobile_api',
+            'file_name':          safe_name,
+            'file_size_kb':       file_size_kb,
+            'transaction_count':  len(transactions),
+            'parse_time_seconds': parse_time,
+        })
     except Exception as e:
+        parse_time = round(time.time() - t0, 1)
         logger.exception("API parse error: %s", safe_name)
+        ph_track(ip, event='pdf_parse_failed', props={
+            'context':            'mobile_api',
+            'file_name':          safe_name,
+            'file_size_kb':       file_size_kb,
+            'error_type':         type(e).__name__,
+            'error_message':      str(e)[:200],
+            'parse_time_seconds': parse_time,
+        })
         return jsonify({'error': str(e)}), 500
     finally:
         if os.path.exists(filepath):
             os.remove(filepath)
-
     if not transactions:
         return jsonify({'error': 'No transactions found'}), 400
-
     return jsonify({
         'transactions': transactions,
         'count':        len(transactions),
@@ -2893,44 +2790,39 @@ def api_parse():
     }), 200
 
 
-# ═══════════════════════════════════════════════════════════
-#  MOBILE PAYMENT API
-# ═══════════════════════════════════════════════════════════
-
 @app.route('/api/payment/create-order', methods=['POST'])
 def api_create_order():
     ip = request.remote_addr
     if is_rate_limited(ip):
         return jsonify({'error': 'Too many requests'}), 429
-
     data         = request.get_json()
     firebase_uid = data.get('firebase_uid', '')
     email        = data.get('email', '')
     plan_name    = data.get('plan', 'Basic')
-
     if plan_name not in PLAN_CONFIG:
         plan_name = 'Basic'
-
     if not firebase_uid:
         return jsonify({'error': 'No user ID'}), 400
-
     plan   = PLAN_CONFIG[plan_name]
-    amount = plan['price'] * 100  # paise
-
+    amount = plan['price'] * 100
     try:
         order = rzp_client.order.create({
             'amount':          amount,
             'currency':        'INR',
             'payment_capture': 1,
         })
-
         supabase.table('payments').insert({
             'amount':            plan['price'],
             'status':            'pending',
             'razorpay_order_id': order['id'],
             'plan':              plan_name,
         }).execute()
-
+        ph_track(firebase_uid, event='payment_order_created', props={
+            'order_id':   order['id'],
+            'amount_inr': plan['price'],
+            'plan':       plan_name,
+            'context':    'mobile',
+        })
         logger.info("Mobile order created: %s plan=%s for %s", order['id'], plan_name, email)
         return jsonify({
             'order_id': order['id'],
@@ -2949,47 +2841,33 @@ def api_verify_payment():
     ip = request.remote_addr
     if is_rate_limited(ip):
         return jsonify({'error': 'Too many requests'}), 429
-
     data                = request.get_json()
     firebase_uid        = data.get('firebase_uid', '')
     razorpay_order_id   = data.get('razorpay_order_id', '')
     razorpay_payment_id = data.get('razorpay_payment_id', '')
     razorpay_signature  = data.get('razorpay_signature', '')
-
     if not firebase_uid:
         return jsonify({'error': 'No user ID'}), 400
-
     try:
         msg      = f"{razorpay_order_id}|{razorpay_payment_id}"
-        expected = hmac.new(
-            RAZORPAY_KEY_SECRET.encode(),
-            msg.encode(),
-            hashlib.sha256
-        ).hexdigest()
-
+        expected = hmac.new(RAZORPAY_KEY_SECRET.encode(), msg.encode(), hashlib.sha256).hexdigest()
         if not hmac.compare_digest(expected, razorpay_signature):
             return jsonify({'error': 'Payment verification failed'}), 400
-
     except Exception as e:
         return jsonify({'error': 'Verification error'}), 500
-
     try:
         plan_name = data.get('plan', 'Basic')
         if plan_name not in PLAN_CONFIG:
             plan_name = 'Basic'
         plan = PLAN_CONFIG[plan_name]
-
         from datetime import datetime, timezone, timedelta
         expires_at = datetime.now(timezone.utc) + timedelta(hours=plan['validity_hours'])
-
         result = supabase.table('payments').update({
             'status':              'paid',
             'razorpay_payment_id': razorpay_payment_id,
             'plan':                plan_name,
         }).eq('razorpay_order_id', razorpay_order_id).execute()
-
         payment_id = result.data[0]['id'] if result.data else None
-
         supabase.table('chat_sessions').insert({
             'firebase_uid':        firebase_uid,
             'payment_id':          payment_id,
@@ -3002,10 +2880,14 @@ def api_verify_payment():
             'output_tokens_used':  0,
             'expires_at':          expires_at.isoformat(),
         }).execute()
-
+        ph_track(firebase_uid, event='payment_completed', props={
+            'amount_inr': plan['price'],
+            'plan':       plan_name,
+            'payment_id': razorpay_payment_id,
+            'context':    'mobile',
+        })
         logger.info("Mobile payment verified: plan=%s for %s", plan_name, firebase_uid)
         return jsonify({'success': True})
-
     except Exception as e:
         logger.exception("Mobile payment verify DB error: %s", e)
         return jsonify({'error': 'Session creation failed'}), 500
@@ -3015,18 +2897,13 @@ def api_verify_payment():
 def api_payment_status():
     data         = request.get_json()
     firebase_uid = data.get('firebase_uid', '')
-
     if not firebase_uid:
         return jsonify({'has_access': False}), 200
-
     try:
         from datetime import datetime, timezone
         result = supabase.table('chat_sessions').select('*').eq(
             'firebase_uid', firebase_uid
-        ).eq('is_active', True).order(
-            'created_at', desc=True
-        ).limit(1).execute()
-
+        ).eq('is_active', True).order('created_at', desc=True).limit(1).execute()
         if result.data:
             s            = result.data[0]
             input_used   = s.get('input_tokens_used', 0)
@@ -3035,12 +2912,10 @@ def api_payment_status():
             output_limit = s.get('output_tokens_limit', 5000)
             plan_name    = s.get('plan', 'Basic')
             expires_at   = s.get('expires_at')
-
             if expires_at:
                 exp = datetime.fromisoformat(expires_at.replace('Z', '+00:00'))
                 if exp < datetime.now(timezone.utc):
                     return jsonify({'has_access': False, 'plan': 'Free'})
-
             if input_used < input_limit and output_used < output_limit:
                 saved_txns        = s.get('transactions') or []
                 actual_session_id = str(s['id'])
@@ -3050,7 +2925,6 @@ def api_payment_status():
                         logger.info("SQLite rebuilt for session %s", actual_session_id)
                     except Exception as e:
                         logger.exception("SQLite rebuild failed: %s", e)
-
                 return jsonify({
                     'has_access':          True,
                     'plan':                plan_name,
@@ -3062,54 +2936,59 @@ def api_payment_status():
                     'messages':            s.get('messages') or [],
                     'pdf_loaded':          len(saved_txns) > 0,
                 })
-
         return jsonify({'has_access': False, 'plan': 'Free'})
-
     except Exception as e:
         logger.exception("Payment status error: %s", e)
         return jsonify({'has_access': False}), 200
 
-
-# ═══════════════════════════════════════════════════════════
-#  MOBILE CHAT API
-# ═══════════════════════════════════════════════════════════
 
 @app.route('/api/chat/upload', methods=['POST'])
 def api_chat_upload():
     ip = request.remote_addr
     if is_rate_limited(ip):
         return jsonify({'error': 'Too many requests'}), 429
-
     file       = request.files.get('pdf_file')
     session_id = request.form.get('session_id', '')
-
     if not file or not file.filename:
         return jsonify({'error': 'No file uploaded'}), 400
     if not session_id:
         return jsonify({'error': 'No session_id provided'}), 400
-
     safe_name = secure_filename(file.filename)
     if not safe_name.lower().endswith('.pdf'):
         return jsonify({'error': 'Only PDF files accepted'}), 400
     if not _is_valid_pdf(file):
         return jsonify({'error': 'Invalid PDF'}), 400
-
     filepath = os.path.join(app.config['UPLOAD_FOLDER'], safe_name)
     file.save(filepath)
-
+    file_size_kb = round(os.path.getsize(filepath) / 1024, 1)
+    t0 = time.time()
     try:
         transactions = parse_transactions(filepath)
+        parse_time   = round(time.time() - t0, 1)
+        ph_track(session_id, event='pdf_parse_success', props={
+            'context':            'mobile_chat_upload',
+            'file_name':          safe_name,
+            'file_size_kb':       file_size_kb,
+            'transaction_count':  len(transactions),
+            'parse_time_seconds': parse_time,
+        })
     except Exception as e:
+        parse_time = round(time.time() - t0, 1)
+        ph_track(session_id, event='pdf_parse_failed', props={
+            'context':            'mobile_chat_upload',
+            'file_name':          safe_name,
+            'file_size_kb':       file_size_kb,
+            'error_type':         type(e).__name__,
+            'error_message':      str(e)[:200],
+            'parse_time_seconds': parse_time,
+        })
         return jsonify({'error': str(e)}), 500
     finally:
         if os.path.exists(filepath):
             os.remove(filepath)
-
     if not transactions:
         return jsonify({'error': 'No transactions found'}), 400
-
     row_count = build_index(session_id, transactions)
-
     try:
         supabase.table('chat_sessions').update({
             'transactions': transactions,
@@ -3117,7 +2996,6 @@ def api_chat_upload():
         }).eq('id', session_id).execute()
     except Exception as e:
         logger.exception("Failed to save transactions: %s", e)
-
     return jsonify({
         'success':           True,
         'session_id':        session_id,
@@ -3130,61 +3008,50 @@ def api_chat_message():
     ip = request.remote_addr
     if is_rate_limited(ip):
         return jsonify({'error': 'Too many requests'}), 429
-
     data         = request.get_json()
     session_id   = data.get('session_id', '')
     user_message = (data.get('message') or '').strip()[:500]
     history      = data.get('history') or []
-
     if not session_id:
         return jsonify({'error': 'No session_id'}), 400
     if not user_message:
         return jsonify({'error': 'Empty message'}), 400
-
     if not get_db(session_id):
         return jsonify({'error': 'No statement loaded. Upload PDF first.'}), 400
-
     try:
         session_data = supabase.table('chat_sessions').select(
             'input_tokens_used, input_tokens_limit, output_tokens_used, output_tokens_limit, expires_at'
         ).eq('id', session_id).limit(1).execute()
-
         if session_data.data:
             s            = session_data.data[0]
             input_used   = s.get('input_tokens_used', 0)
             input_limit  = s.get('input_tokens_limit', 25000)
             output_used  = s.get('output_tokens_used', 0)
             output_limit = s.get('output_tokens_limit', 5000)
-
             from datetime import datetime, timezone
             expires_at = s.get('expires_at')
             if expires_at:
                 exp = datetime.fromisoformat(expires_at.replace('Z', '+00:00'))
                 if exp < datetime.now(timezone.utc):
                     return jsonify({'error': 'Session expired. Please purchase a new plan.'}), 403
-
             if input_used >= input_limit:
                 return jsonify({'error': 'Token limit reached. Please purchase a new plan.'}), 403
             if output_used >= output_limit:
                 return jsonify({'error': 'Token limit reached. Please purchase a new plan.'}), 403
     except Exception as e:
         logger.exception("Token limit check failed: %s", e)
-
     result      = ai_chat(session_id, user_message, history)
     tokens_used = result.get('tokens_used', 0)
-
     try:
         existing = supabase.table('chat_sessions').select(
             'input_tokens_used, output_tokens_used, messages'
         ).eq('id', session_id).limit(1).execute()
-
         if existing.data:
             s                 = existing.data[0]
             existing_messages = s.get('messages') or []
             existing_messages.append({'role': 'user',      'content': user_message})
             existing_messages.append({'role': 'assistant', 'content': result['reply']})
             existing_messages = existing_messages[-100:]
-
             supabase.table('chat_sessions').update({
                 'input_tokens_used':  s.get('input_tokens_used', 0) + tokens_used,
                 'output_tokens_used': s.get('output_tokens_used', 0) + result.get('output_tokens', 0),
@@ -3192,16 +3059,17 @@ def api_chat_message():
             }).eq('id', session_id).execute()
     except Exception as e:
         logger.exception("Token/message update failed: %s", e)
-
-    return jsonify({
-        'reply':       result['reply'],
-        'tokens_used': tokens_used,
-    }), 200
+    ph_track(session_id, event='chat_message_sent', props={
+        'context':       'mobile',
+        'tokens_used':   tokens_used,
+        'query_length':  len(user_message),
+        'reply_length':  len(result.get('reply', '')),
+    })
+    return jsonify({'reply': result['reply'], 'tokens_used': tokens_used}), 200
 
 
 # ═══════════════════════════════════════════════════════════
-#  FINANCIAL CONSOLIDATOR ROUTES
-#  Add these routes to app.py — paste before the ERROR HANDLERS section
+#  FINANCIAL CONSOLIDATOR
 # ═══════════════════════════════════════════════════════════
 
 @app.route('/consolidator', methods=['GET'])
@@ -3212,11 +3080,7 @@ def consolidator_page():
     active = _get_active_chat_session(user_id)
     if not active:
         return redirect('/pay')
-    return render_template('consolidator.html',
-        data=None,
-        is_logged_in=is_logged_in,
-        user_email=user_email,
-    )
+    return render_template('consolidator.html', data=None, is_logged_in=is_logged_in, user_email=user_email)
 
 
 @app.route('/consolidator', methods=['POST'])
@@ -3224,25 +3088,20 @@ def consolidator_analyze():
     ip = request.remote_addr
     if is_rate_limited(ip):
         abort(429)
-
     is_logged_in, user_email, user_id = _get_current_user()
     if not is_logged_in:
         return redirect('/login')
     active = _get_active_chat_session(user_id)
     if not active:
         return redirect('/pay')
-
     from parsers.form26as import parse_26as
     from parsers.form_ais  import parse_ais
     from core.financial_consolidator import consolidate
-
     error_message   = ''
     data            = None
     transactions    = []
     data_26as       = None
     data_ais        = None
-
-    # ── Bank PDF ──────────────────────────────────────────
     bank_pdf = request.files.get('bank_pdf')
     if bank_pdf and bank_pdf.filename:
         safe_name = secure_filename(bank_pdf.filename)
@@ -3265,18 +3124,13 @@ def consolidator_analyze():
                     if os.path.exists(filepath):
                         os.remove(filepath)
     else:
-        # Use cached bank statement
         cached_hash = session.get('file_hash')
         if cached_hash:
             cached = _cache_get(cached_hash)
             if cached:
                 transactions = cached['transactions']
-
     if error_message:
-        return render_template('consolidator.html', data=None,
-            error_message=error_message, is_logged_in=is_logged_in, user_email=user_email)
-
-    # ── 26AS PDF ──────────────────────────────────────────
+        return render_template('consolidator.html', data=None, error_message=error_message, is_logged_in=is_logged_in, user_email=user_email)
     f26as = request.files.get('form_26as')
     if f26as and f26as.filename:
         safe_name = secure_filename(f26as.filename)
@@ -3291,8 +3145,6 @@ def consolidator_analyze():
             finally:
                 if os.path.exists(filepath):
                     os.remove(filepath)
-
-    # ── AIS PDF ───────────────────────────────────────────
     fais = request.files.get('form_ais')
     if fais and fais.filename:
         safe_name = secure_filename(fais.filename)
@@ -3307,38 +3159,22 @@ def consolidator_analyze():
             finally:
                 if os.path.exists(filepath):
                     os.remove(filepath)
-
-    # ── Opening Balance ───────────────────────────────────
     opening_balance = 0.0
     ob_raw = request.form.get('opening_balance', '0').replace(',', '').strip()
     try:
         opening_balance = float(ob_raw) if ob_raw else 0.0
     except Exception:
         opening_balance = 0.0
-
-    # ── Consolidate ───────────────────────────────────────
     if not transactions and not data_26as and not data_ais:
         error_message = 'Please upload at least one document (Bank PDF or 26AS or AIS).'
-        return render_template('consolidator.html', data=None,
-            error_message=error_message, is_logged_in=is_logged_in, user_email=user_email)
-
+        return render_template('consolidator.html', data=None, error_message=error_message, is_logged_in=is_logged_in, user_email=user_email)
     try:
-        data = consolidate(
-            bank_transactions=transactions,
-            data_26as=data_26as,
-            data_ais=data_ais,
-            opening_balance=opening_balance,
-        )
+        data = consolidate(bank_transactions=transactions, data_26as=data_26as, data_ais=data_ais, opening_balance=opening_balance)
     except Exception as e:
         logger.exception("Consolidation error: %s", e)
         error_message = f'Consolidation error: {e}'
+    return render_template('consolidator.html', data=data, error_message=error_message, is_logged_in=is_logged_in, user_email=user_email)
 
-    return render_template('consolidator.html',
-        data=data,
-        error_message=error_message,
-        is_logged_in=is_logged_in,
-        user_email=user_email,
-    )
 
 # ═══════════════════════════════════════════════════════════
 #  BLOG ROUTES
@@ -3372,6 +3208,7 @@ def blog_post(slug):
     is_logged_in, user_email, _ = _get_current_user()
     return render_template('blog_post.html', title=title, content=html_content, slug=slug, is_logged_in=is_logged_in, user_email=user_email)
 
+
 # ═══════════════════════════════════════════════════════════
 #  ERROR HANDLERS
 # ═══════════════════════════════════════════════════════════
@@ -3389,3 +3226,4 @@ def file_too_large(e):
 if __name__ == '__main__':
     debug_mode = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
     app.run(debug=debug_mode)
+    
