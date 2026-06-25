@@ -1,20 +1,23 @@
 """
-core/dashboard.py
-──────────────────
-Financial analysis modules for AarogyamFin Dashboard.
-Features 1-27 (checklist complete):
-
-INCOME ANALYSIS (1-6) — analyze_income()
-EXPENSE & OBLIGATIONS (7-12) — analyze_obligations()
-BALANCE & CASH FLOW (13-16) — analyze_balance_cashflow()
-RED FLAGS & FRAUD (17-21) — analyze_red_flags()
-COMPLIANCE (22-24) — analyze_compliance()
-OUTPUT (25-27) — analyze_reconciliation(), Excel export, run_dashboard()
+core/dashboard.py  — V2 (Accuracy Upgrade)
+═══════════════════════════════════════════
+Changes from V1:
+  ✅ FIX-1:  Regex word-boundary matching instead of substring `in`
+  ✅ FIX-2:  Expense double-counting bug fixed
+  ✅ FIX-3:  Circular txn false positives — counterparty similarity added
+  ✅ FIX-4:  Balance mismatch — explicit sort before checking
+  ✅ FIX-5:  Refund/reversal/cashback filtered from income
+  ✅ FIX-6:  Short keyword collisions eliminated (bet→dream11, ca→audit etc)
+  ✅ FIX-7:  Window dressing — salary-date exclusion
+  ✅ FIX-8:  Loan eligibility — configurable FOIR / interest rate
+  ✅ FIX-9:  GSTR-1 — more realistic classification
+  ✅ FIX-10: Employer extraction — multi-bank format support
 """
 
 from collections import defaultdict
-from datetime import datetime
-import re
+from datetime import datetime, timedelta
+import re, calendar
+from difflib import SequenceMatcher
 
 from core.normalizer import (
     is_loan_disbursal, is_family_transfer, is_self_transfer,
@@ -23,7 +26,69 @@ from core.normalizer import (
 
 
 # ═══════════════════════════════════════════════════════════
-#  CONSTANTS
+#  FIX-1: SAFE KEYWORD MATCHER
+# ═══════════════════════════════════════════════════════════
+#  Old: any(k in desc for k in KEYWORDS) — causes 'bet' to match 'BETTER'
+#  New: _kw_match() uses word-boundary regex for short keywords
+
+_BOUNDARY_CACHE = {}
+
+def _build_boundary_re(keyword: str) -> re.Pattern:
+    """Word-boundary regex for keywords ≤4 chars; plain `in` for longer ones."""
+    if keyword not in _BOUNDARY_CACHE:
+        if len(keyword.strip()) <= 4:
+            escaped = re.escape(keyword.strip())
+            _BOUNDARY_CACHE[keyword] = re.compile(
+                rf'(?<![a-zA-Z0-9]){escaped}(?![a-zA-Z0-9])', re.IGNORECASE
+            )
+        else:
+            _BOUNDARY_CACHE[keyword] = None  # use plain `in`
+    return _BOUNDARY_CACHE[keyword]
+
+
+def _kw_match(desc_lower: str, keywords: list) -> bool:
+    """Safe keyword match — word-boundary for short keywords, substring for long."""
+    for kw in keywords:
+        pat = _build_boundary_re(kw)
+        if pat is not None:
+            if pat.search(desc_lower):
+                return True
+        else:
+            if kw in desc_lower:
+                return True
+    return False
+
+
+def _kw_match_which(desc_lower: str, keywords: list) -> str | None:
+    """Return the first matching keyword, or None."""
+    for kw in keywords:
+        pat = _build_boundary_re(kw)
+        if pat is not None:
+            if pat.search(desc_lower):
+                return kw
+        else:
+            if kw in desc_lower:
+                return kw
+    return None
+
+
+# ═══════════════════════════════════════════════════════════
+#  FIX-5: REVERSAL / REFUND FILTER
+# ═══════════════════════════════════════════════════════════
+
+REVERSAL_KEYWORDS = [
+    'reversal', 'reversed', 'refund', 'cashback', 'cash back',
+    'charge back', 'chargeback', 'credit reversal', 'rev:',
+    'returned', 'reimburse', 'reimbursement', 'correction',
+    'dispute credit', 'txn reversal',
+]
+
+def _is_reversal(desc_lower: str) -> bool:
+    return _kw_match(desc_lower, REVERSAL_KEYWORDS)
+
+
+# ═══════════════════════════════════════════════════════════
+#  CONSTANTS (FIX-6: cleaned up short/ambiguous keywords)
 # ═══════════════════════════════════════════════════════════
 
 SALARY_KEYWORDS = [
@@ -43,87 +108,131 @@ RENTAL_KEYWORDS = ['rent received', 'rental income', 'house rent', 'property ren
 RECURRING_PERSON_KEYWORDS = [
     'roushan kumar', 'roushan kuamr', 'anshu kumari', 'rakesh kumar',
 ]
+
+# FIX-6: removed 'ca ' (matches CANARA, CASH etc)
+# — replaced with longer, unambiguous keywords
 BUSINESS_KEYWORDS = [
-    'gst', 'invoice', 'vendor', 'supplier', 'b2b', 'office',
-    'tds', 'professional', 'consulting', 'advertising', 'marketing', 'domain',
-    'hosting', 'ca ', 'audit', 'legal', 'aws', 'azure', 'google cloud',
-    'linkedin', 'facebook ads', 'meta ads', 'canva', 'godaddy', 'shopify',
+    'gst payment', 'invoice', 'vendor', 'supplier', 'b2b', 'office rent',
+    'tds payment', 'professional fee', 'consulting fee',
+    'advertising', 'marketing', 'domain renewal', 'web hosting',
+    'hosting charge', 'chartered accountant', 'audit fee', 'legal fee',
+    'aws ', 'azure', 'google cloud',
+    'linkedin premium', 'facebook ads', 'meta ads', 'canva pro',
+    'godaddy', 'shopify', 'razorpay fee',
 ]
+
 PERSONAL_KEYWORDS = [
     'swiggy', 'zomato', 'netflix', 'spotify', 'zepto', 'blinkit',
-    'ola ', 'uber', 'rapido', 'bookmyshow', 'pvr', 'inox',
-    'atm', 'cash', 'petrol', 'fuel', 'apollo pharmacy', 'one stop pharma',
-    'tata one mg', 'gym', 'salon', 'spa', 'irctc', 'makemytrip', 'oyo', 'airbnb',
-    'dth', 'recharge', 'dominos', 'pizza', 'shreejee', 'swad sadan', 'annas dosa',
-    'banaras wala', 'gianis', 'bikaner sweets', 'amazon', 'flipkart', 'myntra',
-    'snitch', 'zudio', 'airtel', 'jio', 'google play', 'claude.ai', 'anthropic',
-    'scribd', 'higgsfield', 'aeronfly', 'railway', 'zee5', 'jiohotstar', 'safe gold',
+    'olacabs', 'ola cabs', 'ola ride',   # FIX-6: was 'ola ' — too short
+    'uber', 'rapido', 'bookmyshow', 'pvr ', 'inox',
+    'atm withdrawal', 'cash wdl', 'petrol', 'fuel',
+    'apollo pharmacy', 'one stop pharma', 'tata one mg',
+    'gym membership', 'salon', 'irctc', 'makemytrip', 'oyo ', 'airbnb',
+    'dth recharge', 'mobile recharge', 'dominos', 'pizza hut',
+    'shreejee', 'swad sadan', 'annas dosa',
+    'banaras wala', 'gianis', 'bikaner sweets',
+    'amazon', 'flipkart', 'myntra', 'snitch', 'zudio',
+    'airtel', 'jio ', 'google play', 'claude.ai', 'anthropic',
+    'scribd', 'higgsfield', 'aeronfly', 'railway ticket',
+    'zee5', 'jiohotstar', 'safe gold',
 ]
+
 GST_ELIGIBLE_KEYWORDS = [
     'vendor', 'supplier', 'b2b', 'invoice', 'gst', 'purchase',
-    'raw material', 'office rent', 'professional', 'consulting',
-    'advertising', 'marketing', 'software', 'hosting',
-    'aws', 'azure', 'logistics', 'courier', 'printing', 'stationery',
-    'canva', 'godaddy', 'shopify', 'domain',
-    'meta ads', 'facebook ads', 'google ads', 'linkedin', 'microsoft', 'adobe',
+    'raw material', 'office rent', 'professional fee', 'consulting fee',
+    'advertising', 'marketing', 'software subscription', 'web hosting',
+    'aws ', 'azure', 'logistics', 'courier', 'printing', 'stationery',
+    'canva pro', 'godaddy', 'shopify', 'domain renewal',
+    'meta ads', 'facebook ads', 'google ads', 'linkedin premium',
+    'microsoft 365', 'adobe',
 ]
+
 SECTION_80C = [
-    'lic', 'ppf', 'nsc', 'elss', 'epf', 'provident fund',
-    'life insurance', 'mutual fund', 'tax saving fd', 'safe gold',
+    'lic premium', 'ppf deposit', 'nsc ', 'elss',
+    'epf contribution', 'provident fund',
+    'life insurance', 'tax saving fd', 'safe gold',
+    # removed bare 'mutual fund' — too broad, most MF aren't 80C
 ]
-SECTION_80D = ['health insurance', 'mediclaim', 'star health', 'bajaj allianz health', 'niva bupa']
-TDS_KEYWORDS = ['tds', 'tax deducted', 'income tax']
+SECTION_80D = [
+    'health insurance', 'mediclaim', 'star health',
+    'bajaj allianz health', 'niva bupa',
+]
+TDS_KEYWORDS = ['tds deducted', 'tax deducted', 'income tax']
+
 EMI_KEYWORDS = [
-    'emi', 'loan repay', 'nach', 'pocketly', 'stucred', 'mpokket', 'mpokket financi',
-    'speel finance', 'speel fin', 'lazypay repayme', 'lazypay',
-    'snapmint credit', 'snapmint', 'truecredit', 'true credits',
-    'branch internat', 'branch/', 'kreon finnancia', 'instantpay indi',
+    'emi payment', 'loan repay', 'nach debit', 'nach/',
+    'pocketly', 'stucred', 'mpokket',
+    'speel finance', 'speel fin',
+    'lazypay repay', 'lazypay',
+    'snapmint', 'truecredit', 'true credits',
+    'branch international', 'kreon finnancia', 'instantpay',
 ]
-CHEQUE_KEYWORDS = ['chq', 'cheque', 'clearing', 'cts', 'micr']
-BOUNCE_KEYWORDS = ['return', 'bounce', 'dishonour', 'failed', 'reject', 'insufficient']
-CASH_KEYWORDS   = ['cash deposit', 'cash withdrawal', 'atm', 'cwdr', 'cash wdl', 'cdm']
+
+CHEQUE_KEYWORDS = ['chq dep', 'cheque', 'clearing chq', 'cts/', 'micr']
+BOUNCE_KEYWORDS = ['return unpaid', 'bounce', 'dishonour', 'ecs return',
+                    'nach return', 'insufficient fund']
+CASH_KEYWORDS   = ['cash deposit', 'cash withdrawal', 'atm withdrawal',
+                    'cwdr', 'cash wdl', 'cdm deposit']
+
 HIGH_VALUE_THRESHOLD    = 200000
 CASH_DEPOSIT_DAILY_LIMIT= 50000
 ANNUAL_CASH_LIMIT       = 1000000
 
-# Income analysis constants
-_DIVIDEND_KW = ['dividend', 'div cr', 'div paid', 'div ', 'divident']
-_CASH_DEP_KW = ['cash deposit', 'cash dep', 'cashdep', 'cdm', 'cash cr']
+# Income analysis
+_DIVIDEND_KW = ['dividend', 'div cr', 'div paid', 'dividend credit']
+_CASH_DEP_KW = ['cash deposit', 'cash dep', 'cashdep', 'cdm deposit', 'cash cr']
 _BUSINESS_CREDIT_KW = [
-    'invoice', 'payment received', 'consulting', 'professional fee',
-    'project', 'client', 'service charge', 'razorpay', 'cashfree',
-    'instamojo', 'payu', 'ccavenue',
+    'invoice payment', 'payment received', 'consulting fee',
+    'professional fee', 'project payment', 'client payment',
+    'service charge', 'razorpay settlement', 'cashfree settlement',
+    'instamojo', 'payu settlement', 'ccavenue',
 ]
-_RE_EMPLOYER_NEFT  = re.compile(
-    r'(?:neft(?:inw|cr)?[- /]*|imps[- /]*)([A-Z][A-Z0-9 &.\-]{2,40}?)(?:/|\s{2,}|$)',
-    re.IGNORECASE
-)
-_RE_EMPLOYER_MB    = re.compile(r'mb:received from\s+(.+)', re.IGNORECASE)
-_RE_EMPLOYER_SLASH = re.compile(r'/([A-Z][A-Z0-9 &.\-]{2,30})/', re.IGNORECASE)
 
-# Credit card keywords
+# FIX-10: Multi-bank employer extraction patterns
+_EMPLOYER_PATTERNS = [
+    re.compile(r'mb:received from\s+(.+)', re.I),
+    # HDFC style: NEFT CR-XXXXX-COMPANY NAME
+    re.compile(r'neft\s*cr[- ]*\d*[- ]*(.{3,40?})(?:\s{2,}|/|$)', re.I),
+    # SBI style: NEFT/COMPANY NAME/IFSC
+    re.compile(r'neft/([^/]{3,40}?)/', re.I),
+    # Generic NEFT: NEFT-COMPANY or NEFTINW-COMPANY
+    re.compile(r'neft(?:inw)?[- /]+([A-Z][A-Z0-9 &.\-]{2,40}?)(?:/|\s{2,}|$)', re.I),
+    # IMPS style: IMPS-XXXXX-NAME-IFSC
+    re.compile(r'imps[- ]*\d+[- ]+(.{3,40}?)[- ]+[A-Z]{4}\d', re.I),
+    # RTGS style
+    re.compile(r'rtgs[- /]+(?:\d+[- /]+)?([A-Z][A-Z0-9 &.\-]{2,40}?)(?:/|\s{2,}|$)', re.I),
+    # Slash-delimited: /COMPANY NAME/
+    re.compile(r'/([A-Z][A-Z0-9 &.\-]{2,30})/', re.I),
+]
+
+# Credit card
 CC_KEYWORDS = [
     'credit card', 'cc payment', 'cc bill', 'creditcard',
     'hdfc cc', 'icici cc', 'sbi card', 'axis cc', 'kotak cc',
-    'amex', 'american express', 'visa card', 'mastercard',
+    'amex payment', 'american express',
     'citi card', 'indusind cc', 'yes bank cc',
-    'bill payment', 'card outstanding', 'card dues',
-    'minimum due', 'min due', 'total due',
+    'card bill', 'card outstanding', 'card dues',
+    'minimum due', 'total due',
 ]
 
-# Red flags keywords
+# FIX-6: Gambling — removed 'bet' (matches BETTER, BETHANY)
+# — replaced with specific platform names
 GAMBLING_KW = [
-    'dream11', 'mpl ', 'my11circle', 'fantasy', 'rummy',
-    'bet', 'gambling', 'casino', 'lotto', 'stake',
+    'dream11', 'my11circle', 'fantasy cricket', 'fantasy sports',
+    'rummycircle', 'junglee rummy', 'rummy',
+    'betting', 'gambling', 'casino', 'lottery',
     'binance', 'wazirx', 'coinswitch', 'coinbase', 'zebpay',
-    'bitbns', 'coindcx', 'crypto', 'bitcoin', 'ethereum',
-    'exness', 'forex', 'funding pips', 'ftmo',
+    'bitbns', 'coindcx', 'crypto buy', 'bitcoin', 'ethereum',
+    'exness', 'forex trading', 'funding pips', 'ftmo',
+    'mpl gaming',  # FIX-6: was 'mpl ' — matched AMPLE, TEMPLE
 ]
+
 PENALTY_KW = [
-    'penalty', 'fine', 'court', 'legal fee', 'legal charge',
-    'late fee', 'penal', 'overdue charge', 'notice fee',
+    'penalty charge', 'fine ', 'court fee', 'legal fee', 'legal charge',
+    'late payment fee', 'penal interest', 'overdue charge', 'notice fee',
 ]
-WINDOW_DRESS_DAYS = 3  # days before/after month end to check
+
+WINDOW_DRESS_DAYS = 3
 
 
 # ═══════════════════════════════════════════════════════════
@@ -135,43 +244,53 @@ def _classify_credit(desc: str, amt: float) -> str:
     if is_loan_disbursal(lower):    return 'loan_disbursal'
     if is_self_transfer(lower):     return 'self_transfer'
     if is_family_transfer(lower):   return 'family_transfer'
-    if any(k in lower for k in SALARY_KEYWORDS):    return 'salary'
-    if any(k in lower for k in FREELANCE_KEYWORDS): return 'freelance'
-    if any(k in lower for k in MARKETPLACE_KEYWORDS): return 'marketplace'
-    if any(k in lower for k in INTEREST_KEYWORDS):  return 'interest'
-    if any(k in lower for k in RENTAL_KEYWORDS):    return 'rental'
-    if any(k in lower for k in RECURRING_PERSON_KEYWORDS): return 'recurring_person'
+    if _is_reversal(lower):         return 'reversal'          # FIX-5
+    if _kw_match(lower, SALARY_KEYWORDS):    return 'salary'
+    if _kw_match(lower, FREELANCE_KEYWORDS): return 'freelance'
+    if _kw_match(lower, MARKETPLACE_KEYWORDS): return 'marketplace'
+    if _kw_match(lower, INTEREST_KEYWORDS):  return 'interest'
+    if _kw_match(lower, RENTAL_KEYWORDS):    return 'rental'
+    if _kw_match(lower, RECURRING_PERSON_KEYWORDS): return 'recurring_person'
     if lower.startswith('mb:received'): return 'mb_transfer'
     return 'other_credits'
 
 
 def _extract_employer_name(desc: str) -> str:
-    if not desc: return ''
-    m = _RE_EMPLOYER_MB.search(desc)
-    if m: return m.group(1).strip()[:50].title()
-    m = _RE_EMPLOYER_NEFT.search(desc)
-    if m:
-        name = m.group(1).strip(' /-')
-        if len(name) > 2: return name[:50].title()
-    m = _RE_EMPLOYER_SLASH.search(desc)
-    if m:
-        name = m.group(1).strip()
-        if len(name) > 2: return name[:50].title()
+    """FIX-10: Try multiple bank-specific patterns."""
+    if not desc:
+        return ''
+    for pat in _EMPLOYER_PATTERNS:
+        m = pat.search(desc)
+        if m:
+            name = m.group(1).strip(' /-')
+            if len(name) > 2:
+                return name[:50].title()
+    # Fallback: look for text after salary keywords
     lower = desc.lower()
     for kw in ['salary', 'payroll', 'sal cr', 'wages']:
         idx = lower.find(kw)
         if idx != -1:
             after = desc[idx + len(kw):].strip(' -:/').split()
-            if after: return ' '.join(after[:4]).title()
+            if after:
+                return ' '.join(after[:4]).title()
     return ''
 
 
 def _parse_date(date_str: str):
-    """Parse YYYY-MM-DD string to date object."""
     try:
         return datetime.strptime(date_str, '%Y-%m-%d').date()
     except Exception:
         return None
+
+
+def _desc_similarity(desc1: str, desc2: str) -> float:
+    """FIX-3: Similarity ratio between two descriptions (0.0–1.0)."""
+    # Strip common prefixes/numbers for better comparison
+    clean1 = re.sub(r'[0-9/\-:]+', '', desc1.lower()).strip()
+    clean2 = re.sub(r'[0-9/\-:]+', '', desc2.lower()).strip()
+    if not clean1 or not clean2:
+        return 0.0
+    return SequenceMatcher(None, clean1, clean2).ratio()
 
 
 # ═══════════════════════════════════════════════════════════
@@ -181,18 +300,26 @@ def _parse_date(date_str: str):
 def analyze_income(transactions: list) -> dict:
     salary_txns = []; business_txns = []; rent_txns = []
     dividend_txns = []; interest_txns = []; cash_dep_txns = []
+    reversal_txns = []  # FIX-5
     monthly_salary = defaultdict(float); monthly_business = defaultdict(float)
     monthly_cash_dep = defaultdict(float); monthly_income = defaultdict(float)
     sender_amount = defaultdict(float); sender_count = defaultdict(int)
     employer_names = set()
 
     for t in transactions:
-        if t.get('type') != 'CR' or not t.get('amount'): continue
+        if t.get('type') != 'CR' or not t.get('amount'):
+            continue
         desc = (t.get('desc') or ''); lower = desc.lower()
         amt = t['amount']; date = t.get('date', '')
         month = date[:7] if date else 'Unknown'
 
+        # Skip non-income
         if is_loan_disbursal(lower) or is_family_transfer(lower) or is_self_transfer(lower):
+            continue
+
+        # FIX-5: Skip reversals/refunds — not real income
+        if _is_reversal(lower):
+            reversal_txns.append(t)
             continue
 
         sender = _extract_employer_name(desc)
@@ -201,27 +328,27 @@ def analyze_income(transactions: list) -> dict:
             sender = tokens[0].title() if tokens else 'Unknown'
         sender_amount[sender] += amt; sender_count[sender] += 1
 
-        if any(k in lower for k in _CASH_DEP_KW):
+        if _kw_match(lower, _CASH_DEP_KW):
             cash_dep_txns.append(t); monthly_cash_dep[month] += amt; continue
 
-        if any(k in lower for k in SALARY_KEYWORDS):
+        if _kw_match(lower, SALARY_KEYWORDS):
             emp = _extract_employer_name(desc)
             if emp: employer_names.add(emp)
             salary_txns.append({**t, 'employer': emp})
             monthly_salary[month] += amt; monthly_income[month] += amt; continue
 
-        if any(k in lower for k in _DIVIDEND_KW):
+        if _kw_match(lower, _DIVIDEND_KW):
             dividend_txns.append(t); monthly_income[month] += amt; continue
 
-        if any(k in lower for k in RENTAL_KEYWORDS):
+        if _kw_match(lower, RENTAL_KEYWORDS):
             rent_txns.append(t); monthly_income[month] += amt; continue
 
-        if any(k in lower for k in INTEREST_KEYWORDS):
+        if _kw_match(lower, INTEREST_KEYWORDS):
             interest_txns.append(t); monthly_income[month] += amt; continue
 
-        if (any(k in lower for k in FREELANCE_KEYWORDS) or
-            any(k in lower for k in MARKETPLACE_KEYWORDS) or
-            any(k in lower for k in _BUSINESS_CREDIT_KW)):
+        if (_kw_match(lower, FREELANCE_KEYWORDS) or
+            _kw_match(lower, MARKETPLACE_KEYWORDS) or
+            _kw_match(lower, _BUSINESS_CREDIT_KW)):
             business_txns.append(t)
             monthly_business[month] += amt; monthly_income[month] += amt
 
@@ -240,7 +367,8 @@ def analyze_income(transactions: list) -> dict:
     missing_salary_months = []
     if salary_txns and len(all_months) > 1:
         for m in all_months:
-            if monthly_salary.get(m, 0) == 0: missing_salary_months.append(m)
+            if monthly_salary.get(m, 0) == 0:
+                missing_salary_months.append(m)
 
     total_cash_dep   = sum(t['amount'] for t in cash_dep_txns)
     gst_applicable   = sum(t['amount'] for t in business_txns)
@@ -249,6 +377,7 @@ def analyze_income(transactions: list) -> dict:
     rent_total       = round(sum(t['amount'] for t in rent_txns), 2)
     dividend_total   = round(sum(t['amount'] for t in dividend_txns), 2)
     interest_total   = round(sum(t['amount'] for t in interest_txns), 2)
+    reversal_total   = round(sum(t['amount'] for t in reversal_txns), 2)
 
     top_10_sources = sorted(
         [{'sender': s, 'total_amt': round(a, 2), 'count': sender_count[s],
@@ -272,6 +401,8 @@ def analyze_income(transactions: list) -> dict:
         'cash_flag_10L': total_cash_dep >= 1_000_000,
         'high_single_cash': [t for t in cash_dep_txns if t['amount'] >= 200_000],
         'cash_dep_count': len(cash_dep_txns),
+        # FIX-5: reversals tracked separately
+        'reversal_txns': reversal_txns, 'reversal_total': reversal_total,
         'all_real_credits': round(salary_total + business_total + rent_total + dividend_total + interest_total, 2),
         'gst_applicable': round(gst_applicable, 2),
         'estimated_gst': round(gst_applicable * 0.18, 2),
@@ -304,32 +435,33 @@ def analyze_obligations(transactions: list) -> dict:
         date = t.get('date', ''); month = date[:7] if date else 'Unknown'
 
         # Feature 9: Bounce / ECS
-        if any(k in lower for k in BOUNCE_KEYWORDS):
-            if 'ecs' in lower or 'nach' in lower or 'mandate' in lower:
+        if _kw_match(lower, BOUNCE_KEYWORDS):
+            if any(k in lower for k in ['ecs', 'nach', 'mandate']):
                 ecs_return_txns.append(t)
             else:
                 bounce_txns.append(t)
 
-        if t.get('type') != 'DR' or not amt: continue
+        if t.get('type') != 'DR' or not amt:
+            continue
 
         # Feature 7: EMI
-        if any(k in lower for k in EMI_KEYWORDS):
+        if _kw_match(lower, EMI_KEYWORDS):
             emi_txns.append(t); monthly_emi[month] += amt
-            for kw in EMI_KEYWORDS:
-                if kw in lower and len(kw) > 4:
-                    lender_totals[kw.title()] += amt; break
+            matched = _kw_match_which(lower, EMI_KEYWORDS)
+            if matched and len(matched) > 4:
+                lender_totals[matched.title()] += amt
 
         # Feature 10: Credit card
-        if any(k in lower for k in CC_KEYWORDS):
+        if _kw_match(lower, CC_KEYWORDS):
             cc_txns.append(t); cc_monthly[month].append(amt)
 
         # Feature 12: Top debit destinations
-        if not any(k in lower for k in EXCLUDE_DEST_KW):
+        if not _kw_match(lower, EXCLUDE_DEST_KW):
             tokens = [w for w in desc.split() if len(w) > 3 and not w.isdigit()]
             dest = tokens[0].title() if tokens else 'Unknown'
             debit_dest[dest]['total'] += amt; debit_dest[dest]['count'] += 1
 
-    # CC pattern analysis
+    # CC pattern
     cc_pattern = []
     for month, payments in sorted(cc_monthly.items()):
         total_paid = sum(payments); count = len(payments)
@@ -368,21 +500,17 @@ def analyze_obligations(transactions: list) -> dict:
 # ═══════════════════════════════════════════════════════════
 
 def analyze_balance_cashflow(transactions: list) -> dict:
-    # Group by month
     monthly = defaultdict(lambda: {'credits': 0, 'debits': 0, 'balances': [], 'eom_balance': None})
-
     sorted_txns = sorted(transactions, key=lambda t: t.get('date', ''))
 
     for t in sorted_txns:
         date = t.get('date', ''); month = date[:7] if date else 'Unknown'
         amt = t.get('amount', 0) or 0
         bal = t.get('balance')
-
         if t.get('type') == 'CR': monthly[month]['credits'] += amt
         else: monthly[month]['debits'] += amt
         if bal is not None: monthly[month]['balances'].append(bal)
 
-    # End-of-month balance = last balance in that month
     for month in monthly:
         bals = monthly[month]['balances']
         if bals: monthly[month]['eom_balance'] = bals[-1]
@@ -390,7 +518,6 @@ def analyze_balance_cashflow(transactions: list) -> dict:
     months = sorted(monthly.keys())
     n = len(months)
 
-    # Feature 13: ABB — 3/6/12 month
     all_balances = [b for t in sorted_txns if (b := t.get('balance')) is not None]
     def avg_bal_last_n(n_months):
         recent = months[-n_months:] if len(months) >= n_months else months
@@ -402,14 +529,12 @@ def analyze_balance_cashflow(transactions: list) -> dict:
     abb_6m  = avg_bal_last_n(6)
     abb_12m = avg_bal_last_n(12)
 
-    # Feature 14: Month-end balance trend
     eom_trend = []
     for m in months:
         eob = monthly[m]['eom_balance']
         if eob is not None:
             eom_trend.append({'month': m, 'balance': round(eob, 2)})
 
-    # Trend direction
     if len(eom_trend) >= 2:
         first_half = [e['balance'] for e in eom_trend[:len(eom_trend)//2]]
         second_half = [e['balance'] for e in eom_trend[len(eom_trend)//2:]]
@@ -421,7 +546,6 @@ def analyze_balance_cashflow(transactions: list) -> dict:
     else:
         trend_direction = 'Insufficient data'
 
-    # Feature 15: Net cash flow per month
     monthly_net = []
     for m in months:
         cr = monthly[m]['credits']; dr = monthly[m]['debits']
@@ -435,7 +559,6 @@ def analyze_balance_cashflow(transactions: list) -> dict:
     deficit_months  = sum(1 for x in monthly_net if not x['surplus'])
     avg_net_flow    = round(sum(x['net'] for x in monthly_net) / n, 2) if n else 0
 
-    # Feature 16: Seasonality — high/low income months
     monthly_credits = {m: monthly[m]['credits'] for m in months}
     if monthly_credits:
         avg_cr = sum(monthly_credits.values()) / len(monthly_credits)
@@ -445,16 +568,12 @@ def analyze_balance_cashflow(transactions: list) -> dict:
         high_months = []; low_months = []
 
     return {
-        # Feature 13: ABB
         'abb_3m': abb_3m, 'abb_6m': abb_6m, 'abb_12m': abb_12m,
         'abb_overall': round(sum(all_balances) / len(all_balances), 2) if all_balances else 0,
-        # Feature 14: EOM trend
         'eom_trend': eom_trend, 'trend_direction': trend_direction,
-        # Feature 15: Net cash flow
         'monthly_net': monthly_net,
         'surplus_months': surplus_months, 'deficit_months': deficit_months,
         'avg_net_flow': avg_net_flow,
-        # Feature 16: Seasonality
         'high_months': high_months, 'low_months': low_months,
         'monthly_credits': dict(sorted(monthly_credits.items())),
         'months_analyzed': n,
@@ -466,7 +585,7 @@ def analyze_balance_cashflow(transactions: list) -> dict:
 # ═══════════════════════════════════════════════════════════
 
 def analyze_red_flags(transactions: list) -> dict:
-    # Feature 17: Circular transactions — same amount back and forth within 7 days
+    # ── FIX-3: Circular transactions — now requires description similarity ──
     circular = []
     txn_by_date = defaultdict(list)
     for t in transactions:
@@ -474,66 +593,118 @@ def analyze_red_flags(transactions: list) -> dict:
         if d: txn_by_date[d].append(t)
 
     sorted_dates = sorted(txn_by_date.keys())
+    _seen_circular_pairs = set()  # avoid duplicate flagging
+
     for i, d in enumerate(sorted_dates):
         for t in txn_by_date[d]:
-            if t.get('type') != 'CR': continue
+            if t.get('type') != 'CR':
+                continue
             amt = t.get('amount', 0)
-            # Look for matching debit within 7 days
+            if amt < 5000:  # ignore small amounts — reduces noise
+                continue
+            t_desc = (t.get('desc') or '').lower()
+
             for j in range(i, min(i + 8, len(sorted_dates))):
                 d2 = sorted_dates[j]
                 for t2 in txn_by_date[d2]:
-                    if t2.get('type') == 'DR' and abs(t2.get('amount', 0) - amt) < 1.0 and t2 is not t:
-                        circular.append({
-                            'credit_date': t.get('date'), 'credit_desc': t.get('desc', '')[:50],
-                            'debit_date': t2.get('date'), 'debit_desc': t2.get('desc', '')[:50],
-                            'amount': round(amt, 2),
-                            'days_gap': (d2 - d).days,
-                        })
+                    if t2.get('type') != 'DR' or t2 is t:
+                        continue
+                    if abs(t2.get('amount', 0) - amt) >= 1.0:
+                        continue
 
-    # Feature 18: Window dressing — large deposit near month end, withdrawn after
+                    # FIX-3: Check description similarity OR same counterparty
+                    t2_desc = (t2.get('desc') or '').lower()
+                    similarity = _desc_similarity(t_desc, t2_desc)
+
+                    # Only flag if descriptions are similar (same person/entity)
+                    # OR if it's a large round amount (structuring suspect)
+                    is_suspicious = (
+                        similarity > 0.4 or          # same counterparty likely
+                        (amt >= 100000 and amt % 10000 == 0)  # large round amount
+                    )
+
+                    if not is_suspicious:
+                        continue
+
+                    pair_key = (t.get('date'), t2.get('date'), round(amt, 0))
+                    if pair_key in _seen_circular_pairs:
+                        continue
+                    _seen_circular_pairs.add(pair_key)
+
+                    circular.append({
+                        'credit_date': t.get('date'),
+                        'credit_desc': t.get('desc', '')[:50],
+                        'debit_date': t2.get('date'),
+                        'debit_desc': t2.get('desc', '')[:50],
+                        'amount': round(amt, 2),
+                        'days_gap': (d2 - d).days,
+                        'similarity': round(similarity, 2),
+                    })
+
+    # ── FIX-7: Window dressing — exclude regular salary dates ──
     window_dress = []
+    # First, detect likely salary dates
+    salary_days = set()
     for t in transactions:
-        if t.get('type') != 'CR': continue
-        amt = t.get('amount', 0) or 0
-        if amt < 50000: continue
-        d = _parse_date(t.get('date', ''))
-        if not d: continue
-        # Check if deposit is in last 3 days of month
-        import calendar
-        last_day = calendar.monthrange(d.year, d.month)[1]
-        if d.day >= last_day - WINDOW_DRESS_DAYS:
-            # Look for matching debit in first 5 days of next month
-            next_month_debits = []
-            for t2 in transactions:
-                if t2.get('type') != 'DR': continue
-                d2 = _parse_date(t2.get('date', ''))
-                if not d2: continue
-                gap = (d2 - d).days
-                if 0 < gap <= 8 and abs(t2.get('amount', 0) - amt) / amt < 0.1:
-                    next_month_debits.append(t2)
-            if next_month_debits:
-                window_dress.append({
-                    'deposit_date': t.get('date'), 'deposit_desc': t.get('desc', '')[:50],
-                    'amount': round(amt, 2), 'withdrawal_count': len(next_month_debits),
-                })
+        if t.get('type') == 'CR' and _kw_match((t.get('desc') or '').lower(), SALARY_KEYWORDS):
+            d = _parse_date(t.get('date', ''))
+            if d: salary_days.add(d.day)
 
-    # Feature 19: Gambling / crypto / speculative
+    for t in transactions:
+        if t.get('type') != 'CR':
+            continue
+        amt = t.get('amount', 0) or 0
+        if amt < 50000:
+            continue
+        d = _parse_date(t.get('date', ''))
+        if not d:
+            continue
+
+        last_day = calendar.monthrange(d.year, d.month)[1]
+        if d.day < last_day - WINDOW_DRESS_DAYS:
+            continue
+
+        # FIX-7: Skip if this looks like a regular salary credit
+        if _kw_match((t.get('desc') or '').lower(), SALARY_KEYWORDS):
+            continue
+        if d.day in salary_days:
+            continue
+
+        # Look for matching debit in first 5 days of next month
+        next_month_debits = []
+        for t2 in transactions:
+            if t2.get('type') != 'DR':
+                continue
+            d2 = _parse_date(t2.get('date', ''))
+            if not d2:
+                continue
+            gap = (d2 - d).days
+            if 0 < gap <= 8 and abs(t2.get('amount', 0) - amt) / amt < 0.1:
+                next_month_debits.append(t2)
+        if next_month_debits:
+            window_dress.append({
+                'deposit_date': t.get('date'),
+                'deposit_desc': t.get('desc', '')[:50],
+                'amount': round(amt, 2),
+                'withdrawal_count': len(next_month_debits),
+            })
+
+    # Feature 19: Gambling / crypto
     gambling_txns = []
     for t in transactions:
         desc = (t.get('desc') or '').lower()
-        if any(k in desc for k in GAMBLING_KW):
+        if _kw_match(desc, GAMBLING_KW):
             gambling_txns.append(t)
-
     gambling_total = round(sum(t.get('amount', 0) for t in gambling_txns), 2)
 
-    # Feature 20: Penalty / legal charges
+    # Feature 20: Penalty / legal
     penalty_txns = []
     for t in transactions:
         desc = (t.get('desc') or '').lower()
-        if any(k in desc for k in PENALTY_KW):
+        if _kw_match(desc, PENALTY_KW):
             penalty_txns.append(t)
 
-    # Feature 21: Duplicate / suspicious entries
+    # Feature 21: Duplicates
     seen = defaultdict(list)
     for t in transactions:
         key = (t.get('date', ''), round(t.get('amount', 0), 0), t.get('type'))
@@ -541,7 +712,7 @@ def analyze_red_flags(transactions: list) -> dict:
     duplicate_groups = {k: v for k, v in seen.items() if len(v) > 1}
     duplicate_txns = [t for group in duplicate_groups.values() for t in group]
 
-    # Overall red flag score
+    # Scoring
     flag_score = 0
     if circular:      flag_score += min(len(circular) * 15, 40)
     if window_dress:  flag_score += min(len(window_dress) * 20, 30)
@@ -551,20 +722,14 @@ def analyze_red_flags(transactions: list) -> dict:
     flag_score = min(flag_score, 100)
 
     return {
-        # Feature 17
         'circular_txns': circular[:10], 'circular_count': len(circular),
-        # Feature 18
         'window_dress': window_dress[:10], 'window_dress_count': len(window_dress),
-        # Feature 19
         'gambling_txns': gambling_txns[:20], 'gambling_count': len(gambling_txns),
         'gambling_total': gambling_total,
-        # Feature 20
         'penalty_txns': penalty_txns[:20], 'penalty_count': len(penalty_txns),
         'penalty_total': round(sum(t.get('amount', 0) for t in penalty_txns), 2),
-        # Feature 21
         'duplicate_txns': duplicate_txns[:20], 'duplicate_count': len(duplicate_txns),
         'duplicate_groups': len(duplicate_groups),
-        # Summary
         'flag_score': flag_score,
         'flag_level': 'High' if flag_score >= 50 else 'Medium' if flag_score >= 20 else 'Low',
         'flag_color': 'red' if flag_score >= 50 else 'yellow' if flag_score >= 20 else 'green',
@@ -573,7 +738,7 @@ def analyze_red_flags(transactions: list) -> dict:
 
 
 # ═══════════════════════════════════════════════════════════
-#  1. EXPENSE CATEGORIZATION
+#  1. EXPENSE CATEGORIZATION — FIX-2: double-counting fixed
 # ═══════════════════════════════════════════════════════════
 
 def analyze_expenses(transactions: list) -> dict:
@@ -583,19 +748,22 @@ def analyze_expenses(transactions: list) -> dict:
     monthly_spend = defaultdict(lambda: {'business': 0, 'personal': 0})
 
     for t in transactions:
-        if t.get('type') != 'DR' or not t.get('amount'): continue
+        if t.get('type') != 'DR' or not t.get('amount'):
+            continue
         desc = (t.get('desc') or '').lower()
         amt = t['amount']; date = t.get('date', '')
         month = date[:7] if date else 'Unknown'
+
+        # FIX-2: EMI goes into its own category — no double counting
+        if _kw_match(desc, EMI_KEYWORDS):
+            category_totals['EMI/Loan Repayment'] += amt
+            continue  # skip business/personal — this is debt repayment
+
+        # Determine category
         cat = t.get('category', 'Other')
-        category_totals[cat] += amt
-
-        if any(k in desc for k in EMI_KEYWORDS):
-            category_totals['EMI/Loan Repayment'] += amt; continue
-
-        is_biz = any(k in desc for k in BUSINESS_KEYWORDS)
-        is_per = any(k in desc for k in PERSONAL_KEYWORDS)
-        is_gst = any(k in desc for k in GST_ELIGIBLE_KEYWORDS)
+        is_biz = _kw_match(desc, BUSINESS_KEYWORDS)
+        is_per = _kw_match(desc, PERSONAL_KEYWORDS)
+        is_gst = _kw_match(desc, GST_ELIGIBLE_KEYWORDS)
 
         if cat in ('UPI', 'Transfer', 'Charges', 'IMPS', 'NEFT/RTGS', 'ATM/Cash',
                    'Subscription', 'Entertainment', 'Food', 'Shopping', 'Travel', 'Health'):
@@ -609,10 +777,13 @@ def analyze_expenses(transactions: list) -> dict:
         txn = {**t, 'gst_eligible': is_gst}
         if is_biz and not is_per:
             business.append(txn); monthly_spend[month]['business'] += amt
+            category_totals['Business Expense'] += amt   # FIX-2: single category entry
         elif is_per and not is_biz:
             personal.append(txn); monthly_spend[month]['personal'] += amt
+            category_totals[cat] += amt   # FIX-2: use actual category
         else:
             mixed.append(txn); monthly_spend[month]['personal'] += amt
+            category_totals['Mixed/Uncategorized'] += amt  # FIX-2
         if is_gst: gst_eligible.append(txn)
 
     total_dr = sum(t['amount'] for t in transactions if t.get('type') == 'DR' and t.get('amount'))
@@ -639,6 +810,7 @@ def analyze_itr(transactions: list) -> dict:
         'salary': [], 'freelance': [], 'marketplace': [], 'interest': [],
         'rental': [], 'recurring_person': [], 'mb_transfer': [], 'other_credits': [],
         'loan_disbursal': [], 'family_transfer': [], 'self_transfer': [],
+        'reversal': [],  # FIX-5
     }
     deductions = {'80C': [], '80D': [], 'tds_paid': []}
     high_value_credits = []; monthly_income = defaultdict(float)
@@ -651,14 +823,15 @@ def analyze_itr(transactions: list) -> dict:
         if t.get('type') == 'CR' and amt:
             credit_type = _classify_credit(desc, amt)
             income_sources[credit_type].append(t)
-            if credit_type in ('salary', 'freelance', 'marketplace', 'interest',
-                               'rental', 'recurring_person', 'mb_transfer', 'other_credits'):
+            # FIX-5: reversals don't count as income
+            if credit_type not in ('loan_disbursal', 'family_transfer', 'self_transfer', 'reversal'):
                 monthly_income[month] += amt
-            if amt >= 100000: high_value_credits.append({**t, 'credit_type': credit_type})
+            if amt >= 100000:
+                high_value_credits.append({**t, 'credit_type': credit_type})
         elif t.get('type') == 'DR' and amt:
-            if any(k in desc for k in SECTION_80C):   deductions['80C'].append(t)
-            elif any(k in desc for k in SECTION_80D): deductions['80D'].append(t)
-            elif any(k in desc for k in TDS_KEYWORDS):deductions['tds_paid'].append(t)
+            if _kw_match(desc, SECTION_80C):   deductions['80C'].append(t)
+            elif _kw_match(desc, SECTION_80D): deductions['80D'].append(t)
+            elif _kw_match(desc, TDS_KEYWORDS):deductions['tds_paid'].append(t)
 
     salary_total      = sum(t['amount'] for t in income_sources['salary'])
     freelance_total   = sum(t['amount'] for t in income_sources['freelance'])
@@ -668,6 +841,7 @@ def analyze_itr(transactions: list) -> dict:
     recurring_total   = sum(t['amount'] for t in income_sources['recurring_person'])
     other_total       = sum(t['amount'] for t in income_sources['other_credits'])
     mb_total          = sum(t['amount'] for t in income_sources['mb_transfer'])
+    reversal_total    = sum(t['amount'] for t in income_sources['reversal'])
     loan_disbursal_total  = sum(t['amount'] for t in income_sources['loan_disbursal'])
     family_transfer_total = sum(t['amount'] for t in income_sources['family_transfer'])
     self_transfer_total   = sum(t['amount'] for t in income_sources['self_transfer'])
@@ -679,9 +853,12 @@ def analyze_itr(transactions: list) -> dict:
 
     if freelance_total > 0 or marketplace_total > 0:
         suggested_itr = 'ITR-3 (Business/Freelance Income detected)'
-    elif rental_total > 0: suggested_itr = 'ITR-2 (Rental Income detected)'
-    elif salary_total > 0: suggested_itr = 'ITR-1 (Salary Income — verify with CA)'
-    else: suggested_itr = 'ITR-1 or ITR-2 (Verify with CA — no clear salary found)'
+    elif rental_total > 0:
+        suggested_itr = 'ITR-2 (Rental Income detected)'
+    elif salary_total > 0:
+        suggested_itr = 'ITR-1 (Salary Income — verify with CA)'
+    else:
+        suggested_itr = 'ITR-1 or ITR-2 (Verify with CA — no clear salary found)'
 
     return {
         'income_sources': income_sources, 'deductions': deductions,
@@ -690,6 +867,7 @@ def analyze_itr(transactions: list) -> dict:
         'loan_disbursal_total': round(loan_disbursal_total, 2),
         'family_transfer_total': round(family_transfer_total, 2),
         'self_transfer_total': round(self_transfer_total, 2),
+        'reversal_total': round(reversal_total, 2),  # FIX-5
         'total_credits': round(total_credits, 2),
         'salary_total': round(salary_total, 2),
         'freelance_total': round(freelance_total, 2),
@@ -707,12 +885,13 @@ def analyze_itr(transactions: list) -> dict:
             'Loan Received': round(loan_disbursal_total, 2),
             'Family Transfer': round(family_transfer_total, 2),
             'Self Transfer': round(self_transfer_total, 2),
+            'Reversals/Refunds': round(reversal_total, 2),  # FIX-5
         }
     }
 
 
 # ═══════════════════════════════════════════════════════════
-#  3. AUDIT & RECONCILIATION
+#  3. AUDIT & RECONCILIATION — FIX-4: sort before mismatch check
 # ═══════════════════════════════════════════════════════════
 
 def analyze_reconciliation(transactions: list) -> dict:
@@ -722,26 +901,47 @@ def analyze_reconciliation(transactions: list) -> dict:
     for t in transactions:
         desc = (t.get('desc') or '').lower()
         amt = t.get('amount', 0); date = t.get('date', '')
-        if any(k in desc for k in CHEQUE_KEYWORDS): cheques.append(t)
-        if any(k in desc for k in EMI_KEYWORDS): emis.append(t)
-        if any(k in desc for k in BOUNCE_KEYWORDS): bounced.append(t)
+        if _kw_match(desc, CHEQUE_KEYWORDS): cheques.append(t)
+        if _kw_match(desc, EMI_KEYWORDS): emis.append(t)
+        if _kw_match(desc, BOUNCE_KEYWORDS): bounced.append(t)
         key = (date, round(amt, 0), t.get('type'))
         seen[key].append(t)
 
     for key, txns in seen.items():
         if len(txns) > 1: duplicate_suspects.extend(txns)
 
-    for i in range(1, len(transactions)):
-        prev = transactions[i - 1]; curr = transactions[i]
-        if prev.get('balance') and curr.get('balance') and curr.get('amount'):
-            expected = round(
-                prev['balance'] + curr['amount'] if curr.get('type') == 'CR'
-                else prev['balance'] - curr['amount'], 2
-            )
-            actual = round(curr['balance'], 2)
-            if abs(expected - actual) > 1.0:
-                balance_mismatches.append({**curr, 'expected_balance': expected,
-                                           'diff': round(abs(expected - actual), 2)})
+    # FIX-4: Sort by date THEN by original order within same date
+    sorted_txns = sorted(
+        enumerate(transactions),
+        key=lambda pair: (pair[1].get('date', ''), pair[0])
+    )
+
+    for idx in range(1, len(sorted_txns)):
+        _, prev = sorted_txns[idx - 1]
+        _, curr = sorted_txns[idx]
+
+        if prev.get('balance') is None or curr.get('balance') is None or not curr.get('amount'):
+            continue
+
+        # Only check within same date or consecutive dates (cross-date gaps are normal)
+        prev_date = prev.get('date', '')
+        curr_date = curr.get('date', '')
+        if prev_date and curr_date and prev_date != curr_date:
+            # Cross-date: only flag if dates are consecutive
+            pd = _parse_date(prev_date); cd = _parse_date(curr_date)
+            if pd and cd and (cd - pd).days > 1:
+                continue  # skip — gap between dates, balance may have changed
+
+        expected = round(
+            prev['balance'] + curr['amount'] if curr.get('type') == 'CR'
+            else prev['balance'] - curr['amount'], 2
+        )
+        actual = round(curr['balance'], 2)
+        if abs(expected - actual) > 1.0:
+            balance_mismatches.append({
+                **curr, 'expected_balance': expected,
+                'diff': round(abs(expected - actual), 2)
+            })
 
     total_emi = sum(t['amount'] for t in emis if t.get('amount') and t.get('type') == 'DR')
     total_cr  = sum(t['amount'] for t in transactions if t.get('type') == 'CR' and t.get('amount'))
@@ -761,11 +961,18 @@ def analyze_reconciliation(transactions: list) -> dict:
 
 
 # ═══════════════════════════════════════════════════════════
-#  4. LOAN & CREDIT ASSESSMENT
+#  4. LOAN & CREDIT ASSESSMENT — FIX-8: configurable params
 # ═══════════════════════════════════════════════════════════
 
-def analyze_loan_eligibility(transactions: list) -> dict:
-    if not transactions: return {}
+def analyze_loan_eligibility(
+    transactions: list,
+    foir_cap: float = 0.50,       # FIX-8: configurable FOIR cap (40-65%)
+    interest_rate: float = 0.10,  # FIX-8: configurable annual rate
+    tenure_months: int = 60,      # FIX-8: configurable tenure
+) -> dict:
+    if not transactions:
+        return {}
+
     monthly_data = defaultdict(lambda: {
         'credits': 0, 'real_income': 0, 'debits': 0,
         'min_bal': float('inf'), 'max_bal': 0, 'txn_count': 0
@@ -776,17 +983,22 @@ def analyze_loan_eligibility(transactions: list) -> dict:
     for t in transactions:
         date = t.get('date', ''); month = date[:7] if date else 'Unknown'
         amt = t.get('amount', 0) or 0; desc = (t.get('desc') or '').lower()
+
         if t.get('type') == 'CR':
             monthly_data[month]['credits'] += amt
-            if not is_loan_disbursal(desc) and not is_family_transfer(desc) and not is_self_transfer(desc):
+            # FIX-5: exclude reversals from real income too
+            if (not is_loan_disbursal(desc) and not is_family_transfer(desc)
+                and not is_self_transfer(desc) and not _is_reversal(desc)):
                 monthly_data[month]['real_income'] += amt
         else:
             monthly_data[month]['debits'] += amt
+
         if t.get('balance'):
             monthly_data[month]['min_bal'] = min(monthly_data[month]['min_bal'], t['balance'])
             monthly_data[month]['max_bal'] = max(monthly_data[month]['max_bal'], t['balance'])
         monthly_data[month]['txn_count'] += 1
-        if t.get('type') == 'DR' and any(k in desc for k in EMI_KEYWORDS):
+
+        if t.get('type') == 'DR' and _kw_match(desc, EMI_KEYWORDS):
             emis_detected.append(t)
 
     months = sorted(monthly_data.keys()); n = len(months)
@@ -801,10 +1013,12 @@ def analyze_loan_eligibility(transactions: list) -> dict:
     dscr  = round(base_income / monthly_emi, 2) if monthly_emi > 0 else None
     foir  = round((monthly_emi / base_income) * 100, 1) if base_income and monthly_emi else 0
     negative_months       = sum(1 for m in months if monthly_data[m]['min_bal'] < 0)
-    max_eligible_emi      = round(base_income * 0.50, 2)
+    max_eligible_emi      = round(base_income * foir_cap, 2)   # FIX-8
     remaining_emi_capacity= round(max(0, max_eligible_emi - monthly_emi), 2)
-    monthly_rate = 0.10 / 12
-    loan_eligible = round(remaining_emi_capacity * ((1 - (1 + monthly_rate) ** -60) / monthly_rate), 2) if remaining_emi_capacity > 0 else 0
+    monthly_rate = interest_rate / 12                           # FIX-8
+    loan_eligible = round(
+        remaining_emi_capacity * ((1 - (1 + monthly_rate) ** -tenure_months) / monthly_rate), 2
+    ) if remaining_emi_capacity > 0 else 0
 
     if negative_months == 0 and foir < 40 and avg_balance > base_income * 0.5:
         credit_indicator = 'Strong'; credit_color = 'green'
@@ -826,6 +1040,12 @@ def analyze_loan_eligibility(transactions: list) -> dict:
         'negative_months': negative_months, 'credit_indicator': credit_indicator,
         'credit_color': credit_color, 'months_analyzed': n,
         'emis_detected': emis_detected[:10],
+        # FIX-8: expose assumptions
+        'assumptions': {
+            'foir_cap_pct': foir_cap * 100,
+            'interest_rate_pct': interest_rate * 100,
+            'tenure_months': tenure_months,
+        },
     }
 
 
@@ -841,7 +1061,7 @@ def analyze_compliance(transactions: list) -> dict:
         amt = t.get('amount', 0) or 0; desc = (t.get('desc') or '').lower()
         date = t.get('date', ''); month = date[:7] if date else 'Unknown'
         if amt >= HIGH_VALUE_THRESHOLD: high_value_txns.append(t)
-        if any(k in desc for k in CASH_KEYWORDS):
+        if _kw_match(desc, CASH_KEYWORDS):
             cash_txns.append(t)
             if t.get('type') == 'CR':
                 daily_cash[date] += amt; monthly_cash[month] += amt
@@ -887,35 +1107,62 @@ def analyze_compliance(transactions: list) -> dict:
 
 
 # ═══════════════════════════════════════════════════════════
-#  6. GSTR-1 AUTO-FILL
+#  6. GSTR-1 AUTO-FILL — FIX-9: more realistic B2B detection
 # ═══════════════════════════════════════════════════════════
 
 def analyze_gstr1(transactions: list) -> dict:
     b2b_supplies = []; b2c_supplies = []; export_supplies = []; nil_exempt = []
-    B2B_INDICATORS = [
-        'pvt', 'ltd', 'llp', 'inc', 'technologies', 'solutions', 'services',
-        'enterprises', 'trading', 'industries', 'consultancy', 'consulting',
-        'agency', 'associates', 'exports', 'imports', 'retail', 'wholesale',
-        'razorpay', 'cashfree', 'payu', 'instamojo', 'tramo', 'eko', 'meesho', 'shiprocket',
+
+    # FIX-9: B2B detection — company suffixes + payment gateways
+    B2B_COMPANY_SUFFIXES = [
+        'pvt ltd', 'private limited', 'limited', ' llp', ' inc',
+        'technologies', 'solutions', 'services pvt', 'services ltd',
+        'enterprises', 'trading co', 'industries', 'consultancy',
+        'agency', 'associates', 'exports', 'imports',
     ]
-    EXPORT_INDICATORS = ['swift', 'foreign', 'usd', 'eur', 'gbp', 'wire transfer', 'paypal', 'stripe', 'wise', 'remittance']
-    NIL_EXEMPT_KW    = ['interest', 'dividend', 'gift', 'subsidy']
+    B2B_GATEWAYS = [
+        'razorpay settlement', 'cashfree settlement', 'payu settlement',
+        'instamojo', 'tramo', 'eko ',
+    ]
+    # FIX-9: Marketplace credits — known B2B
+    B2B_MARKETPLACES = ['meesho', 'shiprocket', 'meeshofas']
+    EXPORT_INDICATORS = ['swift', 'foreign inward', 'usd ', 'eur ', 'gbp ',
+                         'wire transfer', 'paypal', 'stripe', 'wise', 'remittance']
+    NIL_EXEMPT_KW = ['interest credit', 'dividend', 'gift received', 'subsidy']
     monthly_sales = defaultdict(lambda: {'b2b': 0, 'b2c': 0, 'export': 0, 'nil': 0})
 
     for t in transactions:
-        if t.get('type') != 'CR' or not t.get('amount'): continue
-        desc = (t.get('desc') or '').lower(); amt = t['amount']
-        date = t.get('date', ''); month = date[:7] if date else 'Unknown'
-        if is_loan_disbursal(desc) or is_family_transfer(desc) or is_self_transfer(desc): continue
-        if any(k in desc for k in SALARY_KEYWORDS): continue
-        if any(k in desc for k in EXPORT_INDICATORS):
+        if t.get('type') != 'CR' or not t.get('amount'):
+            continue
+        desc = (t.get('desc') or ''); lower = desc.lower()
+        amt = t['amount']; date = t.get('date', ''); month = date[:7] if date else 'Unknown'
+
+        # Skip non-revenue
+        if is_loan_disbursal(lower) or is_family_transfer(lower) or is_self_transfer(lower):
+            continue
+        if _is_reversal(lower):
+            continue
+        if _kw_match(lower, SALARY_KEYWORDS):
+            continue
+        if _kw_match(lower, _CASH_DEP_KW):
+            continue
+        if _kw_match(lower, INTEREST_KEYWORDS) and not _kw_match(lower, ['interest on fd']):
+            # Savings interest = nil/exempt, not taxable supply
+            nil_exempt.append(t); monthly_sales[month]['nil'] += amt; continue
+
+        if _kw_match(lower, EXPORT_INDICATORS):
             export_supplies.append(t); monthly_sales[month]['export'] += amt
-        elif any(k in desc for k in NIL_EXEMPT_KW):
+        elif _kw_match(lower, NIL_EXEMPT_KW):
             nil_exempt.append(t); monthly_sales[month]['nil'] += amt
-        elif any(k in desc for k in B2B_INDICATORS):
+        elif (_kw_match(lower, B2B_COMPANY_SUFFIXES) or
+              _kw_match(lower, B2B_GATEWAYS) or
+              _kw_match(lower, B2B_MARKETPLACES)):
             b2b_supplies.append(t); monthly_sales[month]['b2b'] += amt
         else:
-            b2c_supplies.append(t); monthly_sales[month]['b2c'] += amt
+            # FIX-9: default to B2C only for amounts that look like sales
+            # Skip very small credits < 100 (likely cashback/interest)
+            if amt >= 100:
+                b2c_supplies.append(t); monthly_sales[month]['b2c'] += amt
 
     total_b2b = round(sum(t['amount'] for t in b2b_supplies), 2)
     total_b2c = round(sum(t['amount'] for t in b2c_supplies), 2)
@@ -933,6 +1180,8 @@ def analyze_gstr1(transactions: list) -> dict:
         'b2b_count': len(b2b_supplies), 'b2c_count': len(b2c_supplies),
         'export_count': len(export_supplies),
         'filing_status': 'Filing Required' if total_taxable > 0 else 'Verify with CA',
+        # FIX-9: disclaimer
+        'note': 'B2B/B2C classification is approximate. Verify GSTIN of counterparties for accurate GSTR-1.',
     }
 
 
