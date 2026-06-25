@@ -3226,4 +3226,8 @@ def file_too_large(e):
 if __name__ == '__main__':
     debug_mode = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
     app.run(debug=debug_mode)
-    
+
+
+
+
+    echo "# PostHog analytics enabled" >> app.py
