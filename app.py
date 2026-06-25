@@ -3227,3 +3227,7 @@ if __name__ == '__main__':
     debug_mode = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
     app.run(debug=debug_mode)
     
+@app.route('/sw.js')
+def kill_sw():
+    js = "self.addEventListener('install', () => self.skipWaiting()); self.addEventListener('activate', () => { self.registration.unregister(); });"
+    return Response(js, mimetype='application/javascript')
