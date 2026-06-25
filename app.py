@@ -3223,11 +3223,16 @@ def file_too_large(e):
     return "File too large. Maximum size is 10 MB.", 413
 
 
-if __name__ == '__main__':
-    debug_mode = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
-    app.run(debug=debug_mode)
-    
+@app.route('/manifest.json')
+def manifest():
+    return send_file('static/manifest.json', mimetype='application/manifest+json')
+
 @app.route('/sw.js')
 def kill_sw():
     js = "self.addEventListener('install', () => self.skipWaiting()); self.addEventListener('activate', () => { self.registration.unregister(); });"
     return Response(js, mimetype='application/javascript')
+
+if __name__ == '__main__':
+    debug_mode = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
+    app.run(debug=debug_mode)
+    
