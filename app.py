@@ -117,7 +117,7 @@ CHAT_SESSION_HOURS = 48
 
 OWNER_EMAILS = ['hardik101306@gmail.com']
 
-NEW_STATEMENT_ERROR = 'New bank statement detected. Your ₹49 session is locked to one statement. <a href="/pay" style="color:#C9A84C;text-decoration:underline;font-weight:600;">Click here to purchase a new session</a> to analyze a different PDF.'
+NEW_STATEMENT_ERROR = 'New bank statement detected. Your Rs49 session is locked to one statement. <a href="/pay" style="color:#C9A84C;text-decoration:underline;font-weight:600;">Click here to purchase a new session</a> to analyze a different PDF.'
 
 PLAN_CONFIG = {
     'Basic':    {'price': 10,  'input_tokens': 25000,   'output_tokens': 5000,  'validity_hours': 24},
@@ -907,7 +907,7 @@ SBI, HDFC, Kotak, Canara, Axis, Punjab National Bank, Bank of Baroda, ICICI, and
 - Mobile app (Android)
 
 ## Pricing
-Free basic analysis. AI Chat sessions from ₹10.
+Free basic analysis. AI Chat sessions from Rs10.
 
 ## Contact
 aarogyamfin@gmail.com
@@ -1204,7 +1204,7 @@ def export():
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Transactions"
-    ws.append(["#", "Date", "Description", "Type", "Amount (₹)", "Balance (₹)", "Category"])
+    ws.append(["#", "Date", "Description", "Type", "Amount (Rs)", "Balance (Rs)", "Category"])
 
     for i, (d, desc, a, b, tp, cat) in enumerate(
             zip(dates, descs, amounts, balances, types,
@@ -1773,11 +1773,10 @@ def dashboard_export_pdf():
     data     = run_dashboard(cached['transactions'])
     filename = session.get('file_name', 'statement')
 
-    # ── TRACK: PDF report exported ──
     ph_track(user_id, event='pdf_report_exported', props={
         'file_name':         filename,
         'transaction_count': len(cached['transactions']),
-        'export_type':       'pdf_13page',
+        'export_type':       'pdf_v3_14features',
         'total_cr':          data.get('total_cr', 0),
         'total_dr':          data.get('total_dr', 0),
     })
@@ -1807,6 +1806,8 @@ def dashboard_export_pdf():
     C_RED     = colors.HexColor('#f87171')
     C_YELLOW  = colors.HexColor('#fbbf24')
     C_BLUE    = colors.HexColor('#60a5fa')
+    C_PURPLE  = colors.HexColor('#a78bfa')
+    C_ORANGE  = colors.HexColor('#fb923c')
 
     W = A4[0] - 40*mm
 
@@ -1816,30 +1817,31 @@ def dashboard_export_pdf():
         base.update(kw)
         return ParagraphStyle(name, **base)
 
-    s_cover_title  = S('ct',  fontSize=36, fontName='Helvetica-Bold', textColor=C_GOLD,   leading=40, alignment=TA_CENTER)
-    s_cover_sub    = S('cs',  fontSize=13, textColor=C_TEXT,          leading=20, alignment=TA_CENTER)
-    s_cover_meta   = S('cm',  fontSize=9,  textColor=C_MUTED,         leading=14, alignment=TA_CENTER)
-    s_page_title   = S('pt',  fontSize=18, fontName='Helvetica-Bold', textColor=C_GOLD,   leading=22, spaceAfter=2)
-    s_section      = S('sh',  fontSize=11, fontName='Helvetica-Bold', textColor=C_GOLD_L, leading=16, spaceBefore=10, spaceAfter=4)
-    s_body         = S('b',   fontSize=8.5,textColor=C_TEXT,          leading=13)
-    s_muted        = S('m',   fontSize=8,  textColor=C_MUTED,         leading=12)
-    s_tag          = S('tg',  fontSize=7,  textColor=C_GOLD,          leading=10, fontName='Helvetica-Bold')
-    s_footer       = S('ft',  fontSize=7,  textColor=C_MUTED,         leading=10, alignment=TA_CENTER)
+    s_cover_title = S('ct',  fontSize=36, fontName='Helvetica-Bold', textColor=C_GOLD,   leading=40, alignment=TA_CENTER)
+    s_cover_sub   = S('cs',  fontSize=13, textColor=C_TEXT,          leading=20, alignment=TA_CENTER)
+    s_cover_meta  = S('cm',  fontSize=9,  textColor=C_MUTED,         leading=14, alignment=TA_CENTER)
+    s_page_title  = S('pt',  fontSize=18, fontName='Helvetica-Bold', textColor=C_GOLD,   leading=22, spaceAfter=2)
+    s_section     = S('sh',  fontSize=11, fontName='Helvetica-Bold', textColor=C_GOLD_L, leading=16, spaceBefore=10, spaceAfter=4)
+    s_body        = S('b',   fontSize=8.5,textColor=C_TEXT,          leading=13)
+    s_muted       = S('m',   fontSize=8,  textColor=C_MUTED,         leading=12)
+    s_tag         = S('tg',  fontSize=7,  textColor=C_GOLD,          leading=10, fontName='Helvetica-Bold')
+    s_footer      = S('ft',  fontSize=7,  textColor=C_MUTED,         leading=10, alignment=TA_CENTER)
+    s_justify     = S('jt',  fontSize=8.5,textColor=C_TEXT,          leading=13, alignment=4)  # justified
 
     def tbl(rows, col_widths, style_extra=None):
         base_style = [
-            ('BACKGROUND',   (0,0), (-1,-1), C_SURFACE),
-            ('ROWBACKGROUNDS',(0,0),(-1,-1), [C_SURFACE, C_SURFACE2]),
-            ('TEXTCOLOR',    (0,0), (-1,-1), C_TEXT),
-            ('FONTNAME',     (0,0), (-1,-1), 'Helvetica'),
-            ('FONTSIZE',     (0,0), (-1,-1), 8.5),
-            ('LEADING',      (0,0), (-1,-1), 13),
-            ('GRID',         (0,0), (-1,-1), 0.3, C_BORDER),
-            ('LEFTPADDING',  (0,0), (-1,-1), 7),
-            ('RIGHTPADDING', (0,0), (-1,-1), 7),
-            ('TOPPADDING',   (0,0), (-1,-1), 5),
-            ('BOTTOMPADDING',(0,0), (-1,-1), 5),
-            ('VALIGN',       (0,0), (-1,-1), 'MIDDLE'),
+            ('BACKGROUND',    (0,0), (-1,-1), C_SURFACE),
+            ('ROWBACKGROUNDS',(0,0), (-1,-1), [C_SURFACE, C_SURFACE2]),
+            ('TEXTCOLOR',     (0,0), (-1,-1), C_TEXT),
+            ('FONTNAME',      (0,0), (-1,-1), 'Helvetica'),
+            ('FONTSIZE',      (0,0), (-1,-1), 8.5),
+            ('LEADING',       (0,0), (-1,-1), 13),
+            ('GRID',          (0,0), (-1,-1), 0.3, C_BORDER),
+            ('LEFTPADDING',   (0,0), (-1,-1), 7),
+            ('RIGHTPADDING',  (0,0), (-1,-1), 7),
+            ('TOPPADDING',    (0,0), (-1,-1), 5),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 5),
+            ('VALIGN',        (0,0), (-1,-1), 'MIDDLE'),
         ]
         if style_extra:
             base_style.extend(style_extra)
@@ -1849,22 +1851,22 @@ def dashboard_export_pdf():
 
     def hdr_tbl(rows, col_widths, style_extra=None):
         s = [
-            ('BACKGROUND',   (0,0), (-1, 0), colors.HexColor('#1a1500')),
-            ('BACKGROUND',   (0,1), (-1,-1), C_SURFACE),
-            ('ROWBACKGROUNDS',(0,1),(-1,-1), [C_SURFACE, C_SURFACE2]),
-            ('TEXTCOLOR',    (0,0), (-1, 0), C_GOLD),
-            ('TEXTCOLOR',    (0,1), (-1,-1), C_TEXT),
-            ('FONTNAME',     (0,0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTNAME',     (0,1), (-1,-1), 'Helvetica'),
-            ('FONTSIZE',     (0,0), (-1,-1), 8.5),
-            ('LEADING',      (0,0), (-1,-1), 13),
-            ('GRID',         (0,0), (-1,-1), 0.3, C_BORDER),
-            ('LINEBELOW',    (0,0), (-1, 0), 0.8, C_GOLD),
-            ('LEFTPADDING',  (0,0), (-1,-1), 7),
-            ('RIGHTPADDING', (0,0), (-1,-1), 7),
-            ('TOPPADDING',   (0,0), (-1,-1), 5),
-            ('BOTTOMPADDING',(0,0), (-1,-1), 5),
-            ('VALIGN',       (0,0), (-1,-1), 'MIDDLE'),
+            ('BACKGROUND',    (0,0), (-1, 0), colors.HexColor('#1a1500')),
+            ('BACKGROUND',    (0,1), (-1,-1), C_SURFACE),
+            ('ROWBACKGROUNDS',(0,1), (-1,-1), [C_SURFACE, C_SURFACE2]),
+            ('TEXTCOLOR',     (0,0), (-1, 0), C_GOLD),
+            ('TEXTCOLOR',     (0,1), (-1,-1), C_TEXT),
+            ('FONTNAME',      (0,0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTNAME',      (0,1), (-1,-1), 'Helvetica'),
+            ('FONTSIZE',      (0,0), (-1,-1), 8.5),
+            ('LEADING',       (0,0), (-1,-1), 13),
+            ('GRID',          (0,0), (-1,-1), 0.3, C_BORDER),
+            ('LINEBELOW',     (0,0), (-1, 0), 0.8, C_GOLD),
+            ('LEFTPADDING',   (0,0), (-1,-1), 7),
+            ('RIGHTPADDING',  (0,0), (-1,-1), 7),
+            ('TOPPADDING',    (0,0), (-1,-1), 5),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 5),
+            ('VALIGN',        (0,0), (-1,-1), 'MIDDLE'),
         ]
         if style_extra:
             s.extend(style_extra)
@@ -1896,33 +1898,91 @@ def dashboard_export_pdf():
         p = Paragraph(text, S('al', fontSize=8.5, textColor=color, leading=13))
         t = Table([[p]], colWidths=[W])
         t.setStyle(TableStyle([
-            ('BACKGROUND',  (0,0),(-1,-1), bg),
-            ('LINEBEFORE',  (0,0),(0,-1), 3, border),
-            ('LEFTPADDING', (0,0),(-1,-1), 10),
-            ('RIGHTPADDING',(0,0),(-1,-1), 10),
-            ('TOPPADDING',  (0,0),(-1,-1), 8),
+            ('BACKGROUND',   (0,0),(-1,-1), bg),
+            ('LINEBEFORE',   (0,0),(0,-1), 3, border),
+            ('LEFTPADDING',  (0,0),(-1,-1), 10),
+            ('RIGHTPADDING', (0,0),(-1,-1), 10),
+            ('TOPPADDING',   (0,0),(-1,-1), 8),
             ('BOTTOMPADDING',(0,0),(-1,-1), 8),
         ]))
         return t
 
-    def metrics_row(items):
+    def info_box(text, color=None):
+        """Lighter info box for explanatory text."""
+        c = color or C_BLUE
+        bg = colors.HexColor('#0a0f1a')
+        p = Paragraph(text, S('ib', fontSize=8, textColor=colors.HexColor('#93c5fd'), leading=13))
+        t = Table([[p]], colWidths=[W])
+        t.setStyle(TableStyle([
+            ('BACKGROUND',   (0,0),(-1,-1), bg),
+            ('LINEBEFORE',   (0,0),(0,-1), 2, c),
+            ('LEFTPADDING',  (0,0),(-1,-1), 10),
+            ('RIGHTPADDING', (0,0),(-1,-1), 10),
+            ('TOPPADDING',   (0,0),(-1,-1), 7),
+            ('BOTTOMPADDING',(0,0),(-1,-1), 7),
+        ]))
+        return t
+
+    def badge_row(items):
+        """Row of colored badge cells. items = [(label, value, color), ...]"""
         n = len(items)
         col_w = W / n
-        row_vals  = [[Paragraph(str(v), S('mv2', fontSize=15, fontName='Helvetica-Bold',
-                      textColor=c or C_GOLD, leading=19, alignment=TA_CENTER)) for _,v,c in items]]
-        row_labels= [[Paragraph(l, S('ml2', fontSize=7, textColor=C_MUTED,
-                      leading=10, alignment=TA_CENTER)) for l,_,__ in items]]
+        row_vals   = [[Paragraph(str(v), S('bv', fontSize=14, fontName='Helvetica-Bold',
+                       textColor=c or C_GOLD, leading=18, alignment=TA_CENTER)) for _, v, c in items]]
+        row_labels = [[Paragraph(l, S('bl', fontSize=7, textColor=C_MUTED,
+                       leading=10, alignment=TA_CENTER)) for l, _, __ in items]]
         combined = [row_vals[0], row_labels[0]]
         t = Table(combined, colWidths=[col_w]*n)
         t.setStyle(TableStyle([
-            ('BACKGROUND',   (0,0),(-1,-1), C_SURFACE),
-            ('GRID',         (0,0),(-1,-1), 0.3, C_BORDER),
-            ('TOPPADDING',   (0,0),(-1,-1), 10),
-            ('BOTTOMPADDING',(0,0),(-1,-1), 8),
-            ('LEFTPADDING',  (0,0),(-1,-1), 4),
-            ('RIGHTPADDING', (0,0),(-1,-1), 4),
+            ('BACKGROUND',    (0,0),(-1,-1), C_SURFACE),
+            ('GRID',          (0,0),(-1,-1), 0.3, C_BORDER),
+            ('TOPPADDING',    (0,0),(-1,-1), 10),
+            ('BOTTOMPADDING', (0,0),(-1,-1), 8),
+            ('LEFTPADDING',   (0,0),(-1,-1), 4),
+            ('RIGHTPADDING',  (0,0),(-1,-1), 4),
         ]))
         return t
+
+    # alias
+    metrics_row = badge_row
+
+    def mini_bar_chart(data_dict, total, max_width_mm=120):
+        """Simple horizontal bar chart using Table cells."""
+        rows = []
+        for label, value in sorted(data_dict.items(), key=lambda x: -x[1]):
+            if value <= 0:
+                continue
+            pct = value / total if total else 0
+            bar_w = max(2, pct * max_width_mm)
+            empty_w = max_width_mm - bar_w
+
+            bar_cell   = Table([['']], colWidths=[bar_w*mm], rowHeights=[6*mm])
+            bar_cell.setStyle(TableStyle([
+                ('BACKGROUND', (0,0),(-1,-1), C_GOLD),
+                ('LEFTPADDING',(0,0),(-1,-1), 0),
+                ('RIGHTPADDING',(0,0),(-1,-1), 0),
+                ('TOPPADDING',(0,0),(-1,-1), 0),
+                ('BOTTOMPADDING',(0,0),(-1,-1), 0),
+            ]))
+            empty_cell = ''
+            label_p  = Paragraph(label[:30], S('bc', fontSize=7.5, textColor=C_TEXT, leading=10))
+            pct_p    = Paragraph(f'{pct*100:.1f}%  Rs{value:,.0f}', S('bp', fontSize=7, textColor=C_MUTED, leading=10, alignment=TA_RIGHT))
+            rows.append([label_p, bar_cell, pct_p])
+
+        if not rows:
+            return None
+
+        chart = Table(rows, colWidths=[50*mm, max_width_mm*mm, 35*mm])
+        chart.setStyle(TableStyle([
+            ('BACKGROUND',    (0,0),(-1,-1), C_SURFACE),
+            ('TOPPADDING',    (0,0),(-1,-1), 4),
+            ('BOTTOMPADDING', (0,0),(-1,-1), 4),
+            ('LEFTPADDING',   (0,0),(-1,-1), 5),
+            ('RIGHTPADDING',  (0,0),(-1,-1), 5),
+            ('VALIGN',        (0,0),(-1,-1), 'MIDDLE'),
+            ('GRID',          (0,0),(-1,-1), 0.2, C_BORDER),
+        ]))
+        return chart
 
     today_str   = date.today().strftime('%d %B %Y')
     fname_clean = filename.replace('.pdf','').replace('_',' ')
@@ -1935,8 +1995,8 @@ def dashboard_export_pdf():
         canv.rect(0, A4[1]-2*mm, A4[0], 2*mm, fill=1, stroke=0)
         canv.setFillColor(C_MUTED)
         canv.setFont('Helvetica', 7)
-        canv.drawString(20*mm, 12*mm, f'AarogyamFin Financial Report — {fname_clean}')
-        canv.drawRightString(A4[0]-20*mm, 12*mm, f'Page {doc.page} | Generated {today_str}')
+        canv.drawString(20*mm, 12*mm, f'AarogyamFin Financial Intelligence Report — {fname_clean}')
+        canv.drawRightString(A4[0]-20*mm, 12*mm, f'Page {doc.page} | {today_str} | Confidential')
         canv.setStrokeColor(C_BORDER)
         canv.setLineWidth(0.3)
         canv.line(20*mm, 16*mm, A4[0]-20*mm, 16*mm)
@@ -1952,6 +2012,9 @@ def dashboard_export_pdf():
     obl  = data.get('obligations', {})
     cf   = data.get('cashflow', {})
     rf   = data.get('red_flags', {})
+    bk   = data.get('balance_kpis', {})       # #9
+    pm   = data.get('payment_modes', {})       # #10
+    rfl  = data.get('risk_flags', {})          # #11
 
     total_txns = data['total_txns']
     total_cr   = data['total_cr']
@@ -1959,45 +2022,51 @@ def dashboard_export_pdf():
 
     story = []
 
+    # ─────────────────────────────────────────────────────────
     # PAGE 1 — COVER
-    story.append(Spacer(1, 40*mm))
+    # ─────────────────────────────────────────────────────────
+    story.append(Spacer(1, 35*mm))
     story.append(Paragraph('AarogyamFin', s_cover_title))
     story.append(Spacer(1, 4*mm))
     story.append(Paragraph('Financial Intelligence Report', s_cover_sub))
+    story.append(Spacer(1, 2*mm))
+    story.append(Paragraph('CA / NBFC Underwriting Grade', S('ug', fontSize=9, textColor=C_GOLD, leading=12, alignment=TA_CENTER, fontName='Helvetica-Bold')))
     story.append(Spacer(1, 8*mm))
-    story.append(HRFlowable(width='60%', thickness=0.6, color=C_GOLD, hAlign='CENTER', spaceAfter=8, spaceBefore=0))
+    story.append(HRFlowable(width='60%', thickness=0.6, color=C_GOLD, hAlign='CENTER', spaceAfter=8))
     story.append(Spacer(1, 4*mm))
     story.append(Paragraph(fname_clean, S('fn', fontSize=11, textColor=C_TEXT, leading=16, alignment=TA_CENTER)))
     story.append(Spacer(1, 3*mm))
     story.append(Paragraph(f'Generated on {today_str}', s_cover_meta))
-    story.append(Paragraph(f'Powered by AarogyamFin — aarogyamfin.com', s_cover_meta))
-    story.append(Spacer(1, 16*mm))
+    story.append(Paragraph('Powered by AarogyamFin — aarogyamfin.com', s_cover_meta))
+    story.append(Spacer(1, 12*mm))
 
     cover_data = [
-        ['Total Transactions', f'{total_txns:,}',    'Total Credits',  f'₹{total_cr:,.0f}'],
-        ['Total Debits',       f'₹{total_dr:,.0f}',  'Real Income',    f'₹{di["real_income_total"]:,.0f}'],
-        ['Credit Profile',     dl['credit_indicator'],'FOIR',          f'{dl["foir"]}%'],
-        ['Compliance Risk',    dc['risk_level'],       'Suggested ITR', di['suggested_itr'].split('(')[0].strip()],
+        ['Total Transactions', f'{total_txns:,}',           'Total Credits',    f'Rs {total_cr:,.0f}'],
+        ['Total Debits',       f'Rs {total_dr:,.0f}',       'Real Income',      f'Rs {di["real_income_total"]:,.0f}'],
+        ['Credit Profile',     dl.get('credit_indicator','—'), 'FOIR',          f'{dl.get("foir",0)}%'],
+        ['Compliance Risk',    dc['risk_level'],              'Suggested ITR',   di['suggested_itr'].split('(')[0].strip()],
+        ['Avg Daily Balance',  f'Rs {bk.get("avg_daily_balance",0):,.0f}',
+         'Negative Bal Days',  str(bk.get('negative_balance_days', 0))],
     ]
     cover_tbl = Table(cover_data, colWidths=[45*mm, 45*mm, 45*mm, 45*mm])
     cover_tbl.setStyle(TableStyle([
-        ('BACKGROUND',   (0,0),(-1,-1), C_SURFACE),
+        ('BACKGROUND',    (0,0),(-1,-1), C_SURFACE),
         ('ROWBACKGROUNDS',(0,0),(-1,-1),[C_SURFACE, C_SURFACE2]),
-        ('TEXTCOLOR',    (0,0),(0,-1), C_MUTED),
-        ('TEXTCOLOR',    (1,0),(1,-1), C_TEXT),
-        ('TEXTCOLOR',    (2,0),(2,-1), C_MUTED),
-        ('TEXTCOLOR',    (3,0),(3,-1), C_TEXT),
-        ('FONTNAME',     (0,0),(-1,-1), 'Helvetica'),
-        ('FONTNAME',     (1,0),(1,-1), 'Helvetica-Bold'),
-        ('FONTNAME',     (3,0),(3,-1), 'Helvetica-Bold'),
-        ('FONTSIZE',     (0,0),(-1,-1), 9),
-        ('GRID',         (0,0),(-1,-1), 0.3, C_BORDER),
-        ('LINEABOVE',    (0,0),(-1, 0), 1.5, C_GOLD),
-        ('LINEBELOW',    (0,-1),(-1,-1), 1.5, C_GOLD),
-        ('LEFTPADDING',  (0,0),(-1,-1), 10),
-        ('RIGHTPADDING', (0,0),(-1,-1), 10),
-        ('TOPPADDING',   (0,0),(-1,-1), 8),
-        ('BOTTOMPADDING',(0,0),(-1,-1), 8),
+        ('TEXTCOLOR',     (0,0),(0,-1), C_MUTED),
+        ('TEXTCOLOR',     (1,0),(1,-1), C_TEXT),
+        ('TEXTCOLOR',     (2,0),(2,-1), C_MUTED),
+        ('TEXTCOLOR',     (3,0),(3,-1), C_TEXT),
+        ('FONTNAME',      (0,0),(-1,-1), 'Helvetica'),
+        ('FONTNAME',      (1,0),(1,-1), 'Helvetica-Bold'),
+        ('FONTNAME',      (3,0),(3,-1), 'Helvetica-Bold'),
+        ('FONTSIZE',      (0,0),(-1,-1), 9),
+        ('GRID',          (0,0),(-1,-1), 0.3, C_BORDER),
+        ('LINEABOVE',     (0,0),(-1, 0), 1.5, C_GOLD),
+        ('LINEBELOW',     (0,-1),(-1,-1), 1.5, C_GOLD),
+        ('LEFTPADDING',   (0,0),(-1,-1), 10),
+        ('RIGHTPADDING',  (0,0),(-1,-1), 10),
+        ('TOPPADDING',    (0,0),(-1,-1), 8),
+        ('BOTTOMPADDING', (0,0),(-1,-1), 8),
     ]))
     story.append(cover_tbl)
     story.append(Spacer(1, 8*mm))
@@ -2009,217 +2078,429 @@ def dashboard_export_pdf():
     ))
     story.append(PageBreak())
 
-    # Remaining pages follow the same pattern as original — full content preserved
-    # PAGE 2 — Transaction Overview
+    # ─────────────────────────────────────────────────────────
+    # PAGE 2 — TRANSACTION OVERVIEW
+    # ─────────────────────────────────────────────────────────
     story += section_header('Transaction Overview', 'SECTION 01')
     story.append(metrics_row([
-        ('Total Transactions', f'{total_txns:,}',          C_GOLD),
-        ('Total Credits',      f'₹{total_cr:,.0f}',        C_GREEN),
-        ('Total Debits',       f'₹{total_dr:,.0f}',        C_RED),
-        ('Net Flow',           f'₹{total_cr - total_dr:,.0f}', C_GREEN if total_cr > total_dr else C_RED),
+        ('Total Transactions', f'{total_txns:,}',              C_GOLD),
+        ('Total Credits',      f'Rs {total_cr:,.0f}',          C_GREEN),
+        ('Total Debits',       f'Rs {total_dr:,.0f}',          C_RED),
+        ('Net Flow',           f'Rs {total_cr - total_dr:,.0f}',C_GREEN if total_cr > total_dr else C_RED),
     ]))
     story.append(Spacer(1, 5*mm))
+
     md = dl.get('monthly_data', {})
     months_sorted = sorted(md.keys())
     if months_sorted:
         story.append(Paragraph('Monthly Credit vs Debit', s_section))
-        mhdr = [['Month', 'Credits (₹)', 'Debits (₹)', 'Net (₹)', 'Closing Balance']]
+        mhdr = [['Month', 'Credits (Rs)', 'Debits (Rs)', 'Net (Rs)', 'Closing Bal']]
         mrows = []
         for m in months_sorted:
             mv  = md[m]
             cr  = mv.get('credits', 0)
             dr  = mv.get('debits', 0)
             net = cr - dr
-            bal = mv.get('min_bal', 0)
-            mrows.append([m, f'₹{cr:,.0f}', f'₹{dr:,.0f}', f'₹{net:,.0f}', f'₹{bal:,.0f}'])
-        story.append(hdr_tbl(mhdr + mrows, [35*mm, 37*mm, 37*mm, 35*mm, 36*mm]))
+            bal = bk.get('month_end_balances', {}).get(m, mv.get('min_bal', 0))
+            mrows.append([m, f'Rs {cr:,.0f}', f'Rs {dr:,.0f}', f'Rs {net:,.0f}', f'Rs {bal:,.0f}'])
+        story.append(hdr_tbl(mhdr + mrows, [32*mm, 37*mm, 37*mm, 32*mm, 32*mm]))
+
+    story.append(Spacer(1, 5*mm))
+
+    # #10: Payment Mode Analysis
+    story.append(Paragraph('Payment Mode Analysis', s_section))
+    pm_by_mode = pm.get('by_mode', {})
+    if pm_by_mode:
+        pm_hdr = [['Payment Mode', 'Transactions', 'Volume (Rs)', '% of Count']]
+        pm_rows = []
+        for mode, mdata in sorted(pm_by_mode.items(), key=lambda x: -x[1].get('total_volume', 0)):
+            pm_rows.append([
+                mode,
+                str(mdata.get('count', 0)),
+                f'Rs {mdata.get("total_volume", 0):,.0f}',
+                f'{mdata.get("count_pct", 0)}%',
+            ])
+        story.append(hdr_tbl(pm_hdr + pm_rows, [55*mm, 35*mm, 55*mm, 35*mm]))
+        story.append(Spacer(1, 3*mm))
+        if pm.get('international_count', 0) > 0:
+            story.append(alert(
+                f'⚠ {pm["international_count"]} International transaction(s) detected — '
+                f'total volume Rs{pm.get("international_volume",0):,.0f}. '
+                f'Verify FEMA compliance if applicable.', 'warn'))
     story.append(PageBreak())
 
-    # PAGE 3 — Income Analysis
+    # ─────────────────────────────────────────────────────────
+    # PAGE 3 — INCOME ANALYSIS (#1 Real Income Breakdown, #2 Non-Income Credits)
+    # ─────────────────────────────────────────────────────────
     story += section_header('Income Analysis', 'SECTION 02')
     story.append(metrics_row([
-        ('Real Income Total',  f'₹{di["real_income_total"]:,.0f}',   C_GREEN),
-        ('Salary Income',      f'₹{di["salary_total"]:,.0f}',        C_TEXT),
-        ('Freelance/Business', f'₹{di["freelance_total"]:,.0f}',     C_YELLOW),
-        ('Interest Income',    f'₹{di["interest_total"]:,.0f}',      C_TEXT),
+        ('Real Income Total',   f'Rs {di["real_income_total"]:,.0f}',   C_GREEN),
+        ('Salary Income',       f'Rs {di["salary_total"]:,.0f}',        C_TEXT),
+        ('Business/Freelance',  f'Rs {di["freelance_total"]:,.0f}',     C_YELLOW),
+        ('Interest Income',     f'Rs {di["interest_total"]:,.0f}',      C_BLUE),
     ]))
     story.append(Spacer(1, 4*mm))
-    story.append(Paragraph('Income Source Breakdown', s_section))
-    inc_rows = [['Income Source', 'Amount (₹)', 'Classification']]
-    for src, label, cls in [
-        ('salary_total',         'Salary / Payroll',         'Taxable — Schedule S'),
-        ('freelance_total',      'Freelance / Consulting',   'Taxable — PGBP'),
-        ('marketplace_total',    'Marketplace / Ecommerce',  'Taxable — PGBP'),
-        ('interest_total',       'Interest / FD',            'Taxable — Other Sources'),
-        ('loan_disbursal_total', 'Loan Disbursals',          'Non-Income (Liability)'),
-        ('family_transfer_total','Family Transfers',         'Non-Income (Transfer)'),
-        ('self_transfer_total',  'Self Transfers',           'Non-Income (Internal)'),
-    ]:
-        val = di.get(src, 0)
-        if val > 0:
-            inc_rows.append([label, f'₹{val:,.0f}', cls])
-    story.append(hdr_tbl(inc_rows, [70*mm, 50*mm, 60*mm]))
+
+    # #1: Real Income Breakdown table
+    story.append(Paragraph('Real Income Breakdown (Taxable)', s_section))
+    inc_data = inc.get('real_income_breakdown', {})
+    if not inc_data:
+        # fallback to itr data
+        inc_data = {
+            'Salary': di.get('salary_total', 0),
+            'Business/Freelance': di.get('freelance_total', 0),
+            'Interest Income': di.get('interest_total', 0),
+            'Marketplace': di.get('marketplace_total', 0),
+            'Rental Income': 0,
+            'Dividend': 0,
+        }
+    real_income_total = di.get('real_income_total', 1) or 1
+    inc_rows = [['Income Type', 'Amount (Rs)', '% of Real Income', 'Tax Schedule']]
+    tax_schedule_map = {
+        'Salary': 'Schedule S — Salary',
+        'Business/Freelance': 'PGBP — Business Income',
+        'Interest Income': 'Other Sources',
+        'Marketplace': 'PGBP — Business Income',
+        'Rental Income': 'House Property',
+        'Dividend': 'Other Sources',
+        'Other Taxable': 'Other Sources',
+    }
+    for iname, iamt in inc_data.items():
+        if iamt > 0:
+            pct = round(iamt / real_income_total * 100, 1)
+            inc_rows.append([
+                iname,
+                f'Rs {iamt:,.0f}',
+                f'{pct}%',
+                tax_schedule_map.get(iname, 'Verify with CA'),
+            ])
+    inc_rows.append(['TOTAL REAL INCOME', f'Rs {di["real_income_total"]:,.0f}', '100%', ''])
+    story.append(hdr_tbl(inc_rows, [60*mm, 45*mm, 40*mm, 35*mm], [
+        ('FONTNAME', (0,-1),(-1,-1), 'Helvetica-Bold'),
+        ('TEXTCOLOR', (0,-1),(-1,-1), C_GOLD),
+        ('LINEABOVE', (0,-1),(-1,-1), 0.8, C_GOLD),
+    ]))
     story.append(Spacer(1, 4*mm))
-    emp_names = inc.get('employer_names', [])
-    if emp_names:
-        story.append(Paragraph('Employers / Salary Sources Detected', s_section))
-        story.append(Paragraph(', '.join(emp_names), s_body))
-        story.append(Spacer(1, 3*mm))
+
+    # Bar chart for income sources
+    if inc_data:
+        story.append(Paragraph('Income Source Composition', s_section))
+        chart = mini_bar_chart({k: v for k, v in inc_data.items() if v > 0}, real_income_total)
+        if chart:
+            story.append(chart)
+    story.append(Spacer(1, 4*mm))
+
+    # #2: Non-Income Credits (separate section)
+    story.append(Paragraph('Non-Income Credits (Excluded from Taxable Income)', s_section))
+    story.append(info_box(
+        'The following credits are NOT counted as income. They represent loan disbursals, '
+        'internal fund movements, or family transfers. These should be excluded from ITR filing.'
+    ))
+    story.append(Spacer(1, 2*mm))
+    non_inc = inc.get('non_income_credits', {
+        'Loan Disbursals': di.get('loan_disbursal_total', 0),
+        'Self Transfers': di.get('self_transfer_total', 0),
+        'Family Transfers': di.get('family_transfer_total', 0),
+        'Reversals/Refunds': di.get('reversal_total', 0),
+    })
+    ni_rows = [['Non-Income Type', 'Amount (Rs)', 'Reason for Exclusion']]
+    ni_reasons = {
+        'Loan Disbursals': 'Liability — must be repaid, not taxable',
+        'Self Transfers': 'Internal fund movement — same person',
+        'Family Transfers': 'Personal transfer — not business income',
+        'Reversals/Refunds': 'Credit correction — not new income',
+    }
+    for ni_name, ni_amt in non_inc.items():
+        if ni_amt > 0:
+            ni_rows.append([ni_name, f'Rs {ni_amt:,.0f}', ni_reasons.get(ni_name, '—')])
+    if len(ni_rows) > 1:
+        story.append(hdr_tbl(ni_rows, [55*mm, 40*mm, 85*mm], [
+            ('TEXTCOLOR', (1,1),(1,-1), C_RED),
+        ]))
+    else:
+        story.append(alert('✓ No loan disbursals, self transfers, or family transfers detected.', 'ok'))
+
+    story.append(Spacer(1, 4*mm))
     top_cr = inc.get('top_10_sources', [])
     if top_cr:
         story.append(Paragraph('Top Credit Sources', s_section))
-        cr_hdr = [['Rank', 'Sender / Source', 'Total Amount (₹)', 'Transactions', 'Avg per Txn (₹)']]
+        cr_hdr = [['Rank', 'Sender / Source', 'Total (Rs)', 'Count', 'Avg/Txn (Rs)']]
         cr_rows = []
         for i, s in enumerate(top_cr[:10], 1):
-            cr_rows.append([str(i), s['sender'], f'₹{s["total_amt"]:,.0f}', str(s['count']), f'₹{s["avg_amt"]:,.0f}'])
-        story.append(hdr_tbl(cr_hdr + cr_rows, [15*mm, 65*mm, 45*mm, 30*mm, 25*mm]))
+            cr_rows.append([str(i), s['sender'], f'Rs {s["total_amt"]:,.0f}',
+                            str(s['count']), f'Rs {s["avg_amt"]:,.0f}'])
+        story.append(hdr_tbl(cr_hdr + cr_rows, [12*mm, 70*mm, 42*mm, 22*mm, 34*mm]))
     story.append(PageBreak())
 
-    # PAGE 4 — ITR
+    # ─────────────────────────────────────────────────────────
+    # PAGE 4 — ITR / TAX FILING (#5 justification)
+    # ─────────────────────────────────────────────────────────
     story += section_header('ITR / Tax Filing Analysis', 'SECTION 03')
     story.append(alert(f'Suggested ITR Form: {di["suggested_itr"]}', 'ok'))
-    story.append(Spacer(1, 4*mm))
+    story.append(Spacer(1, 3*mm))
+
+    # #5: ITR Justification
+    itr_just = di.get('itr_justification', '')
+    if itr_just:
+        story.append(info_box(f'Why this ITR form? {itr_just}'))
+        story.append(Spacer(1, 4*mm))
+
     story.append(Paragraph('Tax Deductions Identified', s_section))
     ded_data = [
-        kv('Section 80C (LIC / PPF / ELSS / EPF)',  f'₹{di["section_80c_total"]:,.0f}  (Max ₹1,50,000)',  C_YELLOW),
-        kv('Section 80D (Health Insurance)',          f'₹{di["section_80d_total"]:,.0f}  (Max ₹25,000)',    C_YELLOW),
+        kv('Section 80C (LIC / PPF / ELSS / EPF)',  f'Rs {di["section_80c_total"]:,.0f}  (Max Rs 1,50,000)',  C_YELLOW),
+        kv('Section 80D (Health Insurance)',          f'Rs {di["section_80d_total"]:,.0f}  (Max Rs 25,000)',    C_YELLOW),
     ]
     story.append(tbl(ded_data, [90*mm, 90*mm]))
     story.append(Spacer(1, 4*mm))
+
     ded_80c = di.get('deductions', {}).get('80C', [])
     if ded_80c:
         story.append(Paragraph('Section 80C Transactions', s_section))
-        r80c = [['Date', 'Description', 'Amount (₹)']]
+        r80c = [['Date', 'Description', 'Amount (Rs)']]
         for t in ded_80c[:15]:
-            r80c.append([t.get('date',''), t.get('desc','')[:60], f'₹{t.get("amount",0):,.0f}'])
+            r80c.append([t.get('date',''), t.get('desc','')[:60], f'Rs {t.get("amount",0):,.0f}'])
         story.append(hdr_tbl(r80c, [30*mm, 110*mm, 40*mm]))
         story.append(Spacer(1, 3*mm))
+
     hvc = di.get('high_value_credits', [])
     if hvc:
-        story.append(Paragraph(f'High Value Credits ≥ ₹1 Lakh ({len(hvc)} transactions)', s_section))
-        hvc_r = [['Date', 'Description', 'Amount (₹)', 'Type']]
+        story.append(Paragraph(f'High Value Credits ≥ Rs 1 Lakh ({len(hvc)} transactions)', s_section))
+        hvc_r = [['Date', 'Description', 'Amount (Rs)', 'Credit Type']]
         for t in hvc[:12]:
             hvc_r.append([t.get('date',''), t.get('desc','')[:60],
-                          f'₹{t.get("amount",0):,.0f}', t.get('credit_type','').replace('_',' ').title()])
+                          f'Rs {t.get("amount",0):,.0f}',
+                          t.get('credit_type','').replace('_',' ').title()])
         story.append(hdr_tbl(hvc_r, [30*mm, 80*mm, 40*mm, 30*mm], [
             ('TEXTCOLOR', (2,1),(2,-1), C_GREEN),
         ]))
     story.append(PageBreak())
 
-    # PAGE 5 — Expenses
+    # ─────────────────────────────────────────────────────────
+    # PAGE 5 — EXPENSE CATEGORIZATION (#6, #8 bar charts)
+    # ─────────────────────────────────────────────────────────
     story += section_header('Expense Categorization', 'SECTION 04')
     story.append(metrics_row([
-        ('Total Debits',        f'₹{de["total_debits"]:,.0f}',      C_RED),
-        ('Business Expenses',   f'₹{de["business_total"]:,.0f}',    C_BLUE),
-        ('Personal Expenses',   f'₹{de["personal_total"]:,.0f}',    C_RED),
-        ('GST Input Eligible',  f'₹{de["gst_eligible_total"]:,.0f}',C_GREEN),
+        ('Total Debits',       f'Rs {de["total_debits"]:,.0f}',       C_RED),
+        ('Business Expenses',  f'Rs {de["business_total"]:,.0f}',     C_BLUE),
+        ('Personal Expenses',  f'Rs {de["personal_total"]:,.0f}',     C_RED),
+        ('GST Input Eligible', f'Rs {de["gst_eligible_total"]:,.0f}', C_GREEN),
     ]))
     story.append(Spacer(1, 4*mm))
-    story.append(Paragraph('Category-wise Spend Breakdown', s_section))
-    cat_hdr = [['Category', 'Amount (₹)', '% of Total']]
-    cat_rows = []
+    story.append(Paragraph('Expense Category Breakdown', s_section))
+
+    cat_totals = de.get('category_totals', {})
     tot_dr = de['total_debits'] or 1
-    for cat, amt in list(de.get('category_totals', {}).items())[:20]:
+    cat_hdr = [['Category', 'Amount (Rs)', '% of Total']]
+    cat_rows = []
+    for cat, amt in list(cat_totals.items())[:20]:
         pct = round(amt / tot_dr * 100, 1)
-        cat_rows.append([cat, f'₹{amt:,.0f}', f'{pct}%'])
+        cat_rows.append([cat, f'Rs {amt:,.0f}', f'{pct}%'])
     story.append(hdr_tbl(cat_hdr + cat_rows, [80*mm, 60*mm, 40*mm]))
+    story.append(Spacer(1, 4*mm))
+
+    # Bar chart for expenses
+    story.append(Paragraph('Expense Distribution (Visual)', s_section))
+    exp_chart_data = {k: v for k, v in list(cat_totals.items())[:10] if v > 0}
+    chart = mini_bar_chart(exp_chart_data, tot_dr)
+    if chart:
+        story.append(chart)
+
+    story.append(Spacer(1, 4*mm))
+    # #6: mixed count badge
+    mixed_pct = de.get('mixed_pct', 0)
+    if mixed_pct > 20:
+        story.append(alert(
+            f'⚠ {mixed_pct}% of expenses are Mixed/Uncategorized (Rs{de["mixed_total"]:,.0f}). '
+            f'Consider adding more descriptive UPI remarks to improve classification accuracy.',
+            'warn'
+        ))
+    else:
+        story.append(alert(
+            f'✓ Expense categorization quality: {100-mixed_pct:.0f}% of expenses successfully classified. '
+            f'Mixed/Uncategorized: {mixed_pct}% (Rs{de["mixed_total"]:,.0f}).',
+            'ok'
+        ))
+
     story.append(Spacer(1, 4*mm))
     gst_el = de.get('gst_eligible', [])
     if gst_el:
         story.append(Paragraph(f'GST Input Credit Eligible Transactions ({len(gst_el)})', s_section))
-        gst_r = [['Date', 'Description', 'Amount (₹)']]
+        gst_r = [['Date', 'Description', 'Amount (Rs)']]
         for t in gst_el[:12]:
-            gst_r.append([t.get('date',''), t.get('desc','')[:70], f'₹{t.get("amount",0):,.2f}'])
+            gst_r.append([t.get('date',''), t.get('desc','')[:70], f'Rs {t.get("amount",0):,.2f}'])
         story.append(hdr_tbl(gst_r, [30*mm, 110*mm, 40*mm]))
     story.append(PageBreak())
 
-    # PAGE 6 — Obligations
+    # ─────────────────────────────────────────────────────────
+    # PAGE 6 — OBLIGATIONS & EMI ANALYSIS
+    # ─────────────────────────────────────────────────────────
     story += section_header('Obligations & EMI Analysis', 'SECTION 05')
     story.append(metrics_row([
-        ('Total EMI Outflow',   f'₹{obl.get("total_emi_outflow",0):,.0f}',  C_RED),
-        ('Avg Monthly EMI',     f'₹{obl.get("avg_monthly_emi",0):,.0f}',    C_YELLOW),
-        ('FOIR',                f'{dl["foir"]}%',                            C_RED if dl["foir"]>50 else C_YELLOW if dl["foir"]>35 else C_GREEN),
-        ('EMI Capacity Left',   f'₹{dl["remaining_emi_capacity"]:,.0f}/mo', C_GREEN),
+        ('Total EMI Outflow',   f'Rs {obl.get("total_emi_outflow",0):,.0f}',   C_RED),
+        ('Avg Monthly EMI',     f'Rs {obl.get("avg_monthly_emi",0):,.0f}',     C_YELLOW),
+        ('FOIR',                f'{dl.get("foir",0)}%',                        C_RED if dl.get("foir",0)>50 else C_YELLOW if dl.get("foir",0)>35 else C_GREEN),
+        ('EMI Capacity Left',   f'Rs {dl.get("remaining_emi_capacity",0):,.0f}/mo', C_GREEN),
     ]))
     story.append(Spacer(1, 4*mm))
-    if dl['foir'] > 50:
-        story.append(alert(f'⚠ High FOIR: {dl["foir"]}% — EMI obligations exceed 50% of income. Loan approval risk HIGH.', 'danger'))
-    elif dl['foir'] > 35:
-        story.append(alert(f'⚠ Moderate FOIR: {dl["foir"]}% — Banks prefer FOIR ≤ 40% for best approval chances.', 'warn'))
+
+    foir_val = dl.get('foir', 0)
+    if foir_val > 50:
+        story.append(alert(f'⚠ High FOIR: {foir_val}% — EMI obligations exceed 50% of income. Loan approval risk HIGH.', 'danger'))
+    elif foir_val > 35:
+        story.append(alert(f'⚠ Moderate FOIR: {foir_val}% — Banks prefer FOIR ≤ 40% for best approval chances.', 'warn'))
     else:
-        story.append(alert(f'✓ Healthy FOIR: {dl["foir"]}% — Good repayment capacity.', 'ok'))
+        story.append(alert(f'✓ Healthy FOIR: {foir_val}% — Good repayment capacity.', 'ok'))
+
     story.append(Spacer(1, 4*mm))
     emi_txns = obl.get('emi_txns', da.get('emis', []))
     if emi_txns:
         story.append(Paragraph(f'EMI / Loan Repayment Transactions ({len(emi_txns)})', s_section))
-        emi_r = [['Date', 'Description', 'Amount (₹)']]
+        emi_r = [['Date', 'Description', 'Amount (Rs)']]
         for t in emi_txns[:15]:
-            emi_r.append([t.get('date',''), t.get('desc','')[:70], f'₹{t.get("amount",0):,.2f}'])
+            emi_r.append([t.get('date',''), t.get('desc','')[:70], f'Rs {t.get("amount",0):,.2f}'])
         story.append(hdr_tbl(emi_r, [30*mm, 110*mm, 40*mm], [('TEXTCOLOR', (2,1),(2,-1), C_RED)]))
-        story.append(Spacer(1, 3*mm))
-    cc_pat = obl.get('cc_pattern', [])
-    if cc_pat:
-        story.append(Paragraph('Credit Card Payment Pattern', s_section))
-        cc_r = [['Month', 'Total Paid (₹)', 'No. of Payments', 'Pattern']]
-        for row in cc_pat:
-            cc_r.append([row['month'], f'₹{row["total_paid"]:,.0f}', str(row['count']), row['pattern']])
-        story.append(hdr_tbl(cc_r, [40*mm, 50*mm, 40*mm, 50*mm]))
     story.append(PageBreak())
 
-    # PAGE 7 — Loan & Credit
+    # ─────────────────────────────────────────────────────────
+    # PAGE 7 — LOAN & CREDIT ASSESSMENT (#3 credit reasons, #13 FOIR)
+    # ─────────────────────────────────────────────────────────
     story += section_header('Loan & Credit Assessment', 'SECTION 06')
-    credit_color = C_GREEN if dl['credit_color']=='green' else C_RED if dl['credit_color']=='red' else C_YELLOW
+    credit_color = C_GREEN if dl.get('credit_color')=='green' else C_RED if dl.get('credit_color')=='red' else C_YELLOW
     story.append(metrics_row([
-        ('Credit Profile',      dl['credit_indicator'],              credit_color),
-        ('Avg Monthly Income',  f'₹{dl["avg_monthly_credit"]:,.0f}',C_GREEN),
-        ('Avg Monthly Spend',   f'₹{dl["avg_monthly_debit"]:,.0f}', C_RED),
-        ('Avg Balance',         f'₹{dl["avg_balance"]:,.0f}',       C_GOLD),
+        ('Credit Profile',     dl.get('credit_indicator','—'),          credit_color),
+        ('Avg Monthly Income', f'Rs {dl.get("avg_monthly_credit",0):,.0f}', C_GREEN),
+        ('Avg Monthly Spend',  f'Rs {dl.get("avg_monthly_debit",0):,.0f}',  C_RED),
+        ('Loan Eligible',      f'Rs {dl.get("loan_eligible",0):,.0f}',       C_GREEN),
     ]))
     story.append(Spacer(1, 4*mm))
+
+    # #3: Credit Profile summary + reasons
+    credit_summary = dl.get('credit_summary', '')
+    if credit_summary:
+        clr = C_GREEN if dl.get('credit_color')=='green' else C_RED if dl.get('credit_color')=='red' else C_YELLOW
+        level = 'ok' if dl.get('credit_color')=='green' else 'danger' if dl.get('credit_color')=='red' else 'warn'
+        story.append(alert(f'Credit Profile: {dl.get("credit_indicator","—")} — {credit_summary}', level))
+        story.append(Spacer(1, 3*mm))
+
+    credit_reasons = dl.get('credit_reasons', [])
+    if credit_reasons:
+        story.append(Paragraph('Credit Profile Factors', s_section))
+        cr_reason_rows = [[Paragraph(f'• {r}', S('cr', fontSize=8.5, textColor=C_TEXT, leading=13))] for r in credit_reasons]
+        cr_tbl = Table(cr_reason_rows, colWidths=[W])
+        cr_tbl.setStyle(TableStyle([
+            ('BACKGROUND',    (0,0),(-1,-1), C_SURFACE),
+            ('GRID',          (0,0),(-1,-1), 0.2, C_BORDER),
+            ('LEFTPADDING',   (0,0),(-1,-1), 12),
+            ('TOPPADDING',    (0,0),(-1,-1), 5),
+            ('BOTTOMPADDING', (0,0),(-1,-1), 5),
+        ]))
+        story.append(cr_tbl)
+        story.append(Spacer(1, 4*mm))
+
     story.append(Paragraph('Key Credit Metrics', s_section))
     credit_kv = [
-        kv('FOIR (Fixed Obligation to Income Ratio)',  f'{dl["foir"]}%', C_RED if dl["foir"]>50 else C_YELLOW if dl["foir"]>35 else C_GREEN),
-        kv('DSCR (Debt Service Coverage Ratio)',       f'{dl["dscr"]}x' if dl.get('dscr') else 'N/A', C_TEXT),
-        kv('Minimum Balance',                          f'₹{dl["min_balance"]:,.0f}', C_TEXT),
-        kv('Negative Balance Months',                  str(dl['negative_months']), C_RED if dl['negative_months']>0 else C_GREEN),
-        kv('Remaining EMI Capacity',                   f'₹{dl["remaining_emi_capacity"]:,.0f}/month', C_GREEN),
-        kv('Estimated Loan Eligible',                  f'₹{dl["loan_eligible"]:,.0f}', C_GREEN),
-        kv('Months Analyzed',                          str(dl['months_analyzed']), C_TEXT),
+        kv('FOIR (Fixed Obligation to Income Ratio)', f'{dl.get("foir",0)}%',
+           C_RED if dl.get("foir",0)>50 else C_YELLOW if dl.get("foir",0)>35 else C_GREEN),
+        kv('DSCR (Debt Service Coverage Ratio)', f'{dl.get("dscr","N/A")}x' if dl.get('dscr') else 'N/A', C_TEXT),
+        kv('Avg Balance', f'Rs {dl.get("avg_balance",0):,.0f}', C_GOLD_L),
+        kv('Minimum Balance', f'Rs {dl.get("min_balance",0):,.0f}', C_TEXT),
+        kv('Negative Balance Months', str(dl.get('negative_months', 0)),
+           C_RED if dl.get('negative_months',0)>0 else C_GREEN),
+        kv('Remaining EMI Capacity', f'Rs {dl.get("remaining_emi_capacity",0):,.0f}/month', C_GREEN),
+        kv('Estimated Loan Eligible', f'Rs {dl.get("loan_eligible",0):,.0f}', C_GREEN),
+        kv('Months Analyzed', str(dl.get('months_analyzed', 0)), C_TEXT),
     ]
     story.append(tbl(credit_kv, [95*mm, 85*mm]))
-    story.append(Spacer(1, 4*mm))
-    story.append(Paragraph('Monthly Cash Flow', s_section))
-    if months_sorted:
-        cf_hdr = [['Month', 'Credits (₹)', 'Debits (₹)', 'Net (₹)']]
-        cf_rows = []
-        for m in months_sorted:
-            mv  = md[m]
-            cr  = mv.get('credits', 0)
-            dr  = mv.get('debits', 0)
-            net = cr - dr
-            cf_rows.append([m, f'₹{cr:,.0f}', f'₹{dr:,.0f}', f'{"+" if net>=0 else ""}₹{net:,.0f}'])
-        story.append(hdr_tbl(cf_hdr + cf_rows, [40*mm, 50*mm, 50*mm, 40*mm], [
-            ('TEXTCOLOR', (3,1),(3,-1), C_GREEN),
+    story.append(Spacer(1, 5*mm))
+
+    # #13: FOIR Full Calculation Box
+    foir_calc = dl.get('foir_calculation', {})
+    if foir_calc:
+        story.append(Paragraph('FOIR Calculation (Full Transparency)', s_section))
+        foir_rows = [
+            kv('Monthly Real Income (Base for FOIR)',
+               f'Rs {foir_calc.get("monthly_real_income",0):,.0f}', C_GREEN),
+            kv('Monthly EMI / Loan Obligations',
+               f'Rs {foir_calc.get("monthly_emi",0):,.0f}', C_RED),
+            kv('FOIR Formula',
+               foir_calc.get('formula', 'FOIR = (Monthly EMI / Monthly Income) × 100'), C_MUTED),
+            kv('FOIR Calculation',
+               foir_calc.get('calculation', '—'), C_GOLD),
+            kv('FOIR Result',
+               f'{foir_calc.get("foir_pct",0)}%  ({foir_calc.get("status","—")})',
+               C_GREEN if foir_calc.get("foir_pct",0)<=35 else C_YELLOW if foir_calc.get("foir_pct",0)<=50 else C_RED),
+            kv('FOIR Cap (Bank Policy)',
+               f'{foir_calc.get("foir_cap_pct",50)}% (standard lender threshold)', C_TEXT),
+            kv('Max Eligible EMI',
+               f'Rs {foir_calc.get("max_eligible_emi",0):,.0f}/month', C_GOLD_L),
+            kv('Additional EMI Capacity',
+               f'Rs {foir_calc.get("remaining_emi_capacity",0):,.0f}/month', C_GREEN),
+        ]
+        foir_tbl = Table(foir_rows, colWidths=[95*mm, 85*mm])
+        foir_tbl.setStyle(TableStyle([
+            ('BACKGROUND',    (0,0),(-1,-1), colors.HexColor('#0a0f00')),
+            ('ROWBACKGROUNDS',(0,0),(-1,-1), [colors.HexColor('#0a0f00'), colors.HexColor('#0d1200')]),
+            ('GRID',          (0,0),(-1,-1), 0.3, C_BORDER),
+            ('LINELEFT',      (0,0),(0,-1), 3, C_GOLD),
+            ('LEFTPADDING',   (0,0),(-1,-1), 10),
+            ('RIGHTPADDING',  (0,0),(-1,-1), 10),
+            ('TOPPADDING',    (0,0),(-1,-1), 6),
+            ('BOTTOMPADDING', (0,0),(-1,-1), 6),
         ]))
+        story.append(foir_tbl)
+        story.append(Spacer(1, 3*mm))
+        # Interpretation text
+        interp = foir_calc.get('interpretation', '')
+        if interp:
+            story.append(info_box(interp))
     story.append(PageBreak())
 
-    # PAGE 8 — Balance & Cash Flow
+    # ─────────────────────────────────────────────────────────
+    # PAGE 8 — BALANCE & CASH FLOW (#9 Balance KPIs)
+    # ─────────────────────────────────────────────────────────
     story += section_header('Balance & Cash Flow Analysis', 'SECTION 07')
+
+    # #9: New Balance KPIs
     story.append(metrics_row([
-        ('ABB — 3 Month',  f'₹{cf.get("abb_3m",0):,.0f}',  C_GOLD),
-        ('ABB — 6 Month',  f'₹{cf.get("abb_6m",0):,.0f}',  C_TEXT),
-        ('ABB — 12 Month', f'₹{cf.get("abb_12m",0):,.0f}', C_TEXT),
-        ('Avg Net Flow',   f'₹{cf.get("avg_net_flow",0):,.0f}', C_GREEN if cf.get("avg_net_flow",0)>0 else C_RED),
+        ('Avg Daily Balance',   f'Rs {bk.get("avg_daily_balance",0):,.0f}',   C_GOLD),
+        ('Highest Balance',     f'Rs {bk.get("highest_balance",0):,.0f}',     C_GREEN),
+        ('Lowest Balance',      f'Rs {bk.get("lowest_balance",0):,.0f}',      C_RED if bk.get("lowest_balance",0)<0 else C_TEXT),
+        ('Negative Bal Days',   str(bk.get('negative_balance_days', 0)),      C_RED if bk.get('negative_balance_days',0)>0 else C_GREEN),
     ]))
     story.append(Spacer(1, 4*mm))
+
+    if bk.get('negative_balance_days', 0) > 0:
+        neg_dates = bk.get('negative_balance_dates', [])
+        story.append(alert(
+            f'⚠ Negative balance detected on {bk["negative_balance_days"]} day(s): '
+            f'{", ".join(neg_dates[:5])}{"..." if len(neg_dates) > 5 else ""}. '
+            f'This is a strong negative signal for lenders.', 'danger'))
+        story.append(Spacer(1, 3*mm))
+
+    # Monthly Avg Balance
+    monthly_avg_bal = bk.get('monthly_avg_balance', {})
+    if monthly_avg_bal:
+        story.append(Paragraph('Monthly Average Balance', s_section))
+        mab_hdr = [['Month', 'Avg Balance (Rs)', 'Month-End Balance (Rs)']]
+        mab_rows = []
+        month_end_bals = bk.get('month_end_balances', {})
+        for m in sorted(monthly_avg_bal.keys()):
+            mab_rows.append([
+                m,
+                f'Rs {monthly_avg_bal[m]:,.0f}',
+                f'Rs {month_end_bals.get(m, 0):,.0f}',
+            ])
+        story.append(hdr_tbl(mab_hdr + mab_rows, [50*mm, 60*mm, 70*mm]))
+        story.append(Spacer(1, 4*mm))
+
     story.append(Paragraph(f'Balance Trend: {cf.get("trend_direction","N/A")}', s_section))
     eom = cf.get('eom_trend', [])
     if eom:
-        eom_hdr = [['Month', 'End-of-Month Balance (₹)']]
-        eom_rows = [[e['month'], f'₹{e["balance"]:,.0f}'] for e in eom]
+        eom_hdr = [['Month', 'End-of-Month Balance (Rs)']]
+        eom_rows = [[e['month'], f'Rs {e["balance"]:,.0f}'] for e in eom]
         story.append(hdr_tbl(eom_hdr + eom_rows, [80*mm, 100*mm]))
         story.append(Spacer(1, 3*mm))
-    story.append(Paragraph('Seasonality Detection', s_section))
+
     high_m = cf.get('high_months', [])
     low_m  = cf.get('low_months', [])
     if high_m:
@@ -2228,22 +2509,25 @@ def dashboard_export_pdf():
         story.append(alert(f'📉 Low Income Months: {", ".join(low_m)} — 25%+ below average', 'warn'))
     if not high_m and not low_m:
         story.append(alert('✓ Stable Income Pattern — No major seasonal variation detected.', 'ok'))
+
     story.append(Spacer(1, 4*mm))
     mn = cf.get('monthly_net', [])
     if mn:
         story.append(Paragraph('Monthly Net Cash Flow', s_section))
-        mn_hdr = [['Month', 'Credits (₹)', 'Debits (₹)', 'Net (₹)', 'Status']]
+        mn_hdr = [['Month', 'Credits (Rs)', 'Debits (Rs)', 'Net (Rs)', 'Status']]
         mn_rows = []
         for row in mn:
-            mn_rows.append([row['month'], f'₹{row["credits"]:,.0f}', f'₹{row["debits"]:,.0f}',
-                            f'{"+" if row["surplus"] else ""}₹{row["net"]:,.0f}',
+            mn_rows.append([row['month'], f'Rs {row["credits"]:,.0f}', f'Rs {row["debits"]:,.0f}',
+                            f'{"+" if row["surplus"] else ""}Rs {row["net"]:,.0f}',
                             '✓ Surplus' if row['surplus'] else '✗ Deficit'])
         story.append(hdr_tbl(mn_hdr + mn_rows, [35*mm, 42*mm, 42*mm, 38*mm, 23*mm], [
             ('TEXTCOLOR', (3,1),(3,-1), C_GREEN),
         ]))
     story.append(PageBreak())
 
-    # PAGE 9 — Audit
+    # ─────────────────────────────────────────────────────────
+    # PAGE 9 — AUDIT & RECONCILIATION
+    # ─────────────────────────────────────────────────────────
     story += section_header('Audit & Reconciliation', 'SECTION 08')
     story.append(metrics_row([
         ('Reconciliation Score', f'{da["reconciliation_score"]}/100',
@@ -2255,186 +2539,251 @@ def dashboard_export_pdf():
     story.append(Spacer(1, 4*mm))
     story.append(Paragraph('Audit Summary', s_section))
     audit_kv = [
-        kv('Reconciliation Score',    f'{da["reconciliation_score"]}/100'),
-        kv('Balance Mismatches',      str(da['mismatch_count'])),
-        kv('Cheque Bounces',          str(da['bounce_count'])),
-        kv('ECS Returns',             str(obl.get('ecs_count', 0))),
-        kv('EMIs Detected',           str(da['emi_count'])),
-        kv('Total EMI Outflow',       f'₹{da["total_emi_outflow"]:,.0f}'),
-        kv('EMI-to-Income Ratio',     f'{da["emi_to_income_ratio"]}%'),
-        kv('Duplicate Suspects',      str(da['duplicate_count'])),
+        kv('Reconciliation Score',  f'{da["reconciliation_score"]}/100'),
+        kv('Balance Mismatches',    str(da['mismatch_count'])),
+        kv('Cheque Bounces',        str(da['bounce_count'])),
+        kv('ECS Returns',           str(obl.get('ecs_count', 0))),
+        kv('EMIs Detected',         str(da['emi_count'])),
+        kv('Total EMI Outflow',     f'Rs {da["total_emi_outflow"]:,.0f}'),
+        kv('EMI-to-Income Ratio',   f'{da["emi_to_income_ratio"]}%'),
+        kv('Duplicate Suspects',    str(da['duplicate_count'])),
     ]
     story.append(tbl(audit_kv, [95*mm, 85*mm]))
     story.append(Spacer(1, 4*mm))
+
     bm = da.get('balance_mismatches', [])
     if bm:
-        story.append(alert(f'⚠ {len(bm)} balance continuity issue(s) found — may indicate data gaps or parsing issues.', 'warn'))
-        story.append(Spacer(1, 3*mm))
-        bm_hdr = [['Date', 'Description', 'Expected Balance', 'Actual Balance', 'Difference']]
-        bm_rows = []
-        for m in bm[:10]:
-            bm_rows.append([m.get('date',''), m.get('desc','')[:45],
-                            f'₹{m.get("expected_balance",0):,.2f}',
-                            f'₹{m.get("balance",0):,.2f}',
-                            f'₹{m.get("diff",0):,.2f}'])
-        story.append(hdr_tbl(bm_hdr + bm_rows, [28*mm, 65*mm, 35*mm, 35*mm, 17*mm], [
+        story.append(alert(f'⚠ {len(bm)} balance continuity issue(s) found.', 'warn'))
+        bm_hdr = [['Date', 'Description', 'Expected Balance', 'Actual Balance', 'Diff']]
+        bm_rows = [[m.get('date',''), m.get('desc','')[:40],
+                    f'Rs {m.get("expected_balance",0):,.2f}',
+                    f'Rs {m.get("balance",0):,.2f}',
+                    f'Rs {m.get("diff",0):,.2f}'] for m in bm[:10]]
+        story.append(hdr_tbl(bm_hdr + bm_rows, [28*mm, 60*mm, 37*mm, 37*mm, 18*mm], [
             ('TEXTCOLOR', (4,1),(4,-1), C_RED),
         ]))
     else:
         story.append(alert('✓ All balances verified — No continuity issues found.', 'ok'))
+
     story.append(Spacer(1, 4*mm))
     bounced = da.get('bounced', [])
     if bounced:
         story.append(Paragraph(f'Bounced / Returned Transactions ({len(bounced)})', s_section))
-        b_hdr = [['Date', 'Description', 'Amount (₹)']]
-        b_rows = [[t.get('date',''), t.get('desc','')[:70], f'₹{t.get("amount",0):,.2f}'] for t in bounced[:10]]
+        b_hdr = [['Date', 'Description', 'Amount (Rs)']]
+        b_rows = [[t.get('date',''), t.get('desc','')[:70], f'Rs {t.get("amount",0):,.2f}'] for t in bounced[:10]]
         story.append(hdr_tbl(b_hdr + b_rows, [30*mm, 110*mm, 40*mm], [('TEXTCOLOR', (2,1),(2,-1), C_RED)]))
     story.append(PageBreak())
 
-    # PAGE 10 — Red Flags
-    story += section_header('Red Flags & Fraud Detection', 'SECTION 09')
-    flag_color = C_GREEN if rf.get('flag_color')=='green' else C_RED if rf.get('flag_color')=='red' else C_YELLOW
+    # ─────────────────────────────────────────────────────────
+    # PAGE 10 — RISK FLAGS (#11)
+    # ─────────────────────────────────────────────────────────
+    story += section_header('Risk Flags & Underwriting Alerts', 'SECTION 09')
+    rfl_level = rfl.get('risk_level', 'Low')
+    rfl_color_map = {'Low': C_GREEN, 'Medium': C_YELLOW, 'High': C_RED}
+    rfl_clr = rfl_color_map.get(rfl_level, C_GREEN)
     story.append(metrics_row([
-        ('Flag Score',          str(rf.get('flag_score', 0)),         flag_color),
-        ('Circular Txns',       str(rf.get('circular_count', 0)),     C_RED if rf.get('circular_count',0)>0 else C_GREEN),
-        ('Gambling/Crypto',     str(rf.get('gambling_count', 0)),     C_RED if rf.get('gambling_count',0)>0 else C_GREEN),
-        ('Duplicate Groups',    str(rf.get('duplicate_groups', 0)),   C_YELLOW if rf.get('duplicate_groups',0)>0 else C_GREEN),
+        ('Risk Flag Level',     rfl_level,                           rfl_clr),
+        ('Risk Score',          f'{rfl.get("risk_score",0)}/100',    rfl_clr),
+        ('Flags Detected',      str(rfl.get('flag_count', 0)),       C_RED if rfl.get('flag_count',0)>0 else C_GREEN),
+        ('Loan Dependency',     f'{rfl.get("loan_dependency_pct",0)}%', C_RED if rfl.get("loan_dependency_pct",0)>20 else C_GREEN),
     ]))
     story.append(Spacer(1, 4*mm))
-    flag_level = rf.get('flag_level', 'Low')
-    if flag_level == 'High':
+
+    flag_details = rfl.get('flag_details', {})
+    if flag_details:
+        for flag_key, flag_info in flag_details.items():
+            severity = flag_info.get('severity', 'Low')
+            level_map = {'High': 'danger', 'Medium': 'warn', 'Low': 'ok'}
+            story.append(alert(
+                f'[{severity}] {flag_info.get("label","")}: {flag_info.get("description","")}',
+                level_map.get(severity, 'warn')
+            ))
+            story.append(Spacer(1, 2*mm))
+    else:
+        story.append(alert('✓ No significant risk flags detected. Statement appears clean for underwriting.', 'ok'))
+
+    story.append(PageBreak())
+
+    # ─────────────────────────────────────────────────────────
+    # PAGE 11 — RED FLAGS & FRAUD DETECTION
+    # ─────────────────────────────────────────────────────────
+    story += section_header('Red Flags & Fraud Detection', 'SECTION 10')
+    flag_color_val = C_GREEN if rf.get('flag_color')=='green' else C_RED if rf.get('flag_color')=='red' else C_YELLOW
+    story.append(metrics_row([
+        ('Flag Score',       str(rf.get('flag_score', 0)),        flag_color_val),
+        ('Circular Txns',    str(rf.get('circular_count', 0)),    C_RED if rf.get('circular_count',0)>0 else C_GREEN),
+        ('Gambling/Crypto',  str(rf.get('gambling_count', 0)),    C_RED if rf.get('gambling_count',0)>0 else C_GREEN),
+        ('Duplicate Groups', str(rf.get('duplicate_groups', 0)),  C_YELLOW if rf.get('duplicate_groups',0)>0 else C_GREEN),
+    ]))
+    story.append(Spacer(1, 4*mm))
+
+    flag_level_rf = rf.get('flag_level', 'Low')
+    if flag_level_rf == 'High':
         story.append(alert(f'🚨 HIGH RISK: {rf.get("total_flags",0)} red flags detected. Immediate review required.', 'danger'))
-    elif flag_level == 'Medium':
+    elif flag_level_rf == 'Medium':
         story.append(alert(f'⚠ MEDIUM RISK: {rf.get("total_flags",0)} flag(s) detected. Review recommended.', 'warn'))
     else:
         story.append(alert(f'✓ LOW RISK: {rf.get("total_flags",0)} flag(s). Statement appears clean.', 'ok'))
     story.append(Spacer(1, 4*mm))
+
     circ = rf.get('circular_txns', [])
     if circ:
         story.append(Paragraph(f'Circular Transactions ({len(circ)}) — Same amount credited & debited within 7 days', s_section))
         c_hdr = [['Credit Date', 'Credit Desc', 'Debit Date', 'Debit Desc', 'Amount', 'Gap']]
-        c_rows = [[c['credit_date'], c['credit_desc'][:30], c['debit_date'],
-                   c['debit_desc'][:30], f'₹{c["amount"]:,.0f}', f'{c["days_gap"]}d'] for c in circ[:8]]
-        story.append(hdr_tbl(c_hdr + c_rows, [25*mm, 45*mm, 25*mm, 45*mm, 25*mm, 15*mm]))
+        c_rows = [[c['credit_date'], c['credit_desc'][:28], c['debit_date'],
+                   c['debit_desc'][:28], f'Rs {c["amount"]:,.0f}', f'{c["days_gap"]}d'] for c in circ[:8]]
+        story.append(hdr_tbl(c_hdr + c_rows, [25*mm, 43*mm, 25*mm, 43*mm, 25*mm, 19*mm]))
         story.append(Spacer(1, 3*mm))
+
     wd = rf.get('window_dress', [])
     if wd:
         story.append(Paragraph(f'Window Dressing Alerts ({len(wd)}) — Large deposits near month-end', s_section))
         for w in wd[:5]:
             story.append(alert(
-                f'Month-End Deposit: {w["deposit_date"]} — ₹{w["amount"]:,.0f} — '
+                f'Month-End Deposit: {w["deposit_date"]} — Rs{w["amount"]:,.0f} — '
                 f'{w["withdrawal_count"]} matching withdrawal(s) within 8 days', 'warn'))
         story.append(Spacer(1, 3*mm))
+
     gamb = rf.get('gambling_txns', [])
     if gamb:
-        story.append(Paragraph(f'Gambling / Crypto / Speculative ({len(gamb)}) — ₹{rf.get("gambling_total",0):,.0f} total', s_section))
-        g_hdr = [['Date', 'Description', 'Type', 'Amount (₹)']]
-        g_rows = [[t.get('date',''), t.get('desc','')[:65], t.get('type',''), f'₹{t.get("amount",0):,.0f}'] for t in gamb[:12]]
-        story.append(hdr_tbl(g_hdr + g_rows, [28*mm, 90*mm, 15*mm, 47*mm]))
-        story.append(Spacer(1, 3*mm))
-    pen = rf.get('penalty_txns', [])
-    if pen:
-        story.append(Paragraph(f'Penalty / Legal Charges ({len(pen)}) — ₹{rf.get("penalty_total",0):,.0f}', s_section))
-        p_hdr = [['Date', 'Description', 'Amount (₹)']]
-        p_rows = [[t.get('date',''), t.get('desc','')[:75], f'₹{t.get("amount",0):,.0f}'] for t in pen[:10]]
-        story.append(hdr_tbl(p_hdr + p_rows, [28*mm, 112*mm, 40*mm], [('TEXTCOLOR', (2,1),(2,-1), C_RED)]))
+        story.append(Paragraph(f'Gambling / Crypto / Speculative ({len(gamb)}) — Rs{rf.get("gambling_total",0):,.0f} total', s_section))
+        g_hdr = [['Date', 'Description', 'Type', 'Amount (Rs)']]
+        g_rows = [[t.get('date',''), t.get('desc','')[:60], t.get('type',''), f'Rs {t.get("amount",0):,.0f}'] for t in gamb[:12]]
+        story.append(hdr_tbl(g_hdr + g_rows, [28*mm, 87*mm, 15*mm, 50*mm]))
     story.append(PageBreak())
 
-    # PAGE 11 — Compliance
-    story += section_header('Compliance Reporting (PMLA / RBI)', 'SECTION 10')
+    # ─────────────────────────────────────────────────────────
+    # PAGE 12 — COMPLIANCE (#4 risk explanation)
+    # ─────────────────────────────────────────────────────────
+    story += section_header('Compliance Reporting (PMLA / RBI)', 'SECTION 11')
     risk_color_map = {'green': C_GREEN, 'yellow': C_YELLOW, 'red': C_RED}
     risk_c = risk_color_map.get(dc.get('risk_color','green'), C_GREEN)
     story.append(metrics_row([
-        ('Risk Level',          dc['risk_level'],               risk_c),
-        ('Risk Score',          str(dc['risk_score']),          risk_c),
-        ('High Value Txns',     str(dc['high_value_count']),    C_YELLOW if dc['high_value_count']>5 else C_GREEN),
-        ('STR Candidates',      str(dc['str_count']),           C_RED if dc['str_count']>0 else C_GREEN),
+        ('Risk Level',      dc['risk_level'],            risk_c),
+        ('Risk Score',      str(dc['risk_score']),       risk_c),
+        ('High Value Txns', str(dc['high_value_count']), C_YELLOW if dc['high_value_count']>5 else C_GREEN),
+        ('STR Candidates',  str(dc['str_count']),        C_RED if dc['str_count']>0 else C_GREEN),
     ]))
     story.append(Spacer(1, 4*mm))
+
+    # #4: Risk explanation text
+    risk_expl = dc.get('risk_explanation', '')
+    if risk_expl:
+        level_map2 = {'Low': 'ok', 'Medium': 'warn', 'High': 'danger'}
+        story.append(alert(risk_expl, level_map2.get(dc['risk_level'], 'warn')))
+        story.append(Spacer(1, 3*mm))
+
+    # Risk reasons breakdown
+    risk_reasons = dc.get('risk_reasons', [])
+    if risk_reasons and dc['risk_level'] != 'Low':
+        story.append(Paragraph('Compliance Risk Factors', s_section))
+        rr_rows = [[Paragraph(f'• {r}', S('rr', fontSize=8.5, textColor=C_TEXT, leading=13))] for r in risk_reasons]
+        rr_tbl = Table(rr_rows, colWidths=[W])
+        rr_tbl.setStyle(TableStyle([
+            ('BACKGROUND',    (0,0),(-1,-1), C_SURFACE),
+            ('GRID',          (0,0),(-1,-1), 0.2, C_BORDER),
+            ('LEFTPADDING',   (0,0),(-1,-1), 12),
+            ('TOPPADDING',    (0,0),(-1,-1), 5),
+            ('BOTTOMPADDING', (0,0),(-1,-1), 5),
+        ]))
+        story.append(rr_tbl)
+        story.append(Spacer(1, 4*mm))
+
     if dc['form_61a_required']:
-        story.append(alert(f'🚨 Form 61A / SFT Filing REQUIRED — Annual cash total ₹{dc["annual_cash_total"]:,.0f} exceeds ₹10L threshold.', 'danger'))
+        story.append(alert(f'🚨 Form 61A / SFT Filing REQUIRED — Annual cash total Rs{dc["annual_cash_total"]:,.0f} exceeds Rs10L threshold.', 'danger'))
     if dc['str_candidates']:
-        story.append(alert(f'⚠ {dc["str_count"]} STR Candidate(s) — Single day credits ≥ ₹5L. May require filing under PMLA.', 'warn'))
+        story.append(alert(f'⚠ {dc["str_count"]} STR Candidate(s) — Single day credits ≥ Rs5L. May require filing under PMLA.', 'warn'))
     if dc['structured_suspects']:
-        story.append(alert(f'⚠ {dc["structured_count"]} Structuring Suspect(s) — Transactions between ₹1.8L–₹2L detected.', 'warn'))
-    story.append(Spacer(1, 4*mm))
-    story.append(Paragraph('Compliance Metrics', s_section))
-    comp_kv = [
-        kv('Risk Level',                    dc['risk_level']),
-        kv('High Value Transactions (≥₹2L)', str(dc['high_value_count'])),
-        kv('Cash Transactions',             str(dc['cash_count'])),
-        kv('STR Candidates (≥₹5L/day)',     str(dc['str_count'])),
-        kv('Structuring Suspects',          str(dc['structured_count'])),
-        kv('Daily Limit Breaches (>₹50K)',  str(len(dc['daily_breaches']))),
-        kv('Annual Cash Total',             f'₹{dc["annual_cash_total"]:,.0f}'),
-        kv('Form 61A / SFT Required',       'YES — File immediately' if dc['form_61a_required'] else 'Not Required'),
-    ]
-    story.append(tbl(comp_kv, [95*mm, 85*mm]))
+        story.append(alert(f'⚠ {dc["structured_count"]} Structuring Suspect(s) — Transactions between Rs1.8L–Rs2L detected.', 'warn'))
+
     story.append(Spacer(1, 4*mm))
     hvt = dc.get('high_value_txns', [])
     if hvt:
-        story.append(Paragraph(f'High Value Transactions ≥ ₹2 Lakh ({len(hvt)})', s_section))
-        hv_hdr = [['Date', 'Description', 'Type', 'Amount (₹)']]
-        hv_rows = [[t.get('date',''), t.get('desc','')[:65], t.get('type',''), f'₹{t.get("amount",0):,.0f}'] for t in hvt[:15]]
-        story.append(hdr_tbl(hv_hdr + hv_rows, [28*mm, 90*mm, 15*mm, 47*mm], [('TEXTCOLOR', (2,1),(2,-1), C_GREEN)]))
+        story.append(Paragraph(f'High Value Transactions ≥ Rs2 Lakh ({len(hvt)})', s_section))
+        hv_hdr = [['Date', 'Description', 'Type', 'Amount (Rs)']]
+        hv_rows = [[t.get('date',''), t.get('desc','')[:62], t.get('type',''), f'Rs {t.get("amount",0):,.0f}'] for t in hvt[:15]]
+        story.append(hdr_tbl(hv_hdr + hv_rows, [28*mm, 88*mm, 15*mm, 49*mm], [('TEXTCOLOR', (2,1),(2,-1), C_GREEN)]))
     story.append(PageBreak())
 
-    # PAGE 12 — Top Debits
-    story += section_header('Top Debit Destinations & Spend Patterns', 'SECTION 11')
+    # ─────────────────────────────────────────────────────────
+    # PAGE 13 — TOP DEBITS & GSTR-1
+    # ─────────────────────────────────────────────────────────
+    story += section_header('Top Debit Destinations & GST Summary', 'SECTION 12')
     top_db = obl.get('top_10_debits', [])
     if top_db:
         story.append(Paragraph('Top 10 Debit Destinations (by total amount)', s_section))
-        db_hdr = [['Rank', 'Destination', 'Total Amount (₹)', 'Transactions', 'Avg per Txn (₹)']]
-        db_rows = [[str(i+1), d['dest'], f'₹{d["total"]:,.0f}', str(d['count']), f'₹{d["avg"]:,.0f}'] for i, d in enumerate(top_db)]
+        db_hdr = [['Rank', 'Destination', 'Total (Rs)', 'Transactions', 'Avg/Txn (Rs)']]
+        db_rows = [[str(i+1), d['dest'], f'Rs {d["total"]:,.0f}', str(d['count']), f'Rs {d["avg"]:,.0f}']
+                   for i, d in enumerate(top_db)]
         story.append(hdr_tbl(db_hdr + db_rows, [15*mm, 70*mm, 45*mm, 30*mm, 20*mm]))
-        story.append(Spacer(1, 6*mm))
+        story.append(Spacer(1, 5*mm))
+
+        # Bar chart for top debits
+        db_chart = mini_bar_chart({d['dest']: d['total'] for d in top_db[:8]},
+                                  sum(d['total'] for d in top_db))
+        if db_chart:
+            story.append(db_chart)
+        story.append(Spacer(1, 5*mm))
+
     story.append(Paragraph('GSTR-1 Sales Classification', s_section))
     story.append(metrics_row([
-        ('B2B Supplies',   f'₹{dg["total_b2b"]:,.0f}',   C_GREEN),
-        ('B2C Supplies',   f'₹{dg["total_b2c"]:,.0f}',   C_TEXT),
-        ('Export Supplies',f'₹{dg["total_export"]:,.0f}', C_YELLOW),
-        ('Est. GST @18%',  f'₹{dg["estimated_gst"]:,.0f}',C_RED),
+        ('B2B Supplies',    f'Rs {dg["total_b2b"]:,.0f}',    C_GREEN),
+        ('B2C Supplies',    f'Rs {dg["total_b2c"]:,.0f}',    C_TEXT),
+        ('Export Supplies', f'Rs {dg["total_export"]:,.0f}',  C_YELLOW),
+        ('Est. GST @18%',   f'Rs {dg["estimated_gst"]:,.0f}', C_RED),
     ]))
     story.append(Spacer(1, 4*mm))
     gst_status = 'Filing Required' if dg['total_taxable'] > 0 else 'Verify with CA'
     story.append(alert(
-        f'GST Status: {gst_status} — Total Taxable: ₹{dg["total_taxable"]:,.0f} | '
-        f'Est. Liability: ₹{dg["estimated_gst"]:,.0f} | Filing: {dg["filing_status"]}',
+        f'GST Status: {gst_status} — Total Taxable: Rs{dg["total_taxable"]:,.0f} | '
+        f'Est. Liability: Rs{dg["estimated_gst"]:,.0f} | Filing: {dg["filing_status"]}',
         'warn' if dg['total_taxable'] > 0 else 'ok'
     ))
     story.append(PageBreak())
 
-    # PAGE 13 — Scorecard
-    story += section_header('Financial Health Scorecard', 'SECTION 12 — SUMMARY')
+    # ─────────────────────────────────────────────────────────
+    # PAGE 14 — FINANCIAL HEALTH SCORECARD
+    # ─────────────────────────────────────────────────────────
+    story += section_header('Financial Health Scorecard', 'SECTION 13 — SUMMARY')
     story.append(Paragraph(
-        'This scorecard summarizes key financial health indicators derived from the bank statement analysis.',
+        'This scorecard summarizes key financial health indicators for CA/NBFC underwriting decision.',
         s_body
     ))
     story.append(Spacer(1, 5*mm))
 
     def score_row(label, value, status, color):
-        return [label, value, Paragraph(status, S('sr', fontSize=8.5, textColor=color, fontName='Helvetica-Bold', leading=13))]
+        return [label, value, Paragraph(status, S('sr', fontSize=8.5, textColor=color,
+                fontName='Helvetica-Bold', leading=13))]
 
     scorecard = [
         ['Parameter', 'Value', 'Status'],
-        score_row('Real Income (Monthly Avg)', f'₹{dl["avg_monthly_credit"]:,.0f}',
-                  '✓ Good' if dl['avg_monthly_credit'] > 30000 else '⚠ Low',
-                  C_GREEN if dl['avg_monthly_credit'] > 30000 else C_YELLOW),
-        score_row('FOIR', f'{dl["foir"]}%',
-                  '✓ Healthy' if dl["foir"]<=35 else '⚠ Moderate' if dl["foir"]<=50 else '✗ High Risk',
-                  C_GREEN if dl["foir"]<=35 else C_YELLOW if dl["foir"]<=50 else C_RED),
-        score_row('Loan Eligibility', f'₹{dl["loan_eligible"]:,.0f}',
-                  '✓ Eligible' if dl['loan_eligible']>0 else '✗ Not Eligible',
-                  C_GREEN if dl['loan_eligible']>0 else C_RED),
-        score_row('Credit Profile', dl['credit_indicator'],
-                  '✓ Strong' if dl['credit_color']=='green' else '⚠ Moderate' if dl['credit_color']=='yellow' else '✗ Weak',
-                  C_GREEN if dl['credit_color']=='green' else C_YELLOW if dl['credit_color']=='yellow' else C_RED),
+        score_row('Real Income (Monthly Avg)', f'Rs {dl.get("avg_monthly_credit",0):,.0f}',
+                  '✓ Good' if dl.get('avg_monthly_credit',0) > 30000 else '⚠ Low',
+                  C_GREEN if dl.get('avg_monthly_credit',0) > 30000 else C_YELLOW),
+        score_row('FOIR', f'{dl.get("foir",0)}%',
+                  '✓ Healthy' if dl.get("foir",0)<=35 else '⚠ Moderate' if dl.get("foir",0)<=50 else '✗ High Risk',
+                  C_GREEN if dl.get("foir",0)<=35 else C_YELLOW if dl.get("foir",0)<=50 else C_RED),
+        score_row('Loan Eligibility', f'Rs {dl.get("loan_eligible",0):,.0f}',
+                  '✓ Eligible' if dl.get('loan_eligible',0)>0 else '✗ Not Eligible',
+                  C_GREEN if dl.get('loan_eligible',0)>0 else C_RED),
+        score_row('Credit Profile', dl.get('credit_indicator','—'),
+                  '✓ Strong' if dl.get('credit_color')=='green' else '⚠ Moderate' if dl.get('credit_color')=='yellow' else '✗ Weak',
+                  C_GREEN if dl.get('credit_color')=='green' else C_YELLOW if dl.get('credit_color')=='yellow' else C_RED),
+        score_row('Avg Daily Balance', f'Rs {bk.get("avg_daily_balance",0):,.0f}',
+                  '✓ Healthy' if bk.get('avg_daily_balance',0) > 10000 else '⚠ Low',
+                  C_GREEN if bk.get('avg_daily_balance',0) > 10000 else C_YELLOW),
+        score_row('Negative Balance Days', str(bk.get('negative_balance_days', 0)),
+                  '✓ None' if bk.get('negative_balance_days',0)==0 else '✗ Detected',
+                  C_GREEN if bk.get('negative_balance_days',0)==0 else C_RED),
         score_row('Reconciliation Score', f'{da["reconciliation_score"]}/100',
                   '✓ Good' if da['reconciliation_score']>=80 else '⚠ Average' if da['reconciliation_score']>=50 else '✗ Poor',
                   C_GREEN if da['reconciliation_score']>=80 else C_YELLOW if da['reconciliation_score']>=50 else C_RED),
         score_row('Compliance Risk', dc['risk_level'],
                   '✓ Low' if dc['risk_level']=='Low' else '⚠ Medium' if dc['risk_level']=='Medium' else '✗ High',
                   C_GREEN if dc['risk_level']=='Low' else C_YELLOW if dc['risk_level']=='Medium' else C_RED),
+        score_row('Risk Flags', str(rfl.get('flag_count', 0)),
+                  '✓ Clean' if rfl.get('flag_count',0)==0 else f'⚠ {rfl.get("flag_count",0)} Flag(s)',
+                  C_GREEN if rfl.get('flag_count',0)==0 else C_YELLOW if rfl.get('risk_level')=='Medium' else C_RED),
         score_row('Cheque Bounces', str(da['bounce_count']),
                   '✓ Clean' if da['bounce_count']==0 else '✗ Found',
                   C_GREEN if da['bounce_count']==0 else C_RED),
@@ -2444,6 +2793,8 @@ def dashboard_export_pdf():
         score_row('Form 61A Required', 'Yes' if dc['form_61a_required'] else 'No',
                   '✗ File Required' if dc['form_61a_required'] else '✓ Not Required',
                   C_RED if dc['form_61a_required'] else C_GREEN),
+        score_row('Payment Mode (Primary)', pm.get('sorted_modes', [['—',{}]])[0][0] if pm.get('sorted_modes') else '—',
+                  '✓ Identified', C_TEXT),
     ]
 
     sc_tbl = Table(scorecard, colWidths=[90*mm, 55*mm, 35*mm])
@@ -2459,7 +2810,7 @@ def dashboard_export_pdf():
         ('LEADING',       (0,0),(-1,-1), 14),
         ('GRID',          (0,0),(-1,-1), 0.3, C_BORDER),
         ('LINEABOVE',     (0,0),(-1, 0), 1.5, C_GOLD),
-        ('LINEBELOW',     (0,-1),(-1,-1),1.5, C_GOLD),
+        ('LINEBELOW',     (0,-1),(-1,-1), 1.5, C_GOLD),
         ('LINEBELOW',     (0, 0),(-1, 0), 0.8, C_GOLD),
         ('LEFTPADDING',   (0,0),(-1,-1), 10),
         ('RIGHTPADDING',  (0,0),(-1,-1), 10),
@@ -2481,7 +2832,7 @@ def dashboard_export_pdf():
     ))
     story.append(Spacer(1, 3*mm))
     story.append(Paragraph(
-        f'Report generated by AarogyamFin — www.aarogyamfin.com | {today_str}',
+        f'Report generated by AarogyamFin — www.aarogyamfin.com | {today_str} | Version 3.0',
         s_footer
     ))
 
