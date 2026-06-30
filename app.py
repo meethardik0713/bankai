@@ -8,6 +8,8 @@ import hashlib
 import threading
 import hmac
 import razorpay
+import smtplib
+from email.mime.text import MIMEText
 from flask import Flask, request, render_template, send_file, abort, session, redirect, jsonify, Response
 from flask_cors import CORS
 from flask_talisman import Talisman
@@ -43,6 +45,26 @@ def ph_track(user_id, event, props=None, properties=None):
         ph.capture(distinct_id=str(user_id or 'anonymous'), event=event, properties=p)
     except Exception:
         pass
+
+
+def _send_demo_lead_email(name, company, role, phone):
+    subject = f'New Demo Request — {name} ({role})'
+    body = (
+        f"New demo request received on aarogyamfin.com\n\n"
+        f"Name: {name}\n"
+        f"Company/Firm: {company or '-'}\n"
+        f"Role: {role}\n"
+        f"Phone: {phone}\n"
+    )
+    msg = MIMEText(body)
+    msg['Subject'] = subject
+    msg['From']    = GMAIL_USER
+    msg['To']      = DEMO_NOTIFY_EMAIL
+
+    with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+        server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
+        server.send_message(msg)
+
 
 # ── Logging ───────────────────────────────────────────────
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
@@ -125,6 +147,10 @@ PLAN_CONFIG = {
     'Pro':      {'price': 99,  'input_tokens': 300000,  'output_tokens': 15000, 'validity_hours': 125},
     'Elite':    {'price': 499, 'input_tokens': 1500000, 'output_tokens': 20000, 'validity_hours': 200},
 }
+
+GMAIL_USER          = 'aarogyamfin@gmail.com'
+GMAIL_APP_PASSWORD  = os.environ.get('GMAIL_APP_PASSWORD', '')
+DEMO_NOTIFY_EMAIL   = 'aarogyamfin@gmail.com'
 
 request_counts = defaultdict(list)
 RATE_LIMIT  = 10
@@ -635,6 +661,8 @@ def home():
     page_num          = 1
     total_pages       = 1
     total_count       = 0
+    demo_submitted    = session.pop('demo_submitted', False)
+    demo_error        = session.pop('demo_error', None)
 
     cached_hash    = session.get('file_hash')
     cached_name    = session.get('file_name', '')
@@ -825,7 +853,39 @@ def home():
         total_pages       = total_pages,
         total_count       = total_count,
         dashboard_data    = dashboard_data,
+        demo_submitted    = demo_submitted,
+        demo_error        = demo_error,
     )
+
+
+@app.route('/book-demo', methods=['POST'])
+def book_demo():
+    ip = request.remote_addr
+    if is_rate_limited(ip):
+        abort(429)
+
+    name    = request.form.get('name', '').strip()[:100]
+    company = request.form.get('company', '').strip()[:150]
+    role    = request.form.get('role', '').strip()[:50]
+    phone   = request.form.get('phone', '').strip()[:20]
+
+    if not name or not role or not phone:
+        session['demo_error'] = 'Please fill in all required fields.'
+        return redirect('/#book-demo')
+
+    try:
+        _send_demo_lead_email(name, company, role, phone)
+        session['demo_submitted'] = True
+        ph_track(ip, event='demo_requested', props={
+            'role':        role,
+            'has_company': bool(company),
+        })
+        logger.info("Demo lead captured: %s (%s)", name, role)
+    except Exception as e:
+        logger.exception("Demo lead email failed: %s", e)
+        session['demo_error'] = 'Something went wrong sending your request. Please try WhatsApp instead.'
+
+    return redirect('/#book-demo')
 
 
 @app.route('/clear', methods=['POST'])
