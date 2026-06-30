@@ -47,7 +47,7 @@ def ph_track(user_id, event, props=None, properties=None):
         pass
 
 
-def _send_demo_lead_email(name, company, role, phone):
+def _send_demo_lead_email(name, company, role, phone, volume):
     subject = f'New Demo Request — {name} ({role})'
     body = (
         f"New demo request received on aarogyamfin.com\n\n"
@@ -55,6 +55,7 @@ def _send_demo_lead_email(name, company, role, phone):
         f"Company/Firm: {company or '-'}\n"
         f"Role: {role}\n"
         f"Phone: {phone}\n"
+        f"Expected Monthly Volume: {volume}\n"
     )
     msg = MIMEText(body)
     msg['Subject'] = subject
@@ -868,17 +869,19 @@ def book_demo():
     company = request.form.get('company', '').strip()[:150]
     role    = request.form.get('role', '').strip()[:50]
     phone   = request.form.get('phone', '').strip()[:20]
+    volume  = request.form.get('volume', '').strip()[:20]
 
-    if not name or not role or not phone:
+    if not name or not role or not phone or not volume:
         session['demo_error'] = 'Please fill in all required fields.'
         return redirect('/#book-demo')
 
     try:
-        _send_demo_lead_email(name, company, role, phone)
+        _send_demo_lead_email(name, company, role, phone, volume)
         session['demo_submitted'] = True
         ph_track(ip, event='demo_requested', props={
             'role':        role,
             'has_company': bool(company),
+            'volume':      volume,
         })
         logger.info("Demo lead captured: %s (%s)", name, role)
     except Exception as e:
