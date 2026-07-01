@@ -267,11 +267,6 @@
   </div>
 </div>
 
-<!-- FEATURE IMAGE -->
-<div style="max-width: 1200px; margin: 0 auto; padding: 0 60px;">
-  <img src="{{ url_for('static', filename='images/' + feature_image) if feature_image else url_for('static', filename='images/analyzer_output.png') }}" alt="{{ feature_image_alt | default('AarogyamFin AI bank statement analyzer showing transaction table with categories and real-time financial summary') }}" width="{{ feature_image_width | default(1854) }}" height="{{ feature_image_height | default(914) }}" loading="lazy" style="max-width: 100%; border: 1px solid rgba(201,168,76,0.2); border-radius: 4px; margin: 40px auto; display: block; box-shadow: 0 8px 32px rgba(0,0,0,0.4);">
-</div>
-
 <!-- BANKS STRIP -->
 <div class="banks-strip">
   <div class="banks-inner">

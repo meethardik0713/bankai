@@ -1081,9 +1081,7 @@ def bsa_for_ca():
         page_description="AI-powered bank statement analyzer built for Chartered Accountants. Upload client bank PDFs — get instant transactions, Excel export & ITR-ready summaries for every client, every quarter.",
         page_h1="<em>ITR-Ready</em><br>Bank Statement Analysis<br>for Chartered Accountants",
         page_subheading="Built for CA workflows — GST reconciliation, audits & client-ready books",
-        page_intro="Upload client bank statement PDFs and get instant transaction extraction, ITR-ready income summaries, GSTR-1/2B/3B reconciliation support, and audit-friendly Excel exports — built to help CAs manage every client, every filing season, faster.",
-        feature_image="expenses.png", feature_image_width=1885, feature_image_height=909,
-        feature_image_alt="AarogyamFin expense categorization dashboard for Chartered Accountants showing GST-eligible business transactions")
+        page_intro="Upload client bank statement PDFs and get instant transaction extraction, ITR-ready income summaries, GSTR-1/2B/3B reconciliation support, and audit-friendly Excel exports — built to help CAs manage every client, every filing season, faster.")
 
 @app.route('/sbi-bank-statement-analyzer')
 def sbi_bsa():
@@ -1193,9 +1191,7 @@ def bsa_for_dsa():
         page_description="AI-powered bank statement analyzer for DSAs & loan agents. Verify income, calculate FOIR, and assess loan eligibility in seconds before submitting to lenders.",
         page_h1="<em>Instant</em><br>Loan Eligibility<br>Bank Statement Analysis",
         page_subheading="FOIR calculation, EMI detection & faster disbursals for DSAs",
-        page_intro="Upload any borrower's bank statement PDF and get instant income verification, automatic EMI detection, FOIR calculation, and loan eligibility scoring — so DSAs can qualify leads faster and push clean files to lenders for quicker disbursals.",
-        feature_image="Emidetection.png", feature_image_width=1896, feature_image_height=927,
-        feature_image_alt="AarogyamFin EMI detection and loan eligibility analysis for DSA loan processing")
+        page_intro="Upload any borrower's bank statement PDF and get instant income verification, automatic EMI detection, FOIR calculation, and loan eligibility scoring — so DSAs can qualify leads faster and push clean files to lenders for quicker disbursals.")
 
 @app.route('/bank-statement-analyzer-for-nbfc')
 def bsa_for_nbfc():
