@@ -1,32 +1,29 @@
 """
-core/dashboard.py — V6 (Central Engine + Validation Architecture)
+core/dashboard.py — V6.1 (Central Engine + Validation Architecture)
 ══════════════════════════════════════════════════════════════════
-12-point consistency overhaul. Logic only — zero UI changes.
+12-point consistency overhaul + V6.1 correctness patches.
+Logic only — zero UI changes. Drop-in replacement for V6.
+
+V6.1 fixes (see CHANGELOG at bottom):
+  #F1  Balance-ratio health penalty was inverted (descending table
+       routed through ascending step_lookup). Dedicated helper added.
+  #F2  negative_balance_days was set AFTER the engine ran, so the risk
+       flag and health penalty that read it never fired. Now computed
+       inside the engine before risk/health passes.
+  #F3  needs_verification credits were taxed as B2C in GSTR-1 while
+       excluded from ITR income. Now skipped in GSTR-1 too.
+  #F4  run_dashboard's monthly_data loop ignored CDM-as-DR, so BOB/PNB
+       files disagreed with the engine. Same is_cdm guard applied.
+  #F5  FOIR narrative hard-coded "÷ real income" even when the engine
+       used gross credits as the denominator. Now honest about basis.
+  #F6  _validate cross-checks are self-referential post-V6 (documented).
+  Minor: heavy-cash threshold, audit sort O(n²)/unstable, dead
+         reconciliation score removed, dead _pmt removed, cash_dep_total
+         type fixed, stability trims top month only when it's an outlier.
 
 Architecture:
-  ┌─────────────────────────────────────────────────────────┐
-  │  CONSTANTS  (single place for all thresholds/rates)     │
-  │  ↓                                                      │
-  │  CLASSIFIER  (credit/expense classification)            │
-  │  ↓                                                      │
-  │  FinancialEngine  (single source of truth)              │
-  │    • real_income, monthly_income, foir, emi             │
-  │    • loan_eligible, avg_balance                         │
-  │    • risk_score, risk_level, risk_flags                 │
-  │  ↓                                                      │
-  │  ValidationPass  (pre-report consistency check)         │
-  │  ↓                                                      │
-  │  Module reporters  (read engine, never recalculate)     │
-  │  ↓                                                      │
-  │  run_dashboard()  (assembles final dict)                │
-  └─────────────────────────────────────────────────────────┘
-
-Guarantees:
-  • FOIR in every section = same value from engine
-  • Real Income on cover == income section == summary
-  • Risk level in underwriting == fraud section == risk flags
-  • Pre-export validation rejects contradictory reports
-  • Full backward compatibility
+  CONSTANTS → CLASSIFIER → FinancialEngine → ValidationPass →
+  Module reporters (read engine, never recalculate) → run_dashboard()
 """
 
 from __future__ import annotations
@@ -46,8 +43,6 @@ from core.normalizer import (
 
 # ══════════════════════════════════════════════════════════════
 #  §1  CENTRAL CONSTANTS  (#11)
-#  ALL thresholds, rates and limits live here.
-#  Never hardcode these elsewhere.
 # ══════════════════════════════════════════════════════════════
 
 class C:
@@ -78,15 +73,17 @@ class C:
     NEG_DAYS_PENALTY    = [(0, 0), (2, 7), (5, 11), (999, 15)]
     DEP_PENALTY         = {'Low': 0, 'Medium': 6, 'High': 12}
     BOUNCE_PENALTY      = [(0, 0), (1, 4), (3, 6), (999, 8)]
+    # Descending table — DO NOT route through step_lookup (#F1).
+    # Consumed by _bal_ratio_penalty() only.
     BAL_RATIO_PENALTY   = [(1.0, 0), (0.5, 5), (0.2, 12), (0.0, 20)]
 
     # Risk flag thresholds
-    LOAN_DISBURSAL_FLAG = 3     # ≥ this many → frequent_loan flag
-    FAMILY_XFER_PCT     = 15.0  # % of total credits
-    CASH_DEP_FLAG_AMT   = 0
+    LOAN_DISBURSAL_FLAG = 3         # ≥ this many → frequent_loan flag
+    FAMILY_XFER_PCT     = 15.0      # % of total credits
+    CASH_DEP_FLAG_AMT   = 200_000   # #F-minor: only flag when cumulative cash ≥ this
     LOW_BAL_FLAG_RATIO  = 0.20
-    UNVERIFIED_FLAG_PCT = 30.0  # % of credits marked needs_verification
-    SPENDING_SPIKE_MULT = 2.5   # × average
+    UNVERIFIED_FLAG_PCT = 30.0      # % of credits marked needs_verification
+    SPENDING_SPIKE_MULT = 2.5       # × average
 
     # 80C deduction limits (Indian IT Act)
     MAX_80C = 150_000
@@ -102,9 +99,14 @@ class C:
     CV_STABLE   = 25.0
     CV_MODERATE = 50.0
 
+    # Stability outlier trim (#F-minor): only drop the top month when it
+    # exceeds this multiple of the mean of the remaining months.
+    STABILITY_OUTLIER_MULT = 1.5
+
     @staticmethod
     def step_lookup(breaks: list, value: float) -> int:
-        """Lookup penalty from ordered break table [(threshold, penalty), ...]."""
+        """Lookup penalty from ASCENDING break table [(threshold, penalty), ...].
+        Do NOT use for descending tables (e.g. BAL_RATIO_PENALTY)."""
         for threshold, penalty in breaks:
             if value <= threshold:
                 return penalty
@@ -180,13 +182,6 @@ def _parse_date(s: str) -> Optional[datetime.date]:
         return None
 
 
-def _pmt(rate_pm: float, n_months: int, principal: float) -> float:
-    """Standard PMT: monthly payment for loan principal."""
-    if rate_pm <= 0 or n_months <= 0:
-        return _div(principal, n_months)
-    return round(principal * rate_pm / (1 - (1 + rate_pm) ** -n_months), 2)
-
-
 def _eligible_principal(monthly_capacity: float, rate_pa: float, tenure_months: int) -> float:
     """Loan principal given monthly EMI capacity, rate, tenure. (#6)"""
     if monthly_capacity <= 0:
@@ -195,6 +190,15 @@ def _eligible_principal(monthly_capacity: float, rate_pa: float, tenure_months: 
     if rate_pm <= 0:
         return round(monthly_capacity * tenure_months, 2)
     return round(monthly_capacity * (1 - (1 + rate_pm) ** -tenure_months) / rate_pm, 2)
+
+
+def _bal_ratio_penalty(ratio: float) -> int:
+    """#F1 — Descending balance-ratio penalty. Higher ratio = healthier = lower penalty.
+    Replaces the incorrect step_lookup(BAL_RATIO_PENALTY, ...) call."""
+    if ratio >= 1.0: return 0
+    if ratio >= 0.5: return 5
+    if ratio >= 0.2: return 12
+    return 20
 
 
 # ══════════════════════════════════════════════════════════════
@@ -449,7 +453,7 @@ class EngineResult:
     family_transfer_total:  float = 0.0
     self_transfer_total:    float = 0.0
     refund_total:           float = 0.0
-    cash_dep_total:         int   = 0
+    cash_dep_total:         float = 0.0   # #F-minor: was annotated int, holds rounded float
     needs_ver_total:        float = 0.0
     non_income_credits:     Dict  = field(default_factory=dict)
 
@@ -457,6 +461,8 @@ class EngineResult:
     monthly_fixed_obligations: float = 0.0   # EMI-only
     foir:                      float = 0.0
     foir_status:               str   = 'Healthy'
+    foir_base_income:          float = 0.0    # #F5 — denominator actually used
+    foir_income_basis:         str   = 'real income'   # #F5 — label for the denominator
 
     # ── Loan eligibility (#6)
     max_eligible_emi:          float = 0.0
@@ -469,6 +475,7 @@ class EngineResult:
     max_balance:               float = 0.0
     negative_months:           int   = 0
     negative_balance_days:     int   = 0
+    negative_balance_dates:    List  = field(default_factory=list)   # #F2
 
     # ── Risk (#4) — unified risk engine
     risk_score:    int   = 0
@@ -510,7 +517,7 @@ class EngineResult:
 
     # ── Bounce / audit
     bounce_count:          int = 0
-    reconciliation_score:  int = 100
+    reconciliation_score:  int = 100   # kept for backward compat; computed in _build_audit
 
 
 def _build_engine(transactions: list) -> EngineResult:
@@ -623,11 +630,27 @@ def _build_engine(transactions: list) -> EngineResult:
         e.max_balance = round(max(balances), 2)
     e.negative_months = sum(1 for v in month_min_bal.values() if v < 0)
 
+    # ── Pass 4b: negative balance DAYS (#F2) ───────────────────
+    # Computed HERE (was in _build_bk, which ran after the engine, so the
+    # risk flag + health penalty that read this always saw 0). EOD-per-day
+    # definition to match the balance_kpis section.
+    eod_by_day: Dict[str, float] = {}
+    for t in sorted(transactions, key=lambda x: x.get('date', '')):
+        b = t.get('balance'); d = t.get('date', '')
+        if b is not None and d:
+            eod_by_day[d] = _safe(b)
+    neg_dates = sorted(d for d, v in eod_by_day.items() if v < 0)
+    e.negative_balance_dates = neg_dates
+    e.negative_balance_days  = len(neg_dates)
+
     # ── Pass 5: FOIR (#1 — single central calculation) ─────────
     monthly_emi = round(_div(emi_total, e.n_months), 2)
     e.monthly_fixed_obligations = monthly_emi
 
     base_income = e.avg_monthly_real_income if e.avg_monthly_real_income > 10 else e.avg_monthly_credit
+    e.foir_base_income  = round(base_income, 2)                        # #F5
+    e.foir_income_basis = ('real income' if e.avg_monthly_real_income > 10
+                           else 'gross monthly credits (real income could not be isolated)')
 
     # #1 — FOIR formula (central, used everywhere)
     e.foir = round(_pct(monthly_emi, base_income), 1) if base_income > 0 else 0.0
@@ -667,10 +690,8 @@ def _build_engine(transactions: list) -> EngineResult:
     # ── Pass 8: Bounce count ───────────────────────────────────
     e.bounce_count = bounces
 
-    # ── Pass 9: Reconciliation score ──────────────────────────
-    # (detailed mismatch walk done later; approximate here)
-    score = 100 - min(bounces * 10, 30)
-    e.reconciliation_score = max(0, score)
+    # Reconciliation score is computed in _build_audit (single source of truth).
+    # The engine no longer duplicates an approximate score here (#F-minor).
 
     # ── Pass 10: Income stability ──────────────────────────────
     e.income_stability, e.stability_color, e.stability_cv = _calc_stability(
@@ -763,8 +784,15 @@ def _calc_stability(monthly_real: dict):
     avg  = _div(sum(vals), n)
     if avg <= 0:
         return 'Volatile', 'red', 100.0
-    # Trim top outlier for seasonal business (#7)
-    trimmed = sorted(vals)[:-1] if n > 3 else sorted(vals)
+    # #F-minor: trim the top month ONLY when it's a genuine outlier
+    # (seasonal-business handling), not on every multi-month file.
+    s = sorted(vals)
+    if n > 3:
+        rest = s[:-1]
+        rest_avg = _div(sum(rest), len(rest))
+        trimmed = rest if (rest_avg > 0 and s[-1] > rest_avg * C.STABILITY_OUTLIER_MULT) else s
+    else:
+        trimmed = s
     t_avg   = _div(sum(trimmed), len(trimmed))
     var     = _div(sum((v - t_avg) ** 2 for v in trimmed), len(trimmed))
     std     = math.sqrt(var)
@@ -778,8 +806,6 @@ def _calc_stability(monthly_real: dict):
 
 # ══════════════════════════════════════════════════════════════
 #  §8  UNIFIED RISK ENGINE (#4)
-#  Single function generates all risk flags, score and level.
-#  Every section that shows risk data uses e.risk_* from engine.
 # ══════════════════════════════════════════════════════════════
 
 def _run_risk_engine(transactions: list, buckets: dict,
@@ -788,7 +814,6 @@ def _run_risk_engine(transactions: list, buckets: dict,
     """
     #4 — ONE risk engine, ONE set of flags/reasons.
     Underwriting alerts, risk flags and fraud section all use e.risk_*.
-    No contradictions possible.
     """
     flags   = []
     reasons = []
@@ -810,11 +835,13 @@ def _run_risk_engine(transactions: list, buckets: dict,
                       'detail': f'{fam_cnt} transfers Rs{e.family_transfer_total:,.0f} ({fam_pct:.0f}%)'})
         reasons.append(f'High family transfers ({fam_pct:.0f}%)')
 
-    # 3. Heavy cash deposits
-    if e.cash_dep_total > 0 or len(buckets.get(CC.CASH_DEP, [])) >= 1:
+    # 3. Heavy cash deposits (#F-minor: real threshold, not "any deposit")
+    n_cash = len(buckets.get(CC.CASH_DEP, []))
+    if e.cash_dep_total >= C.CASH_DEP_FLAG_AMT:
         flags.append({'key': 'HEAVY_CASH_DEPOSITS', 'severity': 'Medium',
                       'label': 'Heavy Cash Deposits',
-                      'detail': f'Rs{e.cash_dep_total:,.0f} cash deposits — AML attention.'})
+                      'detail': (f'Rs{e.cash_dep_total:,.0f} across {n_cash} deposit(s) '
+                                 f'(≥Rs{C.CASH_DEP_FLAG_AMT:,.0f}) — AML attention.')})
         reasons.append('Heavy cash deposits')
 
     # 4. Low average balance
@@ -831,7 +858,7 @@ def _run_risk_engine(transactions: list, buckets: dict,
                       'detail': f'{e.bounce_count} bounce(s) — strong negative credit signal.'})
         reasons.append(f'{e.bounce_count} bounce(s)')
 
-    # 6. Negative balance days
+    # 6. Negative balance days (#F2: now actually populated before this runs)
     if e.negative_balance_days >= 1:
         flags.append({'key': 'NEGATIVE_BALANCE_DAYS', 'severity': 'High',
                       'label': 'Negative Balance Days',
@@ -870,8 +897,8 @@ def _calc_health(e: EngineResult):
     """Penalty-based score (starts 100). (#6)"""
     p = 0
     p += C.STABILITY_PENALTY.get(e.income_stability, 15)
-    p += C.step_lookup([(b[0], b[1]) for b in C.BAL_RATIO_PENALTY],
-                       _div(e.avg_balance, e.avg_monthly_real_income or 1))
+    # #F1 — dedicated descending helper (was inverted via step_lookup)
+    p += _bal_ratio_penalty(_div(e.avg_balance, e.avg_monthly_real_income or 1))
     p += C.step_lookup([(b[0], b[1]) for b in C.NEG_DAYS_PENALTY],
                        e.negative_balance_days)
     p += C.step_lookup([(b[0], b[1]) for b in C.FOIR_PENALTY_BREAKS], e.foir)
@@ -900,27 +927,30 @@ def _validate(e: EngineResult, income_data: dict, loan_data: dict,
               audit_data: dict) -> ValidationResult:
     """
     #7 #8 #12 — Pre-export consistency check.
-    Verifies that every section agrees with the engine.
-    Auto-corrects minor float drift; logs errors for contradictions.
+
+    #F6 NOTE: Post-V6 every module is a pure reporter that reads engine
+    values, so the cross-field checks below compare engine-derived values
+    against themselves and cannot trip by construction. The load-bearing
+    checks are the RANGE/SANITY ones (FOIR 0–200, loan-dep 0–100, negative
+    eligibility). A green `passed` means "no impossible values", NOT
+    "sections were independently cross-verified".
     """
     vr = ValidationResult()
 
-    # ── 1. Income consistency (#3)
+    # ── 1. Income consistency (#3) — self-referential post-V6
     itr_real  = _safe(income_data.get('real_income_total', 0))
-    loan_real = _safe(loan_data.get('avg_monthly_real_income', 0)) * e.n_months
     if abs(itr_real - e.real_income_total) > 1.0:
         vr.errors.append(
             f'Income mismatch: engine={e.real_income_total}, itr={itr_real}')
         vr.passed = False
 
-    # ── 2. FOIR consistency (#1)
+    # ── 2. FOIR consistency (#1) — self-referential post-V6
     loan_foir = _safe(loan_data.get('foir', 0))
     if abs(loan_foir - e.foir) > 0.5:
         vr.errors.append(f'FOIR mismatch: engine={e.foir}, loan_module={loan_foir}')
         vr.passed = False
 
     # ── 3. EMI consistency (#1)
-    loan_emi = _safe(loan_data.get('monthly_fixed_obligations', 0))
     audit_emi_outflow = _safe(audit_data.get('total_emi_outflow', 0))
     n = e.n_months
     audit_monthly_emi = round(_div(audit_emi_outflow, n), 2)
@@ -941,11 +971,10 @@ def _validate(e: EngineResult, income_data: dict, loan_data: dict,
             e.real_income_total + e.loan_disbursal_total + e.family_transfer_total +
             e.self_transfer_total + e.refund_total + e.cash_dep_total + e.needs_ver_total, 2
         )
-        # bd_sum should be close to total_cr (other buckets: non_income, reimb not in engine)
         if bd_sum > e.total_cr * 1.05:
             vr.warnings.append(f'Credit bucket sum {bd_sum} > total_cr {e.total_cr}')
 
-    # ── 6. Impossible percentages (#7)
+    # ── 6. Impossible percentages (#7) — LOAD-BEARING
     if not (0 <= e.foir <= 200):
         vr.errors.append(f'FOIR out of range: {e.foir}%')
         vr.passed = False
@@ -953,7 +982,7 @@ def _validate(e: EngineResult, income_data: dict, loan_data: dict,
         vr.errors.append(f'Loan dep pct out of range: {e.loan_dep_pct}%')
         vr.passed = False
 
-    # ── 7. Loan eligibility sanity (#6)
+    # ── 7. Loan eligibility sanity (#6) — LOAD-BEARING
     if e.loan_eligible < 0:
         vr.errors.append(f'Negative loan eligibility: {e.loan_eligible}')
         vr.passed = False
@@ -1055,21 +1084,25 @@ def _build_income(transactions: list, buckets: dict, e: EngineResult) -> dict:
 
 
 def _build_loan(e: EngineResult, monthly_data: dict) -> dict:
-    """Loan module — all values from engine (#1 #2 #6)."""
+    """Loan module — all values from engine (#1 #2 #6).
+    #F5 — narrative uses the ACTUAL FOIR denominator + honest basis label."""
     foir_calc = {
         'monthly_real_income':        e.avg_monthly_real_income,
+        'foir_base_income':           e.foir_base_income,      # #F5
+        'income_basis':               e.foir_income_basis,     # #F5
         'monthly_fixed_obligations':  e.monthly_fixed_obligations,
-        'formula':                    'FOIR = (Monthly Fixed Obligations ÷ Monthly Real Income) × 100',
+        'formula':                    'FOIR = (Monthly Fixed Obligations ÷ Monthly Income) × 100',
         'calculation':                (f'FOIR = (Rs{e.monthly_fixed_obligations:,.0f} ÷ '
-                                       f'Rs{e.avg_monthly_real_income:,.0f}) × 100 = {e.foir}%'),
+                                       f'Rs{e.foir_base_income:,.0f}) × 100 = {e.foir}%'),
         'foir_pct':                   e.foir,          # #1 — same value everywhere
         'foir_cap_pct':               C.FOIR_CAP,
         'max_eligible_emi':           e.max_eligible_emi,
         'remaining_emi_capacity':     e.remaining_emi_capacity,
         'status':                     e.foir_status,
-        'note':                       'FOIR includes only recurring EMI/loan repayments.',
+        'note':                       (f'FOIR includes only recurring EMI/loan repayments. '
+                                       f'Denominator uses {e.foir_income_basis}.'),
         'interpretation': (
-            f'Monthly Real Income: Rs{e.avg_monthly_real_income:,.0f} | '
+            f'Monthly Income ({e.foir_income_basis}): Rs{e.foir_base_income:,.0f} | '
             f'Monthly EMIs: Rs{e.monthly_fixed_obligations:,.0f} | '
             f'FOIR: {e.foir}% ({e.foir_status}) | '
             f'Loan eligible: Rs{e.loan_eligible:,.0f} at '
@@ -1091,6 +1124,8 @@ def _build_loan(e: EngineResult, monthly_data: dict) -> dict:
         'monthly_emi':               e.monthly_fixed_obligations,    # #1 single value
         'monthly_fixed_obligations': e.monthly_fixed_obligations,    # #1 single value
         'foir':                      e.foir,                         # #1 single value
+        'foir_base_income':          e.foir_base_income,             # #F5
+        'foir_income_basis':         e.foir_income_basis,            # #F5
         'dscr':                      dscr,
         'loan_eligible':             e.loan_eligible,
         'remaining_emi_capacity':    e.remaining_emi_capacity,
@@ -1112,7 +1147,11 @@ def _build_loan(e: EngineResult, monthly_data: dict) -> dict:
 
 def _build_audit(transactions: list, e: EngineResult) -> dict:
     """Balance validation (#8 #12)."""
-    sorted_txns = sorted(transactions, key=lambda t: (t.get('date', ''), transactions.index(t)))
+    # #F-minor: stable O(n) tiebreak via enumerate (was transactions.index(t),
+    # which is O(n) per call → O(n²) and mis-orders identical rows).
+    sorted_txns = [t for _, t in sorted(
+        enumerate(transactions), key=lambda p: (p[1].get('date', ''), p[0])
+    )]
     mismatches  = []
     prev        = None
 
@@ -1182,18 +1221,14 @@ def _build_audit(transactions: list, e: EngineResult) -> dict:
 def _build_risk_section(e: EngineResult, red_flags: dict) -> dict:
     """
     #4 — Unified risk. Reads from engine, never recalculates.
-    Merges fraud/underwriting/risk into ONE consistent view.
     """
-    # Fraud-level risk score from red_flags
     fraud_score = _safe(red_flags.get('flag_score', 0))
 
-    # Combined score: max of underwriting risk and fraud risk
     combined_score = max(e.risk_score, round(fraud_score * 0.5))
     combined_level = ('High'   if combined_score >= 50 else
                       'Medium' if combined_score >= 20 else 'Low')
     combined_color = {'Low': 'green', 'Medium': 'yellow', 'High': 'red'}[combined_level]
 
-    # Ensure fraud level never contradicts combined level
     fraud_level = red_flags.get('flag_level', 'Low')
     if fraud_level == 'High' and combined_level == 'Low':
         combined_level = 'High'; combined_color = 'red'
@@ -1544,7 +1579,10 @@ def _build_gstr1(transactions: list) -> dict:
         if t.get('type')!='CR' or not t.get('amount'): continue
         lower=(t.get('desc') or '').lower(); amt=_safe(t.get('amount',0)); month=_month(t)
         cls=_classify_credit(lower,amt)
-        if cls in (CC.LOAN,CC.SELF,CC.FAMILY,CC.REFUND,CC.REIMBURSE,CC.NON_INC,CC.CASH_DEP): continue
+        # #F3 — NEEDS_VER added to skip list: an unverified credit must NOT be
+        # taxed as B2C in GST while it's excluded from income for ITR.
+        if cls in (CC.LOAN,CC.SELF,CC.FAMILY,CC.REFUND,CC.REIMBURSE,
+                   CC.NON_INC,CC.CASH_DEP,CC.NEEDS_VER): continue
         if _kw(lower,_SALARY_KW): continue
         if _kw(lower,_INTEREST_KW): nil.append(t); ms[month]['nil']+=amt; continue
         if _kw(lower,EXP_K): exp.append(t); ms[month]['export']+=amt
@@ -1562,7 +1600,7 @@ def _build_gstr1(transactions: list) -> dict:
         'monthly_sales':dict(ms),'months':sorted(ms.keys()),
         'b2b_count':len(b2b),'b2c_count':len(b2c),'export_count':len(exp),
         'filing_status':'Filing Required' if tax>0 else 'Verify with CA',
-        'note':'B2B/B2C approximate. Verify GSTIN for accurate GSTR-1.',
+        'note':'B2B/B2C approximate. Unverified credits excluded. Verify GSTIN for accurate GSTR-1.',
     }
 
 
@@ -1592,28 +1630,27 @@ def _build_payment_modes(transactions: list) -> dict:
 
 
 def _build_bk(transactions: list, e: EngineResult) -> dict:
-    bals_by_day={}; neg_days=set()
-    for t in sorted(transactions, key=lambda x: x.get('date','')):
-        bal=t.get('balance'); date=t.get('date','')
+    """Balance KPIs. #F2 — negative-day count/dates now READ from the engine
+    (previously this function computed them and overwrote e.negative_balance_days
+    AFTER risk/health had already run with 0)."""
+    bals_by_day = {}
+    for t in sorted(transactions, key=lambda x: x.get('date', '')):
+        bal = t.get('balance'); date = t.get('date', '')
         if bal is not None and date:
-            v=_safe(bal); bals_by_day[date]=v
-            if v<0: neg_days.add(date)
-    all_b=list(bals_by_day.values())
-    m_bals=defaultdict(list)
-    m_end={}
-    for date,bal in bals_by_day.items():
+            bals_by_day[date] = _safe(bal)
+    m_bals = defaultdict(list)
+    m_end  = {}
+    for date, bal in bals_by_day.items():
         m_bals[date[:7]].append(bal)
-    for m,blist in m_bals.items():
-        m_end[m]=round(blist[-1],2)
-    m_avg={m:round(_div(sum(b),len(b)),2) for m,b in m_bals.items()}
-    neg_count=len(neg_days)
-    e.negative_balance_days=neg_count   # update engine with precise count
+    for m, blist in m_bals.items():
+        m_end[m] = round(blist[-1], 2)
+    m_avg = {m: round(_div(sum(b), len(b)), 2) for m, b in m_bals.items()}
     return {
-        'avg_daily_balance': e.avg_balance,   # from engine
-        'highest_balance':   e.max_balance,
-        'lowest_balance':    e.min_balance,
-        'negative_balance_days':   neg_count,
-        'negative_balance_dates':  sorted(neg_days),
+        'avg_daily_balance':       e.avg_balance,   # from engine
+        'highest_balance':         e.max_balance,
+        'lowest_balance':          e.min_balance,
+        'negative_balance_days':   e.negative_balance_days,    # #F2 — from engine
+        'negative_balance_dates':  e.negative_balance_dates,   # #F2 — from engine
         'monthly_avg_balance':     dict(sorted(m_avg.items())),
         'month_end_balances':      dict(sorted(m_end.items())),
         'total_days_tracked':      len(bals_by_day),
@@ -1655,18 +1692,27 @@ def run_dashboard(transactions: list) -> dict:
             buckets[CC.CASH_DEP].append(t)
 
     # ── 3. Build monthly_data dict (used by loan + cashflow) ──
+    #    #F4 — same CDM-as-DR routing as the engine, so BOB/PNB files where
+    #    the parser emits cash deposits as DR no longer disagree with e.*.
     monthly_cr = defaultdict(float); monthly_dr = defaultdict(float)
     monthly_re = defaultdict(float); m_min_bal: Dict = {}
     for t in transactions:
         month = _month(t); amt = _safe(t.get('amount', 0))
         lower = (t.get('desc') or '').lower()
         bal   = t.get('balance')
-        if t.get('type') == 'CR':
+        ttype = t.get('type', '')
+        is_cdm = _kw(lower, _CASH_DEP_KW)
+        if ttype == 'CR' and amt > 0:
             monthly_cr[month] += amt
             if _classify_credit(lower, amt) in _TAXABLE:
                 monthly_re[month] += amt
-        else:
-            monthly_dr[month] += amt
+        elif ttype == 'DR' and amt > 0:
+            if is_cdm:
+                monthly_cr[month] += amt          # #F4 — CDM misfiled as DR
+            else:
+                monthly_dr[month] += amt
+        elif amt > 0 and is_cdm:
+            monthly_cr[month] += amt              # #F4 — blank type, desc says cash dep
         if bal is not None:
             v = _safe(bal)
             if month not in m_min_bal: m_min_bal[month] = v
@@ -1700,28 +1746,24 @@ def run_dashboard(transactions: list) -> dict:
 
     # ── 5. Pre-export validation (#7 #8 #12) ──────────────────
     vr = _validate(e, income_data, loan_data, audit_data)
-    # If validation failed, override affected values with engine values
     if not vr.passed:
-        # Force income totals to engine values
-        income_data['real_income_total']     = e.real_income_total
-        itr_data['real_income_total']        = e.real_income_total
-        loan_data['foir']                    = e.foir
-        loan_data['monthly_emi']             = e.monthly_fixed_obligations
+        income_data['real_income_total']       = e.real_income_total
+        itr_data['real_income_total']          = e.real_income_total
+        loan_data['foir']                      = e.foir
+        loan_data['monthly_emi']               = e.monthly_fixed_obligations
         loan_data['monthly_fixed_obligations'] = e.monthly_fixed_obligations
-        loan_data['loan_eligible']           = e.loan_eligible
+        loan_data['loan_eligible']             = e.loan_eligible
 
     # ── 6. Build composite modules that need engine values ─────
-    compliance['risk_score']      = e.risk_score      # #4 consistent
-    compliance['risk_level']      = e.risk_level
-    compliance['risk_color']      = e.risk_color
-    compliance['risk_reasons']    = e.risk_reasons
-    compliance['risk_explanation']= _build_compliance_risk(e, compliance)
-    # Force red_flags level consistent with engine (#4)
+    compliance['risk_score']       = e.risk_score      # #4 consistent
+    compliance['risk_level']       = e.risk_level
+    compliance['risk_color']       = e.risk_color
+    compliance['risk_reasons']     = e.risk_reasons
+    compliance['risk_explanation'] = _build_compliance_risk(e, compliance)
     red_flags['flag_level']  = max(red_flags['flag_level'], e.risk_level,
                                     key=lambda x: {'Low':0,'Medium':1,'High':2}[x])
     red_flags['flag_color']  = {'Low':'green','Medium':'yellow','High':'red'}[red_flags['flag_level']]
 
-    # Stability, loan dep, health — from engine
     income_stab = {
         'stability':        e.income_stability,
         'stability_color':  e.stability_color,
@@ -1832,3 +1874,45 @@ def _empty_dashboard() -> dict:
         'real_income': 0, 'loan_disbursal_total': 0, 'family_transfer_total': 0,
         '_validation': {'passed': True, 'errors': [], 'warnings': []},
     }
+
+
+# ══════════════════════════════════════════════════════════════
+#  CHANGELOG — V6 → V6.1
+# ══════════════════════════════════════════════════════════════
+# #F1  _bal_ratio_penalty() replaces step_lookup(BAL_RATIO_PENALTY,...).
+#      The descending table was being read by an ascending lookup, so
+#      healthy savers got max penalty and thin files got zero. Health
+#      scores across most of the range were wrong.
+# #F2  negative_balance_days/dates now computed in _build_engine (Pass 4b),
+#      before the risk + health passes. Previously set in _build_bk (which
+#      runs after the engine), so the NEGATIVE_BALANCE_DAYS risk flag and
+#      the NEG_DAYS_PENALTY health penalty always saw 0. _build_bk now
+#      reads these from the engine instead of overwriting them.
+#      NOTE: definition is now EOD-per-day consistently (was "any txn that
+#      day" in old _build_bk); numbers may shift slightly but now actually
+#      feed risk/health.
+# #F3  _build_gstr1 skips CC.NEEDS_VER. Unverified credits were excluded
+#      from ITR income but taxed as B2C supply in GST — same rupee, two
+#      answers. estimated_gst no longer inflated by unclassified credits.
+# #F4  run_dashboard step-3 monthly loop applies the same is_cdm routing
+#      as the engine, so monthly_data (fed to loan + cashflow) matches e.*
+#      on BOB/PNB files where CDM comes through as DR.
+# #F5  FOIR narrative (calculation/interpretation/note) now uses
+#      e.foir_base_income + e.foir_income_basis instead of hard-coding
+#      "÷ real income", so thin-real-income files no longer print
+#      "÷ Rs 0 = 42%". foir_base_income/foir_income_basis exposed on the
+#      loan dict too.
+# #F6  _validate docstring documents that the cross-field checks are
+#      self-referential post-V6; only the range/sanity checks are
+#      load-bearing. `passed` != "independently cross-verified".
+# Minor:
+#   • CASH_DEP_FLAG_AMT = 200_000 — "Heavy Cash Deposits" no longer fires
+#     on every single small deposit (was flagging ~all DSA borrowers).
+#   • _build_audit uses enumerate() for a stable O(n) tiebreak (was
+#     transactions.index(t): O(n²) and mis-ordered identical rows).
+#   • Dead engine-side reconciliation score removed (audit is the source).
+#   • Dead _pmt() removed (only _eligible_principal is used).
+#   • cash_dep_total annotated float (was int, held rounded float).
+#   • Stability trims the top month only when it's a real outlier
+#     (>1.5× mean of the rest), not on every multi-month file.
+# ══════════════════════════════════════════════════════════════
