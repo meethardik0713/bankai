@@ -62,7 +62,7 @@ def _send_demo_lead_email(name, company, role, phone, volume):
     msg['From']    = GMAIL_USER
     msg['To']      = DEMO_NOTIFY_EMAIL
 
-    with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+    with smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=10) as server:
         server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
         server.send_message(msg)
 
@@ -875,18 +875,34 @@ def book_demo():
         session['demo_error'] = 'Please fill in all required fields.'
         return redirect('/#book-demo')
 
+    from datetime import datetime, timezone
+
+    try:
+        supabase.table('demo_leads').insert({
+            'name':       name,
+            'company':    company,
+            'role':       role,
+            'phone':      phone,
+            'volume':     volume,
+            'created_at': datetime.now(timezone.utc).isoformat(),
+        }).execute()
+    except Exception as e:
+        logger.exception("Failed to save demo lead to Supabase: %s", e)
+        session['demo_error'] = 'Something went wrong. Please try WhatsApp instead.'
+        return redirect('/#book-demo')
+
     try:
         _send_demo_lead_email(name, company, role, phone, volume)
-        session['demo_submitted'] = True
-        ph_track(ip, event='demo_requested', props={
-            'role':        role,
-            'has_company': bool(company),
-            'volume':      volume,
-        })
-        logger.info("Demo lead captured: %s (%s)", name, role)
     except Exception as e:
         logger.exception("Demo lead email failed: %s", e)
-        session['demo_error'] = 'Something went wrong sending your request. Please try WhatsApp instead.'
+
+    session['demo_submitted'] = True
+    ph_track(ip, event='demo_requested', props={
+        'role':        role,
+        'has_company': bool(company),
+        'volume':      volume,
+    })
+    logger.info("Demo lead captured: %s (%s)", name, role)
 
     return redirect('/#book-demo')
 
