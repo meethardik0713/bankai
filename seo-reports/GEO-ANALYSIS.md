@@ -1,104 +1,57 @@
 # GEO Analysis — www.aarogyamfin.com
-Date: 2026-07-01
+Date: 2026-07-01 (re-audit after commit `8072377`)
+Previous score: 58/100 (2026-07-01, earlier same day)
 
-## GEO Readiness Score: 58/100
+## GEO Readiness Score: 68/100 (+10)
 
-| Category | Score | Weight |
-|---|---|---|
-| Citability | 14/25 | FAQ passages are excellent, but they live on pages that are self-canonicalized away (see Critical Issue) |
-| Structural Readability | 15/20 | Clean H1→H2→H3 hierarchy on homepage; FAQs are proper Q&A format on landing pages |
-| Multi-Modal Content | 2/15 | Zero `<img>` tags, no video, no infographics found on homepage or sampled landing/blog pages |
-| Authority & Brand Signals | 12/20 | Org/SoftwareApplication schema present but lost `sameAs` links; no author byline/date on blog articles |
-| Technical Accessibility | 15/20 | Server-rendered HTML (no JS-dependent content), AI crawlers allowed, llms.txt present but stale |
+| Category | Score | Weight | Change |
+|---|---|---|---|
+| Citability | 21/25 | Self-canonicalization fixed → FAQ content on all 13 audience/bank pages is now reachable/indexable; homepage now opens with a clean definitional sentence | +7 |
+| Structural Readability | 17/20 | Unique H1/subheading per page (was shared/duplicate); FAQ Q&A format and heading hierarchy intact | +2 |
+| Multi-Modal Content | 3/15 | Still zero `<img>`/video/infographics; only credit is the upload-and-analyze tool itself as an interactive element | +1 |
+| Authority & Brand Signals | 12/20 | Unchanged — `sameAs` still missing from Organization schema, blog posts still lack `Article` schema/byline/dates, no external brand presence | 0 |
+| Technical Accessibility | 15/20 | Unchanged — www↔apex still serves 200 on both hosts with no 301; robots.txt/SSR/llms.txt all fine | 0 |
 
 ---
 
-## Critical Issue: 18 Landing Pages Canonicalize Away From Themselves
+## Confirmed Fixed (from the 2026-07-01 morning audit)
 
-This is the single biggest problem found, and it directly undoes recent work. Git history shows unique FAQs were added to 18 landing pages (`5bffead SEO: unique FAQs added to all 18 landing pages`), but every audience/bank-specific variant carries a canonical tag pointing to the generic `/bank-statement-analyzer` page instead of itself:
+1. **Self-canonicalization on 13 shared-template routes** — verified live. Each of `/bank-statement-analyzer`, `-for-ca`, `-for-dsa`, `-for-nbfc`, and the 9 bank-name variants (SBI, HDFC, ICICI, Axis, Kotak, PNB, BoB, Canara, Union) now returns its own `<link rel="canonical">`, unique `<title>`, and unique `og:url` — no longer collapsing into `/bank-statement-analyzer`.
+2. **Unique H1/meta description per page** — spot-checked SBI, HDFC, NBFC pages: all have distinct H1 headline and meta description tailored to the audience/bank.
+3. **Homepage definitional sentence** — hero now opens with: *"AarogyamFin is an AI-powered financial workflow platform that turns bank statements, GST, and tax data into ready-to-use financials for CAs, DSAs, NBFCs, and banks."* — a clean, quotable "what is this" passage in the first \~25 words.
+4. **llms.txt rewritten** — now describes the current GST/ITR/FOIR/books-finalisation positioning (previously described only "bank statement analyzer"), and links out to 20 pages including all audience/bank landing pages, the consolidator, and GST calendar.
+5. **FAQPage schema confirmed present** on landing pages (`@type: FAQPage` with `Question`/`Answer` nodes), in addition to `SoftwareApplication` + `Offer` — this was previously unconfirmed.
+6. **Programmatic keyword-variant pages unaffected/healthy** — spot-checked 5 of the ~15 synonym landing pages (`/bank-statement-to-excel`, `/pdf-bank-parser`, etc., which use a different template than the 13 audience/bank routes): all already self-canonicalize correctly with unique titles, so no regression there.
+7. **AI crawler access confirmed** — served identical HTML to default UA, `GPTBot`, and `PerplexityBot` (only Cloudflare per-request nonce and rotating email-cloaking token differ — both harmless).
 
-| Page | Canonical points to |
+## Still Open (carried over, unaddressed by this commit)
+
+| Issue | Detail |
 |---|---|
-| `/bank-statement-analyzer-for-ca` | `/bank-statement-analyzer` |
-| `/bank-statement-analyzer-for-dsa` | `/bank-statement-analyzer` |
-| `/bank-statement-analyzer-for-nbfc` | `/bank-statement-analyzer` |
-| `/sbi-bank-statement-analyzer` | `/bank-statement-analyzer` |
-| `/bank-statement-to-excel` | itself (correct) |
-
-**Effect:** Google will not index these as distinct pages, and AI crawlers/LLMs treat the canonical URL as the authoritative source — meaning the CA-specific, DSA-specific, and bank-specific FAQ content (e.g. "How does loan eligibility work for NBFCs?") will likely never surface in AI Overviews, ChatGPT, or Perplexity answers keyed to those specific audience/bank queries, even though the content exists and is well-written. This is the highest-leverage fix on this list — it's a one-line template bug (self-canonical vs. hardcoded canonical), not new content work.
-
-**Fix:** In the page template, canonical should be `request.path` (self-referencing) unless the page is a genuine near-duplicate you intend to consolidate. If some consolidation is intentional (e.g. very thin bank-name variants), keep it only for those — not for the CA/DSA/NBFC audience pages, which have materially different FAQ content.
+| **www ↔ apex duplicate host** | `https://www.aarogyamfin.com/` and `https://aarogyamfin.com/` both return `200` with identical content — still no 301. Canonical tag correctly points to apex, so Google should be fine, but AI crawlers are less consistent about respecting canonical than Google is. |
+| **Blog posts lack `Article` schema / byline / dates** | `/blog/how-to-analyze-bank-statement-for-itr` still has no `Article` JSON-LD, no author, no `datePublished`/`dateModified`. |
+| **No `sameAs` on Organization schema** | No LinkedIn/GitHub/social links in the Organization node. |
+| **No brand presence off-site** | No evidence of Wikipedia, Reddit, YouTube, or LinkedIn mentions. Given Ahrefs' correlation data (YouTube ~0.737, Reddit high) this is the highest-effort, highest-payoff category still untouched — expected, since this is a young (`foundingDate: 2025`) product. |
+| **Zero images/video sitewide** | Landing pages, homepage, and blog post sampled all have 0 `<img>` tags and no video. Multi-modal content sees 156% higher selection rates per GEO research — this is the single biggest remaining scoring gap (3/15). |
 
 ---
 
-## AI Crawler Access Status
+## Top 5 Highest-Impact Changes (updated)
 
-robots.txt (served identically on www and non-www):
-
-```
-User-agent: *            Allow: /
-User-agent: Googlebot    Allow: /
-User-agent: Google-Extended  Allow: /
-User-agent: GPTBot       Allow: /
-User-agent: ClaudeBot    Allow: /
-User-agent: Applebot-Extended  Allow: /
-User-agent: meta-externalagent Allow: /
-User-agent: CCBot        Disallow: /
-User-agent: Bytespider   Disallow: /
-```
-
-- ✅ ClaudeBot, GPTBot, Google-Extended, Applebot-Extended explicitly allowed
-- ✅ CCBot and Bytespider blocked (reasonable, avoids uncredited training scrapers)
-- ⚠️ PerplexityBot, OAI-SearchBot, ChatGPT-User, anthropic-ai have no explicit rule — they fall under the wildcard `Allow: /`, so they **are** allowed, but making them explicit is cheap insurance against future default-deny changes by those crawlers.
-
-## www vs non-www Duplicate Host (Still Unresolved)
-
-Both `https://www.aarogyamfin.com/` and `https://aarogyamfin.com/` return `200 OK` with identical content — there is still no 301 redirect between hosts (flagged in the prior audit, April 2026, still open). The saving grace: the `<link rel="canonical">` on every page correctly points to the non-www apex domain, so search engines should consolidate signals correctly. However, AI crawlers are less consistent about respecting canonical tags than Google is, so a real Cloudflare-level 301 (www → apex) remains the more reliable fix and should still be prioritized.
-
-## llms.txt Status: Present but Out of Date
-
-`/llms.txt` exists and is well-formed, but describes an old version of the product:
-
-```
-AarogyamFin is an AI-powered Indian bank statement analyzer.
-Users upload bank statement PDFs and instantly get transaction analysis,
-keyword search, Excel export, and AI chat insights.
-```
-
-The live homepage title/meta description and JSON-LD now describe a much broader "AI CA Workflow Platform" covering **GST compliance (GSTR-1, 3B, 2B reconciliation), 26AS/AIS consolidation, books finalisation (Balance Sheet & P&L), and DSA/NBFC/CA-specific workflows** — none of which appear in llms.txt. An LLM reading llms.txt today would describe AarogyamFin as a much narrower tool than it actually is, undercutting citations for GST/CA-related queries. llms.txt should be rewritten to match current positioning and link to the new landing pages (once their canonical issue above is fixed).
-
-## Brand Mention Analysis
-
-No evidence found (via this audit) of presence on Wikipedia, Reddit, YouTube, or LinkedIn. This was already flagged in the April 2026 audit as an open item requiring off-site work. Given the Ahrefs correlation data (YouTube ~0.737, Reddit strong), this remains the highest-effort/highest-payoff category still untouched.
-
-## Passage-Level Citability
-
-- **Landing page FAQs** (sampled on `/bank-statement-analyzer-for-ca`): well-formed, self-contained, in the 30–70 word range — e.g. the loan eligibility and AI-chat answers are exactly the kind of quotable, fact-dense block AI Overviews extract. Quality is good; **reach is blocked by the canonical issue above.**
-- **Homepage**: ~698 words of visible text, no FAQ section, no "X is..." definitional sentence in the first 60 words — the hero headline is a value prop, not a definition. Adding one definitional sentence near the top (e.g. "AarogyamFin is an AI-powered financial workflow platform that turns bank statements, GST, and tax data into ready-to-use financials for CAs, DSAs, NBFCs, and banks.") would give AI systems a clean, quotable "what is this" passage.
-- **Blog post** (`/blog/how-to-analyze-bank-statement-for-itr`): 2,475 words, correctly self-canonicalized, but no `Article` schema and no visible author byline or published/updated date — a missed authority signal.
-
-## Server-Side Rendering Check
-
-No issue: homepage HTML contains ~698 words of real text without executing JavaScript, and Three.js/Chart.js are loaded for visual/decorative purposes rather than gating content. AI crawlers (which don't run JS) can read the actual page content fine.
-
----
-
-## Top 5 Highest-Impact Changes
-
-1. **Fix canonical tags on the 18 audience/bank landing pages** so each self-canonicalizes (or is intentionally, selectively consolidated). This alone determines whether the recent FAQ content work has any AI/search visibility at all.
-2. **Rewrite `/llms.txt`** to reflect the current GST/CA/books-finalisation positioning, not just the original bank-statement-analyzer description.
-3. **Add `Article` schema + visible author byline + published/updated dates** to blog posts for authority signal.
-4. **Add one definitional sentence** ("AarogyamFin is...") near the top of the homepage for direct-answer extraction.
-5. **Implement the Cloudflare www→apex 301 redirect** (still outstanding from the April audit) so AI crawlers that don't honor canonical tags don't see two live copies of the site.
+1. **Add `Article` schema + visible byline + `datePublished`/`dateModified`** to all blog posts — cheap, high-authority signal that's still fully missing.
+2. **Implement the Cloudflare www→apex 301 redirect** — outstanding since the April 2026 audit; canonical tags mitigate but don't fully substitute for a real redirect with AI crawlers.
+3. **Add at least one relevant image per landing page** (e.g. a screenshot of the analyzer output/dashboard) with descriptive alt text — moves Multi-Modal Content off its 3/15 floor with minimal effort.
+4. **Add `sameAs` array to Organization schema** once any social profiles exist (LinkedIn company page is the easiest first step for a B2B fintech).
+5. **Begin off-site brand-mention work** (Reddit threads in r/IndiaInvestments/r/CharteredAccountants, a YouTube demo walkthrough) — this is the category with the largest score gap (12/20) and the strongest citation correlation per Ahrefs data, but requires ongoing effort rather than a one-time fix.
 
 ## Schema Recommendations
 
-- Add `FAQPage` schema to landing pages (visible FAQ markup exists in HTML but wasn't confirmed as schema-wrapped on `/bank-statement-analyzer-for-ca` — verify and add if missing, since visible FAQs without schema still help GEO but schema helps traditional rich-result eligibility).
-- Add `Article` + `Person` (author) schema to blog posts.
-- Restore `sameAs` array on the `Organization` node once social/brand profiles exist (LinkedIn, GitHub, etc.) — present in the April audit's JSON-LD rewrite but not appearing in the current homepage schema.
+- `Article` + `Person` (author) schema for every blog post.
+- `sameAs` on the existing `Organization` node.
+- Consider `HowTo` schema on the ITR blog post given its step-by-step structure — would aid both traditional rich results and AI extraction of procedural content.
 
 ## Content Reformatting Suggestions
 
-- Homepage hero: prepend a single definitional sentence before the current value-prop copy.
-- Blog posts: add a byline block ("By Hardik, Founder — Updated July 2026") near the top, matching what schema will declare.
-- Landing pages: once canonical is fixed, each audience page's FAQ should stay audience-specific (already true) — no content change needed there, only the canonical/indexation fix.
+- Blog posts: add "By [Name], Founder — Updated July 2026" byline block matching the schema author.
+- Landing pages: no further content change needed — FAQ content is already audience-specific and now correctly indexable.
+- Consider a short screenshot/GIF of the upload → analysis → Excel export flow embedded on the homepage and top landing pages (SBI, HDFC, CA) to address the multi-modal gap.

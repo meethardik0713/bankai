@@ -13,6 +13,36 @@
 <meta property="og:image" content="https://aarogyamfin.com/static/og-image.png" />
 <meta name="twitter:card" content="summary_large_image" />
 <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "{{ title }}",
+  "description": "{{ title }} — Financial insights from AarogyamFin.",
+  "url": "https://aarogyamfin.com/blog/{{ slug }}",
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "https://aarogyamfin.com/blog/{{ slug }}"
+  },
+  "image": "https://aarogyamfin.com/static/og-image.png",
+  "datePublished": "2026-07-01",
+  "dateModified": "2026-07-01",
+  "author": {
+    "@type": "Person",
+    "name": "Hardik",
+    "jobTitle": "Founder at AarogyamFin"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "@id": "https://aarogyamfin.com/#organization",
+    "name": "AarogyamFin",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "https://aarogyamfin.com/static/favicon.svg"
+    }
+  }
+}
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
@@ -47,6 +77,7 @@
   .hero-headline { font-family: 'Cormorant Garamond', serif; font-size: clamp(2rem, 5vw, 3.5rem); font-weight: 300; line-height: 1.15; margin-bottom: 24px; opacity: 0; animation: fadeUp 1s 0.5s forwards; }
   .hero-meta { font-size: 0.75rem; color: var(--muted); letter-spacing: 0.1em; opacity: 0; animation: fadeUp 1s 0.7s forwards; display: flex; align-items: center; gap: 20px; }
   .hero-meta span { display: flex; align-items: center; gap: 6px; }
+  .byline { font-size: 0.78rem; color: var(--muted); letter-spacing: 0.04em; margin-top: 14px; opacity: 0; animation: fadeUp 1s 0.8s forwards; }
 
   /* Blog Content */
   .blog-content { max-width: 860px; margin: 0 auto; padding: 0 60px 80px; }
@@ -149,6 +180,7 @@
     <span>·</span>
     <span>Financial Insights</span>
   </div>
+  <p class="byline">By Hardik, Founder — Updated July 2026</p>
 </div>
 
 <div class="blog-content">
