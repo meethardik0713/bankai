@@ -951,26 +951,35 @@ def sitemap():
 
 @app.route('/llms.txt')
 def llms():
-    content = """# AarogyamFin — AI Bank Statement Analyzer
+    content = """# AarogyamFin — AI-Powered Financial Workflow Platform
 # https://aarogyamfin.com
 
 ## Product
-AarogyamFin is an AI-powered Indian bank statement analyzer.
-Users upload bank statement PDFs and instantly get transaction analysis, keyword search, Excel export, and AI chat insights.
+AarogyamFin is an AI-powered financial workflow platform that turns bank statements, GST, and tax data into ready-to-use financials for Chartered Accountants (CAs), DSAs (loan agents), NBFCs, and banks.
+Users upload bank statement PDFs and instantly get transaction extraction, GST reconciliation (GSTR-1, GSTR-2B, GSTR-3B), ITR-ready income summaries, loan eligibility and FOIR calculation, and consolidated books finalisation (Balance Sheet & P&L).
+
+## Who It's For
+- Chartered Accountants: ITR filing support, GST reconciliation, audit trails, books finalisation for multiple clients.
+- DSAs & Loan Agents: instant income verification, EMI detection, FOIR calculation, and loan eligibility scoring for faster disbursals.
+- NBFCs & Lenders: automated credit underwriting, bulk statement processing, 12-month income trend and risk-flag extraction.
+- Banks: bulk transaction analysis and compliance flagging.
 
 ## Supported Banks
-SBI, HDFC, Kotak, Canara, Axis, Punjab National Bank, Bank of Baroda, ICICI, and all major Indian banks.
+SBI, HDFC, ICICI, Axis, Kotak, Punjab National Bank (PNB), Bank of Baroda, Canara Bank, Union Bank of India, and 20+ other major Indian banks.
 
 ## Features
-- PDF to Excel conversion
-- Transaction search by keyword
-- Credit/Debit categorization
-- AI chat for financial insights
-- Dashboard with ITR, loan eligibility, compliance analysis
-- Mobile app (Android)
+- Bank statement PDF to Excel conversion (any Indian bank, including password-protected PDFs)
+- GST reconciliation: GSTR-1, GSTR-2B, GSTR-3B
+- GST filing calendar and due-date tracking
+- Financial Consolidator: Bank Statement + 26AS + AIS reconciliation into Balance Sheet & Profit and Loss statement
+- Loan eligibility, FOIR, and EMI detection
+- ITR income summary and compliance flags
+- AI chat for natural-language questions on statement data
+- Transaction search and credit/debit categorization
+- Dashboard with export to Excel and PDF
 
 ## Pricing
-Free basic analysis. AI Chat sessions from Rs10.
+Rs 49 per bank statement parse. No subscription, no hidden fees. AI Chat sessions from Rs 10.
 
 ## Contact
 aarogyamfin@gmail.com
@@ -978,6 +987,23 @@ aarogyamfin@gmail.com
 ## URLs
 Homepage: https://aarogyamfin.com
 About: https://aarogyamfin.com/about
+Bank Statement Analyzer: https://aarogyamfin.com/bank-statement-analyzer
+For Chartered Accountants: https://aarogyamfin.com/bank-statement-analyzer-for-ca
+For DSAs: https://aarogyamfin.com/bank-statement-analyzer-for-dsa
+For NBFCs: https://aarogyamfin.com/bank-statement-analyzer-for-nbfc
+SBI Bank Statement Analyzer: https://aarogyamfin.com/sbi-bank-statement-analyzer
+HDFC Bank Statement Analyzer: https://aarogyamfin.com/hdfc-bank-statement-analyzer
+ICICI Bank Statement Analyzer: https://aarogyamfin.com/icici-bank-statement-analyzer
+Axis Bank Statement Analyzer: https://aarogyamfin.com/axis-bank-statement-analyzer
+Kotak Bank Statement Analyzer: https://aarogyamfin.com/kotak-bank-statement-analyzer
+PNB Bank Statement Analyzer: https://aarogyamfin.com/pnb-bank-statement-analyzer
+Bank of Baroda Statement Analyzer: https://aarogyamfin.com/bob-bank-statement-analyzer
+Canara Bank Statement Analyzer: https://aarogyamfin.com/canara-bank-statement-analyzer
+Union Bank Statement Analyzer: https://aarogyamfin.com/union-bank-statement-analyzer
+Financial Consolidator (Books Finalisation): https://aarogyamfin.com/consolidator
+GST Calendar: https://aarogyamfin.com/gst-calendar
+Accuracy Test: https://aarogyamfin.com/accuracy
+Blog: https://aarogyamfin.com/blog
 Privacy: https://aarogyamfin.com/privacy
 Terms: https://aarogyamfin.com/terms
 """
@@ -1033,62 +1059,134 @@ def bank_statement_analyzer():
 @app.route('/bank-statement-analyzer-for-ca')
 def bsa_for_ca():
     is_logged_in, user_email, user_id = _get_current_user()
-    return render_template('bank_statement_analyzer.html', is_logged_in=is_logged_in, user_email=user_email)
+    return render_template(
+        'bank_statement_analyzer.html', is_logged_in=is_logged_in, user_email=user_email,
+        page_title="AI Bank Statement Analyzer for CAs | AarogyamFin",
+        page_description="AI-powered bank statement analyzer built for Chartered Accountants. Upload client bank PDFs — get instant transactions, Excel export & ITR-ready summaries for every client, every quarter.",
+        page_h1="<em>ITR-Ready</em><br>Bank Statement Analysis<br>for Chartered Accountants",
+        page_subheading="Built for CA workflows — GST reconciliation, audits & client-ready books",
+        page_intro="Upload client bank statement PDFs and get instant transaction extraction, ITR-ready income summaries, GSTR-1/2B/3B reconciliation support, and audit-friendly Excel exports — built to help CAs manage every client, every filing season, faster.")
 
 @app.route('/sbi-bank-statement-analyzer')
 def sbi_bsa():
     is_logged_in, user_email, user_id = _get_current_user()
-    return render_template('bank_statement_analyzer.html', is_logged_in=is_logged_in, user_email=user_email)
+    return render_template(
+        'bank_statement_analyzer.html', is_logged_in=is_logged_in, user_email=user_email,
+        page_title="SBI Bank Statement Analyzer | AarogyamFin",
+        page_description="Upload your SBI bank statement PDF and get instant AI-powered transaction extraction, Excel export, loan eligibility & ITR data. Built to handle SBI's statement format accurately.",
+        page_h1="<em>SBI</em><br>Bank Statement<br>Analyzer",
+        page_subheading="Purpose-built parsing accuracy for State Bank of India statement formats",
+        page_intro="Upload your SBI bank statement PDF — including e-statements and passbook exports — and get instant, accurate transaction extraction tuned to SBI's specific formatting, with Excel export, loan eligibility and ITR-ready summaries in seconds.")
 
 @app.route('/hdfc-bank-statement-analyzer')
 def hdfc_bsa():
     is_logged_in, user_email, user_id = _get_current_user()
-    return render_template('bank_statement_analyzer.html', is_logged_in=is_logged_in, user_email=user_email)
+    return render_template(
+        'bank_statement_analyzer.html', is_logged_in=is_logged_in, user_email=user_email,
+        page_title="HDFC Bank Statement Analyzer | AarogyamFin",
+        page_description="Upload your HDFC Bank statement PDF and get instant AI-powered transaction extraction, Excel export, loan eligibility & ITR data. Built to handle HDFC's statement format accurately.",
+        page_h1="<em>HDFC Bank</em><br>Statement<br>Analyzer",
+        page_subheading="Accurate parsing built for HDFC Bank's statement formats",
+        page_intro="Upload your HDFC Bank statement PDF and get instant, accurate transaction extraction tuned to HDFC's specific formatting — with Excel export, loan eligibility and ITR-ready summaries in seconds.")
 
 @app.route('/icici-bank-statement-analyzer')
 def icici_bsa():
     is_logged_in, user_email, user_id = _get_current_user()
-    return render_template('bank_statement_analyzer.html', is_logged_in=is_logged_in, user_email=user_email)
+    return render_template(
+        'bank_statement_analyzer.html', is_logged_in=is_logged_in, user_email=user_email,
+        page_title="ICICI Bank Statement Analyzer | AarogyamFin",
+        page_description="Upload your ICICI Bank statement PDF and get instant AI-powered transaction extraction, Excel export, loan eligibility & ITR data. Built to handle ICICI's statement format accurately.",
+        page_h1="<em>ICICI Bank</em><br>Statement<br>Analyzer",
+        page_subheading="Accurate parsing built for ICICI Bank's statement formats",
+        page_intro="Upload your ICICI Bank statement PDF and get instant, accurate transaction extraction tuned to ICICI's specific formatting — with Excel export, loan eligibility and ITR-ready summaries in seconds.")
 
 @app.route('/axis-bank-statement-analyzer')
 def axis_bsa():
     is_logged_in, user_email, user_id = _get_current_user()
-    return render_template('bank_statement_analyzer.html', is_logged_in=is_logged_in, user_email=user_email)
+    return render_template(
+        'bank_statement_analyzer.html', is_logged_in=is_logged_in, user_email=user_email,
+        page_title="Axis Bank Statement Analyzer | AarogyamFin",
+        page_description="Upload your Axis Bank statement PDF and get instant AI-powered transaction extraction, Excel export, loan eligibility & ITR data. Built to handle Axis Bank's statement format accurately.",
+        page_h1="<em>Axis Bank</em><br>Statement<br>Analyzer",
+        page_subheading="Accurate parsing built for Axis Bank's statement formats",
+        page_intro="Upload your Axis Bank statement PDF and get instant, accurate transaction extraction tuned to Axis Bank's specific formatting — with Excel export, loan eligibility and ITR-ready summaries in seconds.")
 
 @app.route('/kotak-bank-statement-analyzer')
 def kotak_bsa():
     is_logged_in, user_email, user_id = _get_current_user()
-    return render_template('bank_statement_analyzer.html', is_logged_in=is_logged_in, user_email=user_email)
+    return render_template(
+        'bank_statement_analyzer.html', is_logged_in=is_logged_in, user_email=user_email,
+        page_title="Kotak Bank Statement Analyzer | AarogyamFin",
+        page_description="Upload your Kotak Mahindra Bank statement PDF and get instant AI-powered transaction extraction, Excel export, loan eligibility & ITR data. Built to handle Kotak's statement format accurately.",
+        page_h1="<em>Kotak</em><br>Bank Statement<br>Analyzer",
+        page_subheading="Accurate parsing built for Kotak Mahindra Bank's statement formats",
+        page_intro="Upload your Kotak Mahindra Bank statement PDF and get instant, accurate transaction extraction tuned to Kotak's specific formatting — with Excel export, loan eligibility and ITR-ready summaries in seconds.")
 
 @app.route('/pnb-bank-statement-analyzer')
 def pnb_bsa():
     is_logged_in, user_email, user_id = _get_current_user()
-    return render_template('bank_statement_analyzer.html', is_logged_in=is_logged_in, user_email=user_email)
+    return render_template(
+        'bank_statement_analyzer.html', is_logged_in=is_logged_in, user_email=user_email,
+        page_title="PNB Bank Statement Analyzer | AarogyamFin",
+        page_description="Upload your Punjab National Bank statement PDF and get instant AI-powered transaction extraction, Excel export, loan eligibility & ITR data. Built to handle PNB's statement format accurately.",
+        page_h1="<em>PNB</em><br>Bank Statement<br>Analyzer",
+        page_subheading="Accurate parsing built for Punjab National Bank's statement formats",
+        page_intro="Upload your Punjab National Bank statement PDF and get instant, accurate transaction extraction tuned to PNB's specific formatting — with Excel export, loan eligibility and ITR-ready summaries in seconds.")
 
 @app.route('/bob-bank-statement-analyzer')
 def bob_bsa():
     is_logged_in, user_email, user_id = _get_current_user()
-    return render_template('bank_statement_analyzer.html', is_logged_in=is_logged_in, user_email=user_email)
+    return render_template(
+        'bank_statement_analyzer.html', is_logged_in=is_logged_in, user_email=user_email,
+        page_title="Bank of Baroda Statement Analyzer | AarogyamFin",
+        page_description="Upload your Bank of Baroda statement PDF and get instant AI-powered transaction extraction, Excel export, loan eligibility & ITR data. Built to handle BOB's statement format accurately.",
+        page_h1="<em>Bank of Baroda</em><br>Statement<br>Analyzer",
+        page_subheading="Accurate parsing built for Bank of Baroda's statement formats",
+        page_intro="Upload your Bank of Baroda statement PDF and get instant, accurate transaction extraction tuned to BOB's specific formatting — with Excel export, loan eligibility and ITR-ready summaries in seconds.")
 
 @app.route('/canara-bank-statement-analyzer')
 def canara_bsa():
     is_logged_in, user_email, user_id = _get_current_user()
-    return render_template('bank_statement_analyzer.html', is_logged_in=is_logged_in, user_email=user_email)
+    return render_template(
+        'bank_statement_analyzer.html', is_logged_in=is_logged_in, user_email=user_email,
+        page_title="Canara Bank Statement Analyzer | AarogyamFin",
+        page_description="Upload your Canara Bank statement PDF and get instant AI-powered transaction extraction, Excel export, loan eligibility & ITR data. Built to handle Canara Bank's statement format accurately.",
+        page_h1="<em>Canara Bank</em><br>Statement<br>Analyzer",
+        page_subheading="Accurate parsing built for Canara Bank's statement formats",
+        page_intro="Upload your Canara Bank statement PDF and get instant, accurate transaction extraction tuned to Canara Bank's specific formatting — with Excel export, loan eligibility and ITR-ready summaries in seconds.")
 
 @app.route('/union-bank-statement-analyzer')
 def union_bsa():
     is_logged_in, user_email, user_id = _get_current_user()
-    return render_template('bank_statement_analyzer.html', is_logged_in=is_logged_in, user_email=user_email)
+    return render_template(
+        'bank_statement_analyzer.html', is_logged_in=is_logged_in, user_email=user_email,
+        page_title="Union Bank Statement Analyzer | AarogyamFin",
+        page_description="Upload your Union Bank of India statement PDF and get instant AI-powered transaction extraction, Excel export, loan eligibility & ITR data. Built to handle Union Bank's statement format accurately.",
+        page_h1="<em>Union Bank</em><br>Statement<br>Analyzer",
+        page_subheading="Accurate parsing built for Union Bank of India's statement formats",
+        page_intro="Upload your Union Bank of India statement PDF and get instant, accurate transaction extraction tuned to Union Bank's specific formatting — with Excel export, loan eligibility and ITR-ready summaries in seconds.")
 
 @app.route('/bank-statement-analyzer-for-dsa')
 def bsa_for_dsa():
     is_logged_in, user_email, user_id = _get_current_user()
-    return render_template('bank_statement_analyzer.html', is_logged_in=is_logged_in, user_email=user_email)
+    return render_template(
+        'bank_statement_analyzer.html', is_logged_in=is_logged_in, user_email=user_email,
+        page_title="AI Bank Statement Analyzer for DSAs | AarogyamFin",
+        page_description="AI-powered bank statement analyzer for DSAs & loan agents. Verify income, calculate FOIR, and assess loan eligibility in seconds before submitting to lenders.",
+        page_h1="<em>Instant</em><br>Loan Eligibility<br>Bank Statement Analysis",
+        page_subheading="FOIR calculation, EMI detection & faster disbursals for DSAs",
+        page_intro="Upload any borrower's bank statement PDF and get instant income verification, automatic EMI detection, FOIR calculation, and loan eligibility scoring — so DSAs can qualify leads faster and push clean files to lenders for quicker disbursals.")
 
 @app.route('/bank-statement-analyzer-for-nbfc')
 def bsa_for_nbfc():
     is_logged_in, user_email, user_id = _get_current_user()
-    return render_template('bank_statement_analyzer.html', is_logged_in=is_logged_in, user_email=user_email)
+    return render_template(
+        'bank_statement_analyzer.html', is_logged_in=is_logged_in, user_email=user_email,
+        page_title="AI Bank Statement Analyzer for NBFCs | AarogyamFin",
+        page_description="AI-powered bank statement analyzer for NBFCs & lenders. Automated underwriting — extract 12-month income trends, EMI obligations, risk flags and credit profile instantly.",
+        page_h1="<em>Automated</em><br>Credit Underwriting<br>for NBFCs & Lenders",
+        page_subheading="Bulk statement processing, risk assessment & underwriting at scale",
+        page_intro="Process borrower bank statements in bulk with AI-powered credit underwriting — extract 12-month income trends, EMI obligations, risk flags, and credit profiles automatically, so NBFCs can assess and disburse loans without manual statement review.")
 
 @app.route('/privacy')
 def privacy():

@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AI Bank Statement Analyzer India | AarogyamFin</title>
+<title>{{ page_title | default("AI Bank Statement Analyzer India | AarogyamFin") }}</title>
 <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
-<link rel="canonical" href="https://aarogyamfin.com/bank-statement-analyzer" />
-<meta name="description" content="AI-powered bank statement analyzer for Indian CAs, DSAs & NBFCs. Upload any bank PDF — get instant transactions, Excel export, loan eligibility & ITR data. Supports SBI, HDFC, ICICI & 30+ banks." />
-<meta property="og:title" content="AI Bank Statement Analyzer India | AarogyamFin" />
-<meta property="og:description" content="Upload any Indian bank statement PDF. Get instant AI analysis — transactions, Excel export, loan eligibility, ITR data. Trusted by CAs, DSAs & NBFCs." />
-<meta property="og:url" content="https://aarogyamfin.com/bank-statement-analyzer" />
+<link rel="canonical" href="https://aarogyamfin.com{{ request.path }}" />
+<meta name="description" content="{{ page_description | default('AI-powered bank statement analyzer for Indian CAs, DSAs & NBFCs. Upload any bank PDF — get instant transactions, Excel export, loan eligibility & ITR data. Supports SBI, HDFC, ICICI & 30+ banks.') }}" />
+<meta property="og:title" content="{{ page_title | default('AI Bank Statement Analyzer India | AarogyamFin') }}" />
+<meta property="og:description" content="{{ page_description | default('AI-powered bank statement analyzer for Indian CAs, DSAs & NBFCs. Upload any bank PDF — get instant transactions, Excel export, loan eligibility & ITR data. Supports SBI, HDFC, ICICI & 30+ banks.') }}" />
+<meta property="og:url" content="https://aarogyamfin.com{{ request.path }}" />
 <meta property="og:type" content="website" />
 <meta property="og:image" content="https://aarogyamfin.com/static/og-image.png" />
 <meta name="twitter:card" content="summary_large_image" />
@@ -72,6 +72,7 @@
   .hero-tag { display: inline-block; font-size: 0.68rem; letter-spacing: 0.28em; text-transform: uppercase; color: var(--gold); border: 1px solid var(--border); padding: 7px 18px; margin-bottom: 32px; background: rgba(201,168,76,0.04); }
   .hero-headline { font-family: 'Cormorant Garamond', serif; font-size: clamp(2.4rem, 4vw, 4rem); font-weight: 300; line-height: 1.1; margin-bottom: 24px; }
   .hero-headline em { font-style: italic; color: var(--gold-light); }
+  .hero-subheading { font-size: 1rem; font-weight: 400; color: var(--gold-light); margin-bottom: 18px; }
   .hero-sub { font-size: 0.95rem; line-height: 1.9; color: var(--muted); margin-bottom: 40px; }
   .hero-actions { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
   .btn-primary { display: inline-flex; align-items: center; gap: 10px; background: var(--gold); color: #060810; font-family: 'DM Sans', sans-serif; font-size: 0.78rem; font-weight: 500; letter-spacing: 0.16em; text-transform: uppercase; padding: 16px 36px; text-decoration: none; transition: opacity 0.3s; }
@@ -225,12 +226,9 @@
   <div class="seo-hero">
     <div>
       <div class="hero-tag">DPIIT Recognised · DIPP265941 · Made in India</div>
-      <h1 class="hero-headline">
-        <em>AI-Powered</em><br>
-        Bank Statement<br>
-        Analyzer
-      </h1>
-      <p class="hero-sub">Upload any Indian bank statement PDF — get instant transaction extraction, Excel export, loan eligibility, ITR data, and AI-powered insights. Built for CAs, DSAs & NBFCs.</p>
+      <h1 class="hero-headline">{{ page_h1 | default('<em>AI-Powered</em><br>Bank Statement<br>Analyzer') | safe }}</h1>
+      <p class="hero-subheading">{{ page_subheading | default('Trusted by CAs, DSAs & NBFCs across India') }}</p>
+      <p class="hero-sub">{{ page_intro | default('Upload any Indian bank statement PDF — get instant transaction extraction, Excel export, loan eligibility, ITR data, and AI-powered insights. Built for CAs, DSAs & NBFCs.') }}</p>
       <div class="hero-actions">
         <a href="/" class="btn-primary">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
