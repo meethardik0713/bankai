@@ -17,6 +17,7 @@ from parsers.axis_bank  import AxisBankParser
 from parsers.pnb        import PNBParser
 from parsers.bob        import BOBParser
 from parsers.icici_bank import ICICIBankParser
+from parsers.saraswat   import SaraswatParser
 from parsers.generic    import GenericParser
 
 
@@ -30,6 +31,7 @@ _PARSERS = [
     AxisBankParser(),
     PNBParser(),
     BOBParser(),
+    SaraswatParser(),
     GenericParser(),     # Always last — catches everything else
 ]
 
