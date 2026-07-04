@@ -440,11 +440,11 @@ tr:hover td { background: rgba(201,168,76,0.02); }
     Export ▾
   </button>
   <div id="exportMenu" style="display:none; position:absolute; right:0; top:100%; margin-top:6px; background:#0d1117; border:1px solid var(--border); min-width:180px; z-index:999; box-shadow:0 8px 24px rgba(0,0,0,0.4);">
-    <a href="/dashboard/export" target="_blank" style="display:flex; align-items:center; gap:10px; padding:12px 16px; color:var(--text); text-decoration:none; font-size:0.8rem; border-bottom:1px solid var(--border); transition:background 0.2s;" onmouseover="this.style.background='rgba(201,168,76,0.08)'" onmouseout="this.style.background='transparent'">
+    <a href="/dashboard/export{% if src_hash %}?src={{ src_hash }}{% endif %}" target="_blank" style="display:flex; align-items:center; gap:10px; padding:12px 16px; color:var(--text); text-decoration:none; font-size:0.8rem; border-bottom:1px solid var(--border); transition:background 0.2s;" onmouseover="this.style.background='rgba(201,168,76,0.08)'" onmouseout="this.style.background='transparent'">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
       Excel (.xlsx)
     </a>
-    <a href="/dashboard/export/pdf" target="_blank" style="display:flex; align-items:center; gap:10px; padding:12px 16px; color:var(--text); text-decoration:none; font-size:0.8rem; border-bottom:1px solid var(--border); transition:background 0.2s;" onmouseover="this.style.background='rgba(201,168,76,0.08)'" onmouseout="this.style.background='transparent'">
+    <a href="/dashboard/export/pdf{% if src_hash %}?src={{ src_hash }}{% endif %}" target="_blank" style="display:flex; align-items:center; gap:10px; padding:12px 16px; color:var(--text); text-decoration:none; font-size:0.8rem; border-bottom:1px solid var(--border); transition:background 0.2s;" onmouseover="this.style.background='rgba(201,168,76,0.08)'" onmouseout="this.style.background='transparent'">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f87171" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
       PDF Report
     </a>

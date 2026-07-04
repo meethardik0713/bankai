@@ -21,6 +21,7 @@ from core.verifier import run_accuracy_check
 from core.post_validator import validate_and_fix
 from core.sqlite_indexer import build_index, drop_index, get_db
 from core.chat_engine import verify_data, chat as ai_chat
+from core.statement_info import extract_statement_info
 from core.dashboard import run_dashboard
 from core.gstr1 import run_gstr1
 from supabase import create_client, Client
@@ -859,6 +860,151 @@ def home():
     )
 
 
+@app.route('/analyze-multi', methods=['POST'])
+def analyze_multi():
+    ip = request.remote_addr
+    if is_rate_limited(ip):
+        abort(429)
+    is_logged_in, user_email, user_id = _get_current_user()
+
+    keyword = request.form.get('keyword', '')[:100]
+
+    slots = []
+    primary_file = request.files.get('pdf_file')
+    if primary_file and primary_file.filename:
+        slots.append({
+            'file': primary_file,
+            'bank_name': request.form.get('bank_name', 'Bank Account 1'),
+            'account_type': request.form.get('account_type', ''),
+            'account_number': request.form.get('account_number', ''),
+        })
+    i = 1
+    while True:
+        f = request.files.get(f'extra_pdf_{i}')
+        if not f or not f.filename:
+            break
+        slots.append({
+            'file': f,
+            'bank_name': request.form.get(f'extra_bank_name_{i}', f'Bank Account {i+1}'),
+            'account_type': request.form.get(f'extra_account_type_{i}', ''),
+            'account_number': request.form.get(f'extra_account_number_{i}', ''),
+        })
+        i += 1
+
+    if not slots:
+        return render_template('index.html', error_message='Please upload at least one bank statement.',
+                                is_logged_in=is_logged_in, user_email=user_email)
+
+    accounts = []
+    combined_txns = []
+
+    for idx, slot in enumerate(slots):
+        file = slot['file']
+        safe_name = secure_filename(file.filename)
+        if not safe_name.lower().endswith('.pdf') or not _is_valid_pdf(file):
+            continue
+
+        fhash  = _file_hash(file)
+        cached = _cache_get(fhash)
+        if cached:
+            txns = cached['transactions']
+        else:
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], safe_name)
+            file.save(filepath)
+            try:
+                txns = parse_transactions(filepath)
+                if txns:
+                    vr   = validate_and_fix(txns)
+                    txns = vr['transactions']
+                _cache_set(fhash, txns, safe_name)
+            except Exception:
+                logger.exception("Multi-account parse error: %s", safe_name)
+                txns = []
+            finally:
+                if os.path.exists(filepath):
+                    os.remove(filepath)
+
+        acct_number = slot['account_number']
+        acct_label  = slot['bank_name'] + (f" •••{acct_number[-4:]}" if acct_number else '')
+        tagged_txns = [{**t, 'source_account': acct_label} for t in txns]
+        combined_txns.extend(tagged_txns)
+
+        acct_cr = sum(t['amount'] for t in txns if t.get('type') == 'CR' and t.get('amount'))
+        acct_dr = sum(t['amount'] for t in txns if t.get('type') == 'DR' and t.get('amount'))
+        try:
+            acct_dashboard = run_dashboard(txns[:300]) if txns else None
+        except Exception:
+            logger.exception("Multi-account dashboard error: %s", safe_name)
+            acct_dashboard = None
+
+        accounts.append({
+            'id':              f'acc_{idx}',
+            'label':           acct_label,
+            'filename':        safe_name,
+            'transaction_data':sorted(txns, key=lambda t: t.get('date',''), reverse=True)[:100],
+            'total_credit':    round(acct_cr, 2),
+            'total_debit':     round(acct_dr, 2),
+            'count':           len(txns),
+            'dashboard_data':  acct_dashboard,
+            'fhash':           fhash,
+        })
+
+    combined_cr = sum(t['amount'] for t in combined_txns if t.get('type') == 'CR' and t.get('amount'))
+    combined_dr = sum(t['amount'] for t in combined_txns if t.get('type') == 'DR' and t.get('amount'))
+    try:
+        combined_dashboard = run_dashboard(combined_txns[:300]) if combined_txns else None
+    except Exception:
+        logger.exception("Combined dashboard error")
+        combined_dashboard = None
+
+    multi_accounts = accounts
+    if len(accounts) > 1:
+        combined_hash = hashlib.md5(
+            ('|'.join(sorted(a['fhash'] for a in accounts))).encode()
+        ).hexdigest()
+        _cache_set(combined_hash, combined_txns, f'Combined ({len(accounts)} Accounts)')
+
+        multi_accounts = [{
+            'id':               'combined',
+            'label':            f'Combined ({len(accounts)} Accounts)',
+            'transaction_data': sorted(combined_txns, key=lambda t: t.get('date',''), reverse=True)[:100],
+            'total_credit':     round(combined_cr, 2),
+            'total_debit':      round(combined_dr, 2),
+            'count':            len(combined_txns),
+            'dashboard_data':   combined_dashboard,
+            'fhash':            combined_hash,
+        }] + accounts
+
+    ph_track(user_id or ip, event='multi_account_analyzed', props={
+        'account_count': len(accounts),
+        'total_txns':    len(combined_txns),
+    })
+
+    return render_template('index.html',
+        multi_accounts    = multi_accounts,
+        keyword           = keyword,
+        is_logged_in      = is_logged_in,
+        user_email        = user_email,
+        error_message     = '',
+        transaction_data  = [],
+        total             = 0.0,
+        total_debit       = 0.0,
+        total_credit      = 0.0,
+        amounts_count     = 0,
+        count             = 0,
+        selected_filename = '',
+        parse_time        = None,
+        has_cached_file   = False,
+        cached_filename   = '',
+        page_num          = 1,
+        total_pages       = 1,
+        total_count       = 0,
+        dashboard_data    = None,
+        demo_submitted    = False,
+        demo_error        = None,
+    )
+
+
 @app.route('/book-demo', methods=['POST'])
 def book_demo():
     ip = request.remote_addr
@@ -1420,20 +1566,31 @@ def dashboard_page():
     if not active:
         return redirect('/pay')
 
-    data        = None
-    cached_hash = session.get('file_hash')
-    locked_hash = _get_locked_hash(user_id)
+    data          = None
+    error_message = ''
 
-    if cached_hash and (not locked_hash or cached_hash == locked_hash):
-        cached = _cache_get(cached_hash)
+    src_hash = request.args.get('src', '').strip()
+    if src_hash:
+        cached = _cache_get(src_hash)
         if cached:
             data = run_dashboard(cached['transactions'])
+        else:
+            error_message = 'This report has expired. Please re-analyze the statement(s).'
+    else:
+        cached_hash = session.get('file_hash')
+        locked_hash = _get_locked_hash(user_id)
+        if cached_hash and (not locked_hash or cached_hash == locked_hash):
+            cached = _cache_get(cached_hash)
+            if cached:
+                data = run_dashboard(cached['transactions'])
 
     return render_template(
         'dashboard.html',
-        data         = data,
-        is_logged_in = is_logged_in,
-        user_email   = user_email,
+        data          = data,
+        error_message = error_message,
+        is_logged_in  = is_logged_in,
+        user_email    = user_email,
+        src_hash      = src_hash,
     )
 
 
@@ -1575,13 +1732,17 @@ def dashboard_export():
     if not is_logged_in:
         return redirect('/login')
 
-    cached_hash = session.get('file_hash')
-    if not cached_hash:
-        return "No data available. Please upload a PDF first.", 400
+    src_hash = request.args.get('src', '').strip()
+    if src_hash:
+        cached_hash = src_hash
+    else:
+        cached_hash = session.get('file_hash')
+        if not cached_hash:
+            return "No data available. Please upload a PDF first.", 400
 
-    locked_hash = _get_locked_hash(user_id)
-    if locked_hash and cached_hash != locked_hash:
-        return NEW_STATEMENT_ERROR, 403
+        locked_hash = _get_locked_hash(user_id)
+        if locked_hash and cached_hash != locked_hash:
+            return NEW_STATEMENT_ERROR, 403
 
     cached = _cache_get(cached_hash)
     if not cached:
@@ -1940,9 +2101,14 @@ def dashboard_export_pdf():
     if not is_logged_in:
         return redirect('/login')
 
-    cached_hash = session.get('file_hash')
-    if not cached_hash:
-        return "No data available. Please upload a PDF first.", 400
+    src_hash = request.args.get('src', '').strip()
+    if src_hash:
+        cached_hash = src_hash
+    else:
+        cached_hash = session.get('file_hash')
+        if not cached_hash:
+            return "No data available. Please upload a PDF first.", 400
+
     cached = _cache_get(cached_hash)
     if not cached:
         return "Session expired. Please re-upload.", 400
@@ -3264,6 +3430,35 @@ def gstr1_analyze():
 # ═══════════════════════════════════════════════════════════
 #  MOBILE API ROUTES
 # ═══════════════════════════════════════════════════════════
+
+@app.route('/api/detect-info', methods=['POST'])
+def api_detect_info():
+    ip = request.remote_addr
+    if is_rate_limited(ip):
+        return jsonify({'error': 'Too many requests'}), 429
+
+    file = request.files.get('pdf_file')
+    if not file or not file.filename:
+        return jsonify({'error': 'No file uploaded'}), 400
+
+    safe_name = secure_filename(file.filename)
+    if not safe_name.lower().endswith('.pdf'):
+        return jsonify({'error': 'Only PDF files accepted'}), 400
+    if not _is_valid_pdf(file):
+        return jsonify({'error': 'Invalid PDF'}), 400
+
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], 'detect_' + safe_name)
+    file.save(filepath)
+    try:
+        info = extract_statement_info(filepath)
+        return jsonify(info), 200
+    except Exception as e:
+        logger.exception("detect-info failed: %s", e)
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if os.path.exists(filepath):
+            os.remove(filepath)
+
 
 @app.route('/api/parse', methods=['POST'])
 def api_parse():

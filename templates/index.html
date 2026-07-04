@@ -127,7 +127,17 @@
   .form-input:focus { border-color: rgba(201,168,76,0.4); }
   .form-input::placeholder { color: var(--muted); }
 
-  select.form-input { cursor: pointer; }
+  select.form-input { cursor: pointer; color-scheme: dark; }
+  select.form-input option {
+    background: #0d1117;
+    color: #e8e4d9;
+    padding: 10px;
+  }
+  select.form-input option:checked,
+  select.form-input option:hover {
+    background: #c9a84c;
+    color: #060810;
+  }
 
   .form-actions { display: flex; gap: 12px; margin-top: 8px; }
   .submit-btn { flex: 1; padding: 18px; background: var(--gold); color: #060810; border: none; font-family: 'DM Sans', sans-serif; font-size: 0.82rem; font-weight: 500; letter-spacing: 0.2em; text-transform: uppercase; cursor: pointer; transition: opacity 0.3s; }
@@ -600,14 +610,157 @@
         </div>
       </div>
 
+      <div class="form-group" id="bankDetailsCard" style="display:none; background:rgba(201,168,76,0.04); border:1px solid var(--border); padding:20px; border-radius:2px;">
+        <label class="form-label" style="margin-bottom:16px;">Bank Account Details</label>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+          <div>
+            <label class="form-label" style="font-size:0.62rem;">Bank Name</label>
+            <select id="bankNameSelect" name="bank_name" class="form-input" style="color-scheme: dark;">
+              <option>State Bank of India</option>
+              <option>HDFC Bank</option>
+              <option>ICICI Bank</option>
+              <option>Axis Bank</option>
+              <option>Kotak Mahindra Bank</option>
+              <option>Punjab National Bank</option>
+              <option>Bank of Baroda</option>
+              <option>Canara Bank</option>
+              <option>Union Bank of India</option>
+              <option>IndusInd Bank</option>
+              <option>Yes Bank</option>
+              <option>IDFC FIRST Bank</option>
+              <option>Federal Bank</option>
+              <option>Indian Bank</option>
+              <option>Indian Overseas Bank</option>
+              <option>UCO Bank</option>
+              <option>Bank of Maharashtra</option>
+              <option>Central Bank of India</option>
+              <option>Punjab & Sind Bank</option>
+              <option>Bandhan Bank</option>
+              <option>RBL Bank</option>
+              <option>South Indian Bank</option>
+              <option>Karur Vysya Bank</option>
+              <option>City Union Bank</option>
+              <option>Karnataka Bank</option>
+              <option>DCB Bank</option>
+              <option>Jammu & Kashmir Bank</option>
+              <option>Tamilnad Mercantile Bank</option>
+              <option>Dhanlaxmi Bank</option>
+              <option>CSB Bank</option>
+              <option>Nainital Bank</option>
+              <option>AU Small Finance Bank</option>
+              <option>Equitas Small Finance Bank</option>
+              <option>Ujjivan Small Finance Bank</option>
+              <option>ESAF Small Finance Bank</option>
+              <option>ESB (Suryoday) Small Finance Bank</option>
+              <option>Jana Small Finance Bank</option>
+              <option>Utkarsh Small Finance Bank</option>
+              <option>Fincare Small Finance Bank</option>
+              <option>North East Small Finance Bank</option>
+              <option>Capital Small Finance Bank</option>
+              <option>Shivalik Small Finance Bank</option>
+              <option>Unity Small Finance Bank</option>
+              <option>Saraswat Co-operative Bank</option>
+              <option>Cosmos Co-operative Bank</option>
+              <option>Shamrao Vithal Co-operative Bank</option>
+              <option>Abhyudaya Co-operative Bank</option>
+              <option>TJSB Sahakari Bank</option>
+              <option>NKGSB Co-operative Bank</option>
+              <option>Bharat Co-operative Bank</option>
+              <option>Kalyan Janata Sahakari Bank</option>
+              <option>Punjab and Maharashtra Co-op Bank</option>
+              <option>Apna Sahakari Bank</option>
+              <option>Zoroastrian Co-operative Bank</option>
+              <option>Deutsche Bank India</option>
+              <option>HSBC India</option>
+              <option>Citibank India</option>
+              <option>Standard Chartered Bank India</option>
+              <option>DBS Bank India</option>
+              <option>Bank of America India</option>
+              <option>JPMorgan Chase Bank India</option>
+              <option>Barclays Bank India</option>
+              <option>BNP Paribas India</option>
+              <option>Credit Suisse India</option>
+              <option>Sumitomo Mitsui Banking Corp</option>
+              <option>Mizuho Bank India</option>
+              <option>Bank of China India</option>
+              <option>Industrial and Commercial Bank of China</option>
+              <option>NatWest India</option>
+              <option>Societe Generale India</option>
+              <option>Credit Agricole India</option>
+              <option>American Express Banking Corp</option>
+              <option>AB Bank Bangladesh</option>
+              <option>Bank of Bahrain and Kuwait</option>
+              <option>Bank of Ceylon</option>
+              <option>Bank of Nova Scotia</option>
+              <option>CTBC Bank</option>
+              <option>Doha Bank</option>
+              <option>Emirates NBD Bank</option>
+              <option>FirstRand Bank</option>
+              <option>KEB Hana Bank</option>
+              <option>Kookmin Bank</option>
+              <option>Krung Thai Bank</option>
+              <option>Mashreq Bank</option>
+              <option>MUFG Bank</option>
+              <option>PT Bank Maybank Indonesia</option>
+              <option>Qatar National Bank</option>
+              <option>Sberbank</option>
+              <option>Shinhan Bank</option>
+              <option>SBM Bank India</option>
+              <option>United Overseas Bank</option>
+              <option>Woori Bank</option>
+              <option>NABARD</option>
+              <option>SIDBI</option>
+              <option>NHB (National Housing Bank)</option>
+              <option>EXIM Bank</option>
+              <option>Airtel Payments Bank</option>
+              <option>India Post Payments Bank</option>
+              <option>Fino Payments Bank</option>
+              <option>Paytm Payments Bank</option>
+              <option>Jio Payments Bank</option>
+              <option>NSDL Payments Bank</option>
+              <option>Other / Unrecognized</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label" style="font-size:0.62rem;">Account Type</label>
+            <select id="accountTypeSelect" name="account_type" class="form-input">
+              <option>Savings</option>
+              <option>Current</option>
+              <option>Cash Credit</option>
+              <option>Overdraft</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label" style="font-size:0.62rem;">Account Number</label>
+            <input type="text" id="accountNumberInput" name="account_number" class="form-input" placeholder="Not detected">
+          </div>
+          <div></div>
+          <div>
+            <label class="form-label" style="font-size:0.62rem;">Statement Start Date</label>
+            <input type="date" id="statementStartInput" class="form-input">
+          </div>
+          <div>
+            <label class="form-label" style="font-size:0.62rem;">Statement End Date</label>
+            <input type="date" id="statementEndInput" class="form-input">
+          </div>
+        </div>
+        <div id="bankDetectStatus" style="font-size:0.7rem; color:var(--muted); margin-top:10px;"></div>
+      </div>
+
       <div class="form-group">
         <label class="form-label">Search Keyword (e.g. Rekha, ATM, Salary)</label>
         <input type="text" name="keyword" id="keywordInput" placeholder="Leave empty to see all transactions" value="{{ keyword }}" class="form-input">
       </div>
 
+      <div id="extraAccountsContainer"></div>
+
+      <button type="button" id="addAccountBtn" style="background:transparent; border:1px dashed var(--border); color:var(--gold); font-family:'DM Sans',sans-serif; font-size:0.75rem; letter-spacing:0.14em; text-transform:uppercase; padding:14px; width:100%; cursor:pointer; margin-bottom:24px; transition:all 0.3s;">
+        + Add Another Bank Account
+      </button>
+
       <div class="form-actions">
         {% if is_logged_in %}
-        <button type="submit" class="submit-btn">⚡ Analyze Statement</button>
+        <button type="submit" class="submit-btn" id="mainAnalyzeBtn">⚡ Analyze Statement</button>
         {% else %}
         <a href="/login" class="submit-btn" style="text-align:center; text-decoration:none;">🔐 Login to Analyze</a>
         {% endif %}
@@ -615,6 +768,82 @@
       </div>
     </form>
   </div>
+
+  {% if multi_accounts %}
+  <div style="display:flex; gap:8px; margin-bottom:24px; margin-top:24px; flex-wrap:wrap; border-bottom:1px solid var(--border); padding-bottom:12px; position:relative; z-index:5; background:var(--bg);">
+    {% for acc in multi_accounts %}
+    <button type="button" class="ma-tab-btn" data-tab-id="{{ acc.id }}"
+      style="background:{% if loop.first %}var(--gold){% else %}transparent{% endif %}; color:{% if loop.first %}#060810{% else %}var(--muted){% endif %}; border:1px solid var(--border); font-family:'DM Sans',sans-serif; font-size:0.72rem; letter-spacing:0.1em; text-transform:uppercase; padding:10px 18px; cursor:pointer; transition:all 0.2s;">
+      {{ acc.label }} <span style="opacity:0.7;">({{ acc.count }})</span>
+    </button>
+    {% endfor %}
+  </div>
+
+  {% for acc in multi_accounts %}
+  <div class="ma-tab-panel" id="tab-{{ acc.id }}" style="display:{% if loop.first %}block{% else %}none{% endif %};">
+    <div class="stats-row reveal">
+      <div class="stat-box"><div class="stat-number">{{ acc.count }}</div><div class="stat-label">Transactions</div></div>
+      <div class="stat-box"><div class="stat-total">₹{{ "{:,.2f}".format(acc.total_credit + acc.total_debit) }}</div><div class="stat-label">Total Turnover</div></div>
+      <div class="stat-box"><div class="stat-credit">↑ ₹{{ "{:,.2f}".format(acc.total_credit) }}</div><div class="stat-label">Total Credit</div></div>
+      <div class="stat-box"><div class="stat-debit">↓ ₹{{ "{:,.2f}".format(acc.total_debit) }}</div><div class="stat-label">Total Debit</div></div>
+    </div>
+
+    <div class="results-split">
+      <div class="results-box reveal">
+        <div class="results-header"><h3>{{ acc.label }} — Transactions</h3></div>
+        <table>
+          <thead><tr><th>Date</th><th>Description</th><th>Type</th><th>Amount (₹)</th><th>Balance (₹)</th></tr></thead>
+          <tbody>
+            {% for t in acc.transaction_data %}
+            <tr>
+              <td class="date-col">{{ t.date }}</td>
+              <td class="desc-col" title="{{ t.desc }}">{{ t.desc }}{% if t.source_account %} <span style="color:var(--gold); font-size:0.68rem;">· {{ t.source_account }}</span>{% endif %}</td>
+              <td>{% if t.type == 'CR' %}<span class="badge-credit">↑ CR</span>{% elif t.type == 'DR' %}<span class="badge-debit">↓ DR</span>{% else %}—{% endif %}</td>
+              <td class="{% if t.type == 'CR' %}amount-credit{% elif t.type == 'DR' %}amount-debit{% endif %}">{% if t.amount %}₹{{ "%.2f"|format(t.amount) }}{% else %}—{% endif %}</td>
+              <td class="balance-col">{% if t.balance %}₹{{ "%.2f"|format(t.balance) }}{% else %}—{% endif %}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {% if acc.dashboard_data %}
+      <aside class="split-dashboard reveal">
+
+        <div class="dash-card">
+          <span class="dash-section-title">💰 Income & Spending</span>
+          <div class="dash-metric"><span class="dash-metric-label">Real Income</span><span class="dash-metric-value green">₹{{ "{:,.0f}".format(acc.dashboard_data['itr']['real_income_total']) }}</span></div>
+          <div class="dash-metric"><span class="dash-metric-label">Loan Received</span><span class="dash-metric-value red">₹{{ "{:,.0f}".format(acc.dashboard_data['itr']['loan_disbursal_total']) }}</span></div>
+          <div class="dash-metric"><span class="dash-metric-label">Avg Monthly Spend</span><span class="dash-metric-value">₹{{ "{:,.0f}".format(acc.dashboard_data['loan']['avg_monthly_debit']) }}</span></div>
+          <div class="dash-metric"><span class="dash-metric-label">Avg Balance</span><span class="dash-metric-value gold">₹{{ "{:,.0f}".format(acc.dashboard_data['loan']['avg_balance']) }}</span></div>
+        </div>
+
+        <div class="dash-card">
+          <span class="dash-section-title">📋 Tax & EMI</span>
+          <div class="dash-metric"><span class="dash-metric-label">Salary</span><span class="dash-metric-value green">₹{{ "{:,.0f}".format(acc.dashboard_data['itr']['salary_total']) }}</span></div>
+          <div class="dash-metric"><span class="dash-metric-label">Freelance</span><span class="dash-metric-value green">₹{{ "{:,.0f}".format(acc.dashboard_data['itr']['freelance_total']) }}</span></div>
+          <div class="dash-metric"><span class="dash-metric-label">EMI Outflow</span><span class="dash-metric-value red">₹{{ "{:,.0f}".format(acc.dashboard_data['audit']['total_emi_outflow']) }}</span></div>
+          <div class="dash-metric"><span class="dash-metric-label">FOIR</span><span class="dash-metric-value {% if acc.dashboard_data['loan']['foir'] > 50 %}red{% elif acc.dashboard_data['loan']['foir'] > 35 %}gold{% else %}green{% endif %}">{{ acc.dashboard_data['loan']['foir'] }}%</span></div>
+          <div class="dash-metric"><span class="dash-metric-label">ITR Form</span><span class="dash-metric-value gold small">{{ acc.dashboard_data['itr']['suggested_itr'].split('(')[0].strip() }}</span></div>
+        </div>
+
+        <div class="dash-card">
+          <span class="dash-section-title">🛡️ Risk & Credit</span>
+          <div class="dash-metric"><span class="dash-metric-label">Compliance Risk</span><span class="dash-badge {{ acc.dashboard_data['compliance']['risk_level'] | lower }}">{{ acc.dashboard_data['compliance']['risk_level'] }}</span></div>
+          <div class="dash-metric"><span class="dash-metric-label">Credit Profile</span><span class="dash-badge {% if acc.dashboard_data['loan']['credit_color'] == 'green' %}low{% elif acc.dashboard_data['loan']['credit_color'] == 'red' %}high{% else %}medium{% endif %}">{{ acc.dashboard_data['loan']['credit_indicator'] }}</span></div>
+          <div class="dash-metric"><span class="dash-metric-label">Loan Eligible</span><span class="dash-metric-value gold">₹{{ "{:,.0f}".format(acc.dashboard_data['loan']['loan_eligible']) }}</span></div>
+          <div class="dash-metric"><span class="dash-metric-label">Balance Mismatches</span><span class="dash-metric-value {% if acc.dashboard_data['audit']['mismatch_count'] > 0 %}red{% else %}green{% endif %}">{{ acc.dashboard_data['audit']['mismatch_count'] }}</span></div>
+          <div class="dash-metric"><span class="dash-metric-label">EMIs Detected</span><span class="dash-metric-value">{{ acc.dashboard_data['audit']['emi_count'] }}</span></div>
+        </div>
+
+        <a href="/dashboard?src={{ acc.fhash }}" class="dash-view-full">View Full Dashboard →</a>
+
+      </aside>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+  {% endif %}
 
   {% if transaction_data %}
 
@@ -1013,11 +1242,128 @@ fileBtn.addEventListener('click', function(e) {
   pdfInput.click();
 });
 
+// ── MULTI-ACCOUNT SUPPORT ──
+let extraAccountIndex = 0;
+const extraAccountsContainer = document.getElementById('extraAccountsContainer');
+const addAccountBtn = document.getElementById('addAccountBtn');
+const analyzeForm = document.getElementById('analyzeForm');
+
+const BANK_OPTIONS_HTML = document.getElementById('bankNameSelect').innerHTML;
+
+addAccountBtn.addEventListener('click', function() {
+  extraAccountIndex++;
+  const idx = extraAccountIndex;
+  const block = document.createElement('div');
+  block.style.cssText = 'border:1px solid var(--border); padding:20px; margin-bottom:16px; background:rgba(255,255,255,0.015); position:relative;';
+  block.innerHTML = `
+    <button type="button" class="remove-account-btn" style="position:absolute; top:12px; right:12px; background:rgba(248,113,113,0.12); border:1px solid rgba(248,113,113,0.3); color:#f87171; width:26px; height:26px; cursor:pointer;">✕</button>
+    <label class="form-label">Additional Bank Statement PDF</label>
+    <div class="file-upload-wrapper">
+      <div class="file-upload-btn extra-file-btn">
+        <svg class="file-upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <span class="file-name">Click to choose PDF file</span>
+      </div>
+      <input type="file" name="extra_pdf_${idx}" class="extra-pdf-input" accept=".pdf" style="display:none;">
+    </div>
+    <div class="extra-bank-card" style="display:none; margin-top:16px; grid-template-columns:1fr 1fr; gap:16px;">
+      <div><label class="form-label" style="font-size:0.62rem;">Bank Name</label>
+        <select name="extra_bank_name_${idx}" class="form-input" style="color-scheme:dark;">${BANK_OPTIONS_HTML}</select></div>
+      <div><label class="form-label" style="font-size:0.62rem;">Account Type</label>
+        <select name="extra_account_type_${idx}" class="form-input"><option>Savings</option><option>Current</option><option>Cash Credit</option><option>Overdraft</option></select></div>
+      <div><label class="form-label" style="font-size:0.62rem;">Account Number</label>
+        <input type="text" name="extra_account_number_${idx}" class="form-input" placeholder="Not detected"></div>
+    </div>
+    <div class="extra-status" style="font-size:0.7rem; color:var(--muted); margin-top:8px;"></div>
+  `;
+  extraAccountsContainer.appendChild(block);
+
+  const fileInput = block.querySelector('.extra-pdf-input');
+  const fileBtnEl = block.querySelector('.extra-file-btn');
+  const bankCard  = block.querySelector('.extra-bank-card');
+  const status    = block.querySelector('.extra-status');
+
+  fileBtnEl.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', function() {
+    if (!this.files || !this.files[0]) return;
+    fileBtnEl.querySelector('.file-name').textContent = this.files[0].name;
+    fileBtnEl.classList.add('has-file');
+    bankCard.style.display = 'grid';
+    status.textContent = '⏳ Detecting bank details…';
+    const fd = new FormData();
+    fd.append('pdf_file', this.files[0]);
+    fetch('/api/detect-info', { method: 'POST', body: fd })
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) { status.textContent = 'Could not auto-detect — fill manually.'; return; }
+        if (data.bank_name)      block.querySelector(`[name="extra_bank_name_${idx}"]`).value = data.bank_name;
+        if (data.account_type)   block.querySelector(`[name="extra_account_type_${idx}"]`).value = data.account_type;
+        if (data.account_number) block.querySelector(`[name="extra_account_number_${idx}"]`).value = data.account_number;
+        status.textContent = data.detected ? '✓ Auto-detected — verify below.' : '⚠ Please verify manually.';
+      })
+      .catch(() => { status.textContent = 'Detection failed — fill manually.'; });
+  });
+
+  block.querySelector('.remove-account-btn').addEventListener('click', () => block.remove());
+});
+
+analyzeForm.addEventListener('submit', function() {
+  if (extraAccountsContainer.children.length > 0) {
+    this.action = '/analyze-multi';
+  } else {
+    this.action = '/';
+  }
+});
+
+// Tab switching for multi-account results
+document.querySelectorAll('.ma-tab-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.ma-tab-btn').forEach(b => { b.style.background='transparent'; b.style.color='var(--muted)'; });
+    document.querySelectorAll('.ma-tab-panel').forEach(p => p.style.display='none');
+    this.style.background = 'var(--gold)'; this.style.color = '#060810';
+    document.getElementById('tab-' + this.dataset.tabId).style.display = 'block';
+  });
+});
+
+const bankDetailsCard     = document.getElementById('bankDetailsCard');
+const bankNameSelect      = document.getElementById('bankNameSelect');
+const accountTypeSelect   = document.getElementById('accountTypeSelect');
+const accountNumberInput  = document.getElementById('accountNumberInput');
+const statementStartInput = document.getElementById('statementStartInput');
+const statementEndInput   = document.getElementById('statementEndInput');
+const bankDetectStatus    = document.getElementById('bankDetectStatus');
+
+function detectBankInfo(file) {
+  bankDetailsCard.style.display = 'block';
+  bankDetectStatus.textContent = '⏳ Detecting bank details…';
+  const fd = new FormData();
+  fd.append('pdf_file', file);
+  fetch('/api/detect-info', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) {
+        bankDetectStatus.textContent = 'Could not auto-detect — please fill manually.';
+        return;
+      }
+      if (data.bank_name)      bankNameSelect.value = data.bank_name;
+      if (data.account_type)   accountTypeSelect.value = data.account_type;
+      if (data.account_number) accountNumberInput.value = data.account_number;
+      if (data.start_date)     statementStartInput.value = data.start_date;
+      if (data.end_date)       statementEndInput.value = data.end_date;
+      bankDetectStatus.textContent = data.detected
+        ? '✓ Bank auto-detected — verify details below.'
+        : '⚠ Bank not recognized — please verify manually.';
+    })
+    .catch(() => {
+      bankDetectStatus.textContent = 'Detection failed — please fill manually.';
+    });
+}
+
 pdfInput.addEventListener('change', function() {
   if (this.files && this.files[0]) {
     fileNameEl.textContent = this.files[0].name;
     fileBtn.classList.add('has-file');
     deleteBtn.classList.add('visible');
+    detectBankInfo(this.files[0]);
   }
 });
 
@@ -1034,6 +1380,8 @@ clearAllBtn.addEventListener('click', function(e) {
 
 function clearEverything() {
   pdfInput.value = '';
+  bankDetailsCard.style.display = 'none';
+  bankDetectStatus.textContent = '';
   fileNameEl.textContent = 'Click to choose PDF file';
   fileBtn.classList.remove('has-file');
   deleteBtn.classList.remove('visible');
@@ -1142,9 +1490,13 @@ const observer = new IntersectionObserver(entries => {
 }, { threshold: 0.1 });
 revealEls.forEach(el => observer.observe(el));
 
-{% if transaction_data or keyword %}
+{% if transaction_data or keyword or multi_accounts %}
 window.addEventListener('load', () => {
-  setTimeout(() => document.getElementById('analyzer').scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
+  setTimeout(() => {
+    const el = document.getElementById('analyzer');
+    const y = el.getBoundingClientRect().top + window.pageYOffset - 100;
+    window.scrollTo({ top: y, behavior: 'smooth' });
+  }, 300);
 });
 {% endif %}
 
