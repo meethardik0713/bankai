@@ -139,7 +139,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 CHAT_MESSAGE_LIMIT = 50
 CHAT_SESSION_HOURS = 48
 
-OWNER_EMAILS = ['hardik101306@gmail.com']
+OWNER_EMAILS = ['hardik101306@gmail.com', 'internataarogyamfin@gmail.com']
 
 NEW_STATEMENT_ERROR = 'New bank statement detected. Your Rs49 session is locked to one statement. <a href="/pay" style="color:#C9A84C;text-decoration:underline;font-weight:600;">Click here to purchase a new session</a> to analyze a different PDF.'
 
