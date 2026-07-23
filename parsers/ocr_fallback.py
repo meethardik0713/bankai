@@ -137,7 +137,7 @@ def ocr_parse(pdf_path: str) -> list[dict]:
 # ═══════════════════════════════════════════════════════════
 
 def _ocr_dataframe(page_img, pytesseract, Output):
-    raw = pytesseract.image_to_data(page_img, lang='eng', output_type=Output.DATAFRAME)
+    raw = pytesseract.image_to_data(page_img, lang='eng', output_type=Output.DATAFRAME, timeout=15)
     df  = raw[(raw['conf'] > CONF_THRESHOLD) & (raw['text'].str.strip() != '')].copy()
     return df.reset_index(drop=True) if not df.empty else None
 
