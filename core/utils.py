@@ -70,6 +70,31 @@ def parse_amt(text: str) -> float:
         return 0.0
 
 
+_RE_STMT_PERIOD = re.compile(
+    r'(\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4})\s*(?:to|-|–|—)\s*(\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4})',
+    re.IGNORECASE
+)
+
+
+def extract_statement_period(pdf_path: str):
+    """Scan first page for a 'DD Mon YYYY - DD Mon YYYY' style range.
+    Returns (start_date_str, end_date_str) or (None, None)."""
+    try:
+        with pdfplumber.open(pdf_path) as pdf:
+            text = pdf.pages[0].extract_text() or ''
+            m = _RE_STMT_PERIOD.search(text)
+            if m:
+                start_raw, end_raw = m.group(1), m.group(2)
+                start = try_date(start_raw)
+                end   = try_date(end_raw)
+                if start and end:
+                    print(f"[utils] Statement period: {start} to {end}")
+                    return start, end
+    except Exception:
+        pass
+    return None, None
+
+
 def extract_opening_balance_from_pdf(pdf_path: str) -> float:
     """Scan first 2 pages of PDF text for opening balance. Returns None if not found."""
     try:

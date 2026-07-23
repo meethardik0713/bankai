@@ -64,17 +64,21 @@ def _extract_account_type(text: str):
     return mapping.get(m.group(1).lower(), m.group(1).title())
 
 
+_DATE_TOKEN = r'[\d]{1,2}[\s/.\-][A-Za-z]{0,9}[\s/.\-]?\d{2,4}'
+
 def _extract_statement_period(text: str):
     patterns = [
-        r'(?:statement period|statement from|period)\s*[:\-]?\s*([\d/.\-]{6,10})\s*(?:to|-|–)\s*([\d/.\-]{6,10})',
-        r'from\s*([\d/.\-]{6,10})\s*to\s*([\d/.\-]{6,10})',
+        r'(?:statement period|statement from|period)\s*[:\-]?\s*(' + _DATE_TOKEN + r')\s*(?:to|-|–|—)\s*(' + _DATE_TOKEN + r')',
+        r'from\s*(' + _DATE_TOKEN + r')\s*to\s*(' + _DATE_TOKEN + r')',
+        # Label-less range, e.g. Kotak: "01 Apr 2025 - 31 Mar 2026"
+        r'(' + _DATE_TOKEN + r')\s*(?:to|-|–|—)\s*(' + _DATE_TOKEN + r')',
     ]
     for pat in patterns:
         m = re.search(pat, text, re.IGNORECASE)
         if m:
             start = _normalize_date(m.group(1))
             end   = _normalize_date(m.group(2))
-            if start or end:
+            if start and end:
                 return start, end
     return None, None
 
