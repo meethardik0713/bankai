@@ -294,6 +294,51 @@ def _clear_locked_hash(user_id: str):
         logger.exception("Failed to clear statement_hash: %s", e)
 
 
+def _stash_pending_pdf(file_storage, user_id: str, fhash: str, safe_name: str):
+    """Keep a rejected (new) statement so it can be processed right after payment."""
+    try:
+        path = os.path.join(app.config['UPLOAD_FOLDER'], f'pending_{user_id}_{fhash}.pdf')
+        file_storage.stream.seek(0)
+        file_storage.save(path)
+        session['pending_pdf']  = path
+        session['pending_hash'] = fhash
+        session['pending_name'] = safe_name
+    except Exception as e:
+        logger.exception("Failed to stash pending PDF: %s", e)
+
+
+def _process_pending_pdf(user_id: str):
+    """Parse the statement uploaded before payment. Returns an error string or None."""
+    path  = session.get('pending_pdf')
+    fhash = session.get('pending_hash')
+    name  = session.get('pending_name', 'statement.pdf')
+    error = None
+    try:
+        if not path or not fhash or not os.path.exists(path):
+            error = 'Session expired. Please re-upload the PDF.'
+        else:
+            transactions = parse_transactions(path)
+            if transactions:
+                vr = validate_and_fix(transactions)
+                transactions = vr['transactions']
+                _cache_set(fhash, transactions, name)
+                session['file_hash'] = fhash
+                session['file_name'] = name
+                if _get_locked_hash(user_id) is None:
+                    _set_locked_hash(user_id, fhash)
+            else:
+                error = 'No transactions found in PDF.'
+    except Exception as e:
+        logger.exception("Pending PDF parse error: %s", e)
+        error = f'Could not parse: {e}'
+    finally:
+        if path and os.path.exists(path):
+            os.remove(path)
+        for k in ('pending_pdf', 'pending_hash', 'pending_name'):
+            session.pop(k, None)
+    return error
+
+
 # ═══════════════════════════════════════════════════════════
 #  AUTH ROUTES
 # ═══════════════════════════════════════════════════════════
@@ -456,7 +501,11 @@ def verify_payment():
 
         previous_lock = _get_locked_hash(user_id)
         current_hash  = session.get('file_hash')
-        if current_hash and current_hash != previous_lock:
+        if session.get('pending_hash'):
+            _clear_locked_hash(user_id)
+            session.pop('file_hash', None)
+            session.pop('file_name', None)
+        elif current_hash and current_hash != previous_lock:
             _set_locked_hash(user_id, current_hash)
         elif previous_lock:
             _clear_locked_hash(user_id)
@@ -707,6 +756,7 @@ def home():
                         locked_hash = _get_locked_hash(user_id)
                         if locked_hash and locked_hash != fhash:
                             error_message = NEW_STATEMENT_ERROR
+                            _stash_pending_pdf(file, user_id, fhash, safe_name)
 
                 if not error_message:
                     cached = _cache_get(fhash)
@@ -1580,6 +1630,11 @@ def dashboard_page():
     data          = None
     error_message = ''
 
+    if session.get('pending_hash') and _get_locked_hash(user_id) is None:
+        pending_error = _process_pending_pdf(user_id)
+        if pending_error:
+            error_message = pending_error
+
     src_hash = request.args.get('src', '').strip()
     if src_hash:
         cached = _cache_get(src_hash)
@@ -1661,6 +1716,7 @@ def dashboard_analyze():
         locked_hash = _get_locked_hash(user_id)
 
         if locked_hash and locked_hash != fhash:
+            _stash_pending_pdf(file, user_id, fhash, safe_name)
             return render_template('dashboard.html',
                 data          = None,
                 error_message = NEW_STATEMENT_ERROR,
