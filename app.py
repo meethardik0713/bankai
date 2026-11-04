@@ -454,9 +454,11 @@ def verify_payment():
             'output_tokens_used': 0,
         }).execute()
 
-        _clear_locked_hash(user_id)
-        session.pop('file_hash', None)
-        session.pop('file_name', None)
+        current_hash = session.get('file_hash')
+        if current_hash:
+            _set_locked_hash(user_id, current_hash)
+        else:
+            _clear_locked_hash(user_id)
 
         ph_track(user_id, event='payment_completed', props={
             'amount_inr': 49,
@@ -3962,6 +3964,7 @@ def kill_sw():
 if __name__ == '__main__':
     debug_mode = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
     app.run(debug=debug_mode)
+    
     
 
     
