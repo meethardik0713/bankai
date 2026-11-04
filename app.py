@@ -164,6 +164,18 @@ _CACHE_TTL  = 1800
 PAGE_SIZE   = 100
 _PDF_MAGIC  = b'%PDF'
 
+# Disk cache shared by all gunicorn workers (memory cache is per-process)
+_CACHE_DIR = os.path.join(UPLOAD_FOLDER, '_cache')
+os.makedirs(_CACHE_DIR, exist_ok=True)
+
+
+def _cache_path(file_hash: str):
+    import re
+    if isinstance(file_hash, str) and re.fullmatch(r'[0-9a-f]{32}', file_hash):
+        return os.path.join(_CACHE_DIR, file_hash + '.pkl')
+    return None
+
+
 def _cache_get(file_hash: str):
     with _CACHE_LOCK:
         entry = _CACHE.get(file_hash)
@@ -171,15 +183,46 @@ def _cache_get(file_hash: str):
             return entry
         if entry:
             del _CACHE[file_hash]
-        return None
+
+    path = _cache_path(file_hash)
+    if path and os.path.exists(path):
+        try:
+            import pickle
+            with open(path, 'rb') as f:
+                entry = pickle.load(f)
+            if (time.time() - entry['ts']) < _CACHE_TTL:
+                with _CACHE_LOCK:
+                    _CACHE[file_hash] = entry
+                return entry
+            os.remove(path)
+        except Exception as e:
+            logger.exception("Disk cache read failed: %s", e)
+    return None
 
 
 def _cache_set(file_hash: str, transactions: list, filename: str):
+    entry = {'transactions': transactions, 'filename': filename, 'ts': time.time()}
     with _CACHE_LOCK:
         if len(_CACHE) >= 10:
             oldest = min(_CACHE, key=lambda k: _CACHE[k]['ts'])
             del _CACHE[oldest]
-        _CACHE[file_hash] = {'transactions': transactions, 'filename': filename, 'ts': time.time()}
+        _CACHE[file_hash] = entry
+
+    path = _cache_path(file_hash)
+    if path:
+        try:
+            import pickle
+            tmp = path + '.tmp'
+            with open(tmp, 'wb') as f:
+                pickle.dump(entry, f)
+            os.replace(tmp, path)
+            now = time.time()
+            for name in os.listdir(_CACHE_DIR):
+                fp = os.path.join(_CACHE_DIR, name)
+                if name.endswith('.pkl') and now - os.path.getmtime(fp) > _CACHE_TTL:
+                    os.remove(fp)
+        except Exception as e:
+            logger.exception("Disk cache write failed: %s", e)
 
 
 def _file_hash(file_storage) -> str:
@@ -1121,6 +1164,9 @@ def clear_cache():
     if fhash:
         with _CACHE_LOCK:
             _CACHE.pop(fhash, None)
+        path = _cache_path(fhash)
+        if path and os.path.exists(path):
+            os.remove(path)
     return ('', 204)
 
 
