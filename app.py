@@ -391,7 +391,7 @@ def create_order():
         logger.info("Order created: %s for %s", order['id'], user_email)
         return jsonify({
             'order_id': order['id'],
-            'amount':   1000,
+            'amount':   4900,
             'currency': 'INR',
             'key_id':   RAZORPAY_KEY_ID,
             'email':    user_email,
@@ -454,9 +454,14 @@ def verify_payment():
             'output_tokens_used': 0,
         }).execute()
 
-        current_hash = session.get('file_hash')
-        if current_hash:
+        previous_lock = _get_locked_hash(user_id)
+        current_hash  = session.get('file_hash')
+        if current_hash and current_hash != previous_lock:
             _set_locked_hash(user_id, current_hash)
+        elif previous_lock:
+            _clear_locked_hash(user_id)
+            session.pop('file_hash', None)
+            session.pop('file_name', None)
         else:
             _clear_locked_hash(user_id)
 
@@ -3964,7 +3969,7 @@ def kill_sw():
 if __name__ == '__main__':
     debug_mode = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
     app.run(debug=debug_mode)
-    
+
     
 
     
