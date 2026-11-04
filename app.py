@@ -797,9 +797,6 @@ def home():
                     has_active  = bool(active_sess)
                     if has_active:
                         locked_hash = _get_locked_hash(user_id)
-                        if locked_hash and locked_hash != fhash:
-                            error_message = NEW_STATEMENT_ERROR
-                            _stash_pending_pdf(file, user_id, fhash, safe_name)
 
                 if not error_message:
                     cached = _cache_get(fhash)
@@ -1691,6 +1688,8 @@ def dashboard_page():
     else:
         cached_hash = session.get('file_hash')
         locked_hash = _get_locked_hash(user_id)
+        if cached_hash and locked_hash and cached_hash != locked_hash:
+            return redirect('/pay')
         if cached_hash and (not locked_hash or cached_hash == locked_hash):
             cached = _cache_get(cached_hash)
             if cached:
