@@ -464,7 +464,7 @@ def verify_payment():
             'order_id':   razorpay_order_id,
         })
         logger.info("Payment verified + session created for %s", user_email)
-        return jsonify({'success': True, 'redirect': '/chat'})
+        return jsonify({'success': True, 'redirect': '/dashboard'})
 
     except Exception as e:
         logger.exception("Post-payment DB error: %s", e)
@@ -477,6 +477,10 @@ def verify_payment():
 
 @app.route('/chat', methods=['GET', 'POST'])
 def chat_page():
+    return redirect('/dashboard')
+
+
+def _old_chat_page_disabled():
     is_logged_in, user_email, user_id = _get_current_user()
     if not is_logged_in:
         return redirect('/login')
